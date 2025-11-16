@@ -5,7 +5,7 @@ import { Label } from '../ui/label.js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../lib/supabaseClient'; // correct path
 
 interface LoginFormProps {
   onLogin: (user: any) => void;
@@ -22,24 +22,53 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
     e.preventDefault();
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    try {
+      // Sign in with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        toast.error(error.message);
+      } else if (data.user) {
+        // Fetch user profile from "profiles" table
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+          toast.error('Failed to fetch profile: ' + profileError.message);
+        } else {
+          toast.success('Login successful!');
+          onLogin(profileData);
+        }
+      }
+    } catch (err: any) {
+      toast.error('Unexpected error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle forgot password
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast.error('Please enter your email first.');
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password', // optional redirect page
     });
 
     if (error) {
       toast.error(error.message);
-    } else if (data.user) {
-      toast.success('Login successful!');
-      onLogin({
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.user_metadata.name || data.user.email,
-        role: data.user.user_metadata.role || 'student',
-      });
+    } else {
+      toast.success('Password reset email sent! Check your inbox.');
     }
-
-    setLoading(false);
   };
 
   return (
@@ -62,7 +91,7 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
                 <Input
                   id="email"
                   type="email"
-                  placeholder="e.g., student@utm.my"
+                  placeholder="e.g., student@utm.my or cafeteria@utm.my"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -88,6 +117,17 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+
+                {/* Forgot Password */}
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-purple-700 hover:underline text-sm"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </div>
 
               <Button
@@ -100,6 +140,9 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
               </Button>
 
               <div className="text-center space-y-2">
+                <p className="text-sm text-slate-600">
+                  Demo: Use any email (try "cafeteria@utm.my" for cafeteria staff role)
+                </p>
                 <p className="text-sm text-slate-600">
                   Don't have an account?{' '}
                   <button

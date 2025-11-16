@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient'; // correct path
+import { supabase } from '../../lib/supabaseClient'; // adjust path
 
 interface RegisterFormProps {
   onRegister: () => void;
@@ -34,49 +34,55 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
     setLoading(true);
 
-    // 1. Register user in Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          name: formData.name,
-          role: formData.role,
+    try {
+      // 1. Register user in Supabase Auth without auto-login
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            name: formData.name,
+            role: formData.role,
+          },
+          emailRedirectTo: window.location.origin + '/login', // stay on login page
         },
-      },
-    });
+      });
 
-    if (error) {
-      toast.error(error.message);
-      setLoading(false);
-      return;
-    }
-
-    // 2. Insert user profile in the "profiles" table
-    if (data.user) {
-      const { error: profileError } = await supabase.from('profiles').insert([
-        {
-          id: data.user.id, // same as auth user ID
-          name: formData.name,
-          email: formData.email,
-          role: formData.role,
-        },
-      ]);
-
-      if (profileError) {
-        toast.error('Failed to create profile: ' + profileError.message);
-      } else {
-        toast.success('Registration successful! Please check your email for verification.');
-        onRegister();
+      if (error) {
+        toast.error(error.message);
+        setLoading(false);
+        return;
       }
-    }
 
-    setLoading(false);
+      // 2. Insert user profile in "profiles" table
+      if (data.user) {
+        const { error: profileError } = await supabase.from('profiles').insert([
+          {
+            id: data.user.id,
+            name: formData.name,
+            email: formData.email,
+            role: formData.role,
+          },
+        ]);
+
+        if (profileError) {
+          toast.error('Failed to create profile: ' + profileError.message);
+        } else {
+          toast.success('Registration successful! Please login.');
+          onRegister(); // redirect to login page
+        }
+      }
+    } catch (err: any) {
+      toast.error('Unexpected error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {/* Logo and Title */}
         <div className="text-center mb-8">
           <img src="/UTMMunch-Logo.jpg" alt="UTMMunch Logo" className="h-24 w-auto mx-auto mb-4" />
           <p className="text-slate-600">Create your account to get started with UTMMunch</p>
@@ -115,7 +121,10 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Select value={formData.role} onValueChange={(value: string) => setFormData({ ...formData, role: value })}>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value: string) => setFormData({ ...formData, role: value })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -170,7 +179,11 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
               <p className="text-sm text-center text-slate-600">
                 Already have an account?{' '}
-                <button type="button" onClick={onSwitchToLogin} className="text-purple-700 hover:underline">
+                <button
+                  type="button"
+                  onClick={onSwitchToLogin}
+                  className="text-purple-700 hover:underline"
+                >
                   Login here
                 </button>
               </p>
