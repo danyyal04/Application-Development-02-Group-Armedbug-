@@ -1,21 +1,15 @@
-import { useState } from 'react';
-import { ArrowLeft, CreditCard, Check, AlertCircle, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, CreditCard, AlertCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { Separator } from '../ui/separator.js';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group.js';
 import { Label } from '../ui/label.js';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog.js';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog.js';
 import { Input } from '../ui/input.js';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabaseClient.js';
 
 interface CartItem {
   id: string;
@@ -29,7 +23,10 @@ interface PaymentMethod {
   type: 'fpx' | 'ewallet' | 'card';
   name: string;
   details: string;
-  isDefault: boolean;
+  pin: string;
+  is_default: boolean;
+  balance: number | null;
+  credit_limit: number | null;
 }
 
 interface CheckoutPageProps {
@@ -44,28 +41,62 @@ interface CheckoutPageProps {
 }
 
 export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack, onSuccess }: CheckoutPageProps) {
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showAddPaymentDialog, setShowAddPaymentDialog] = useState(false);
   const [paymentCredentials, setPaymentCredentials] = useState('');
-
-  // Mock saved payment methods
-  const [savedPaymentMethods] = useState<PaymentMethod[]>([
-    { id: '1', type: 'fpx', name: 'Maybank', details: '****1234', isDefault: true },
-    { id: '2', type: 'ewallet', name: 'Touch \'n Go eWallet', details: '012-345-6789', isDefault: false },
-    { id: '3', type: 'card', name: 'Visa', details: '****5678', isDefault: false },
-  ]);
-
   const [newPaymentData, setNewPaymentData] = useState({
     type: 'fpx' as 'fpx' | 'ewallet' | 'card',
     name: '',
     details: '',
   });
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const serviceFee = 0.50;
   const total = subtotal + serviceFee;
+
+  // Fetch payment methods
+  const fetchPayments = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('payment')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true });
+
+    if (error) return toast.error('Failed to load payment methods');
+    if (data) setPaymentMethods(data as PaymentMethod[]);
+
+    // Select default payment if exists
+    const defaultMethod = (data as PaymentMethod[]).find(pm => pm.is_default);
+    if (defaultMethod) setSelectedPaymentId(defaultMethod.id);
+  };
+
+  useEffect(() => {
+    fetchPayments();
+
+    // Subscribe to real-time payment method changes
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const channel = supabase.channel('payment-changes').on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'payment', filter: `user_id=eq.${user.id}` },
+        () => {
+          fetchPayments();
+        }
+      ).subscribe();
+
+      return () => {
+        channel.unsubscribe();
+      };
+    })();
+  }, []);
 
   const getPaymentTypeLabel = (type: string) => {
     switch (type) {
@@ -87,51 +118,105 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
     }
   };
 
-  const handleAddNewPayment = () => {
+  // Add new payment method
+  const handleAddNewPayment = async () => {
     if (!newPaymentData.name || !newPaymentData.details) {
       toast.error('Please fill in all fields');
       return;
     }
 
-    toast.success('Payment method added successfully!');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return toast.error('User not logged in');
+
+    const payload = {
+      user_id: user.id,
+      type: newPaymentData.type,
+      name: newPaymentData.name,
+      details: newPaymentData.details,
+      is_default: paymentMethods.length === 0,
+      balance: newPaymentData.type === 'card' ? null : 100,
+      credit_limit: newPaymentData.type === 'card' ? 500 : null,
+    };
+
+    const { data, error } = await supabase
+      .from('payment')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) return toast.error('Failed to add payment method');
+
+    // ✅ Add to state and select it
+    setPaymentMethods([...paymentMethods, data]);
+    setSelectedPaymentId(data.id);
+
     setShowAddPaymentDialog(false);
     setNewPaymentData({ type: 'fpx', name: '', details: '' });
+    toast.success('Payment method added successfully!');
   };
 
-  const handlePaymentMethodSelect = (paymentId: string) => {
-    setSelectedPaymentId(paymentId);
-  };
+  // Confirm payment and place order
+  const handleConfirmPayment = async () => {
+    if (!selectedPaymentId) return toast.error('Please select a payment method');
 
-  const handleProceedToPayment = () => {
-    if (!selectedPaymentId) {
-      toast.error('Please select a payment method');
-      return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return toast.error('User not logged in');
+
+    const { data: payment } = await supabase
+      .from('payment')
+      .select('*')
+      .eq('id', selectedPaymentId)
+      .single();
+
+    if (!payment) return toast.error('Payment method not found');
+
+    // Check PIN
+    if (payment.pin !== paymentCredentials) {
+      return toast.error('Incorrect PIN');
     }
 
-    setShowPaymentDialog(true);
-  };
-
-  const handleConfirmPayment = () => {
-    if (!paymentCredentials) {
-      toast.error('Invalid payment details. Please check and try again.');
-      return;
+    // Check balance / credit_limit
+    if (payment.type === 'card' && total > payment.credit_limit!) {
+      return toast.error('Credit limit exceeded! Please use another card.');
+    }
+    if ((payment.type === 'fpx' || payment.type === 'ewallet') && total > payment.balance!) {
+      return toast.error('Insufficient balance! Please use another method.');
     }
 
     setIsProcessing(true);
 
-    // Simulate payment gateway processing
-    setTimeout(() => {
-      const isSuccess = Math.random() > 0.1; // 90% success rate for demo
+    // Place order
+    const { error: orderError } = await supabase
+      .from('orders')
+      .insert([{
+        user_id: user.id,
+        total_amount: total,
+        payment_id: payment.id,
+        items: JSON.stringify(cartItems),
+      }]);
 
-      if (isSuccess) {
-        toast.success('Payment successful! Your order is being prepared.');
-        setShowPaymentDialog(false);
-        onSuccess();
-      } else {
-        toast.error('Payment failed or cancelled. Please try again.');
-        setIsProcessing(false);
-      }
-    }, 2000);
+    if (orderError) {
+      setIsProcessing(false);
+      return toast.error('Failed to place order');
+    }
+
+    // Deduct balance/credit
+    const { error: updateError } = await supabase
+      .from('payment')
+      .update({
+        balance: payment.balance ? payment.balance - total : payment.balance,
+        credit_limit: payment.credit_limit ? payment.credit_limit - total : payment.credit_limit,
+      })
+      .eq('id', selectedPaymentId);
+
+    if (updateError) {
+      setIsProcessing(false);
+      return toast.error('Payment failed');
+    }
+
+    toast.success('Payment successful! Your order is being prepared.');
+    setShowPaymentDialog(false);
+    onSuccess();
   };
 
   return (
@@ -139,15 +224,14 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
       {/* Header */}
       <div className="mb-8">
         <Button variant="ghost" onClick={onBack} className="mb-4 -ml-2">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Menu
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Menu
         </Button>
         <h1 className="text-slate-900 mb-2">Checkout 💳</h1>
         <p className="text-slate-600">Review your order and complete payment</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Order Summary */}
+        {/* Order & Payment */}
         <div className="lg:col-span-2 space-y-6">
           {/* Pickup Details */}
           <Card>
@@ -155,102 +239,58 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
               <CardTitle>Pickup Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Cafeteria</span>
-                <span className="text-slate-900">{cafeteria.name}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Location</span>
-                <span className="text-slate-900">{cafeteria.location}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Pickup Time</span>
-                <Badge className="bg-purple-600">
-                  <Clock className="w-3 h-3 mr-1" />
-                  {getPickupTimeLabel(pickupTime)}
-                </Badge>
+              <div className="flex justify-between"><span className="text-slate-600">Cafeteria</span><span className="text-slate-900">{cafeteria.name}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">Location</span><span className="text-slate-900">{cafeteria.location}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">Pickup Time</span>
+                <Badge className="bg-purple-600"><Clock className="w-3 h-3 mr-1" />{getPickupTimeLabel(pickupTime)}</Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* Order Items */}
+          {/* Order Summary */}
           <Card>
             <CardHeader>
               <CardTitle>Order Summary</CardTitle>
               <CardDescription>{cartItems.length} items</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {cartItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between py-2">
-                    <div className="flex-1">
-                      <p className="text-slate-900">{item.name}</p>
-                      <p className="text-sm text-slate-500">Qty: {item.quantity}</p>
-                    </div>
-                    <p className="text-slate-900">RM {(item.price * item.quantity).toFixed(2)}</p>
-                  </div>
-                ))}
-              </div>
+            <CardContent className="space-y-3">
+              {cartItems.map(item => (
+                <div key={item.id} className="flex justify-between py-2">
+                  <div><p className="text-slate-900">{item.name}</p><p className="text-sm text-slate-500">Qty: {item.quantity}</p></div>
+                  <p className="text-slate-900">RM {(item.price * item.quantity).toFixed(2)}</p>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
-          {/* Payment Method Selection */}
+          {/* Payment Method */}
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Payment Method</CardTitle>
-                  <CardDescription>Select your preferred payment option</CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddPaymentDialog(true)}
-                >
-                  Add New
-                </Button>
-              </div>
+            <CardHeader className="flex justify-between">
+              <div><CardTitle>Payment Method</CardTitle><CardDescription>Select your preferred payment option</CardDescription></div>
+              <Button variant="outline" size="sm" onClick={() => setShowAddPaymentDialog(true)}>Add New</Button>
             </CardHeader>
             <CardContent>
-              {savedPaymentMethods.length === 0 ? (
+              {paymentMethods.length === 0 ? (
                 <div className="text-center py-8">
                   <CreditCard className="w-12 h-12 mx-auto mb-4 text-slate-300" />
                   <p className="text-slate-500 mb-4">No payment methods found.</p>
-                  <Button onClick={() => setShowAddPaymentDialog(true)}>
-                    Add Payment Method
-                  </Button>
+                  <Button onClick={() => setShowAddPaymentDialog(true)}>Add Payment Method</Button>
                 </div>
               ) : (
-                <RadioGroup value={selectedPaymentId} onValueChange={handlePaymentMethodSelect}>
-                  <div className="space-y-3">
-                    {savedPaymentMethods.map((method) => (
-                      <div
-                        key={method.id}
-                        className={`flex items-center space-x-3 p-4 border rounded-lg cursor-pointer transition-colors ${
-                          selectedPaymentId === method.id
-                            ? 'border-purple-600 bg-purple-50'
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                        onClick={() => handlePaymentMethodSelect(method.id)}
-                      >
-                        <RadioGroupItem value={method.id} id={method.id} />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Label htmlFor={method.id} className="cursor-pointer text-slate-900">
-                              {method.name}
-                            </Label>
-                            {method.isDefault && (
-                              <Badge variant="secondary" className="text-xs">Default</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-slate-600">
-                            {getPaymentTypeLabel(method.type)} • {method.type === 'ewallet' ? method.details : `****${method.details}`}
-                          </p>
+                <RadioGroup value={selectedPaymentId} onValueChange={setSelectedPaymentId} className="space-y-3">
+                  {paymentMethods.map(pm => (
+                    <div key={pm.id} className={`flex items-center space-x-3 p-4 border rounded-lg cursor-pointer ${selectedPaymentId === pm.id ? 'border-purple-600 bg-purple-50' : 'border-slate-200 hover:border-slate-300'}`} onClick={() => setSelectedPaymentId(pm.id)}>
+                      <RadioGroupItem value={pm.id} id={pm.id} />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor={pm.id} className="cursor-pointer text-slate-900">{pm.name}</Label>
+                          {pm.is_default && <Badge variant="secondary" className="text-xs">Default</Badge>}
                         </div>
-                        <CreditCard className="w-5 h-5 text-slate-400" />
+                        <p className="text-sm text-slate-600">{getPaymentTypeLabel(pm.type)} • {(pm.type === 'fpx' || pm.type === 'ewallet') ? `Balance: RM ${pm.balance?.toFixed(2)}` : `Limit: RM ${pm.credit_limit?.toFixed(2)}`}</p>
                       </div>
-                    ))}
-                  </div>
+                      <CreditCard className="w-5 h-5 text-slate-400" />
+                    </div>
+                  ))}
                 </RadioGroup>
               )}
             </CardContent>
@@ -260,169 +300,89 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
         {/* Price Summary */}
         <div className="lg:col-span-1">
           <Card className="sticky top-20">
-            <CardHeader>
-              <CardTitle>Price Summary</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Price Summary</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <div className="flex justify-between text-slate-600">
-                  <span>Subtotal</span>
-                  <span>RM {subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Service Fee</span>
-                  <span>RM {serviceFee.toFixed(2)}</span>
-                </div>
+                <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>RM {subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between text-slate-600"><span>Service Fee</span><span>RM {serviceFee.toFixed(2)}</span></div>
               </div>
               <Separator />
-              <div className="flex justify-between text-slate-900">
-                <span>Total</span>
-                <span>RM {total.toFixed(2)}</span>
-              </div>
-
-              <Button
-                className="w-full text-white hover:opacity-90"
-                style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
-                onClick={handleProceedToPayment}
-                disabled={!selectedPaymentId}
-              >
-                Place Order
-              </Button>
-
+              <div className="flex justify-between text-slate-900"><span>Total</span><span>RM {total.toFixed(2)}</span></div>
+              <Button className="w-full text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }} onClick={() => setShowPaymentDialog(true)} disabled={!selectedPaymentId}>Place Order</Button>
               <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
-                <p className="text-xs text-blue-800">
-                  Your payment will be processed securely. Please collect your order at the specified pickup time.
-                </p>
+                <p className="text-xs text-blue-800">Your payment will be processed securely. Please collect your order at the specified pickup time.</p>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Payment Gateway Dialog */}
+      {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Complete Payment</DialogTitle>
-            <DialogDescription>
-              Enter your credentials to process payment
-            </DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Complete Payment</DialogTitle><DialogDescription>Enter your PIN / credentials to process payment</DialogDescription></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="p-4 bg-slate-50 rounded-lg space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Amount</span>
-                <span className="text-slate-900">RM {total.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Payment Method</span>
-                <span className="text-slate-900">
-                  {savedPaymentMethods.find(m => m.id === selectedPaymentId)?.name}
-                </span>
-              </div>
+              <div className="flex justify-between text-sm"><span className="text-slate-600">Amount</span><span className="text-slate-900">RM {total.toFixed(2)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-slate-600">Payment Method</span><span className="text-slate-900">{paymentMethods.find(m => m.id === selectedPaymentId)?.name}</span></div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="credentials">
-                {savedPaymentMethods.find(m => m.id === selectedPaymentId)?.type === 'fpx'
-                  ? 'Banking Username/PIN'
-                  : savedPaymentMethods.find(m => m.id === selectedPaymentId)?.type === 'ewallet'
-                  ? 'E-Wallet PIN'
-                  : 'Card CVV'}
-              </Label>
-              <Input
-                id="credentials"
-                type="password"
-                placeholder="Enter credentials"
-                value={paymentCredentials}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentCredentials(e.target.value)}
-              />
+              <Label htmlFor="credentials">Enter PIN to confirm payment</Label>
+              <Input id="credentials" type="password" placeholder="Enter PIN" value={paymentCredentials} onChange={e => setPaymentCredentials(e.target.value)} />
             </div>
 
             <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
               <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5" />
-              <p className="text-xs text-amber-800">
-                Demo mode: Enter any credentials to simulate payment
-              </p>
+              <p className="text-xs text-amber-800">Demo mode: Enter your PIN / credentials to simulate payment</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowPaymentDialog(false)}
-              disabled={isProcessing}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmPayment}
-              disabled={isProcessing}
-              className="flex-1 text-white hover:opacity-90"
-              style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
-            >
-              {isProcessing ? 'Processing...' : 'Confirm Payment'}
-            </Button>
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)} disabled={isProcessing} className="flex-1">Cancel</Button>
+            <Button onClick={handleConfirmPayment} disabled={isProcessing} className="flex-1 text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>{isProcessing ? 'Processing...' : 'Confirm Payment'}</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Add Payment Method Dialog */}
+      {/* Add Payment Dialog */}
       <Dialog open={showAddPaymentDialog} onOpenChange={setShowAddPaymentDialog}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Payment Method</DialogTitle>
-            <DialogDescription>
-              Add a payment method to use for your orders
-            </DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Add New Payment Method</DialogTitle><DialogDescription>Add a payment method to use for your orders</DialogDescription></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="type">Payment Type</Label>
-              <Select
+              <Label>Payment Type</Label>
+              <select
+                className="w-full rounded-md border bg-input-background px-3 py-2 text-sm"
                 value={newPaymentData.type}
-                onValueChange={(value: any) => setNewPaymentData({ ...newPaymentData, type: value })}
+                onChange={(e) => setNewPaymentData({ ...newPaymentData, type: e.target.value as any, name: '', details: '' })}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fpx">FPX Online Banking</SelectItem>
-                  <SelectItem value="ewallet">E-Wallet</SelectItem>
-                  <SelectItem value="card">Debit/Credit Card</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="fpx">FPX Online Banking</option>
+                <option value="ewallet">E-Wallet</option>
+                <option value="card">Debit/Credit Card</option>
+              </select>
             </div>
 
+            {/* Conditional fields */}
             {newPaymentData.type === 'fpx' && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="bank">Bank Name</Label>
-                  <Select
+                  <Label>Bank</Label>
+                  <select
+                    className="w-full rounded-md border bg-input-background px-3 py-2 text-sm"
                     value={newPaymentData.name}
-                    onValueChange={(value: string) => setNewPaymentData({ ...newPaymentData, name: value })}
+                    onChange={(e) => setNewPaymentData({ ...newPaymentData, name: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select bank" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Maybank">Maybank</SelectItem>
-                      <SelectItem value="CIMB Bank">CIMB Bank</SelectItem>
-                      <SelectItem value="Public Bank">Public Bank</SelectItem>
-                      <SelectItem value="RHB Bank">RHB Bank</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select bank</option>
+                    <option value="Maybank">Maybank</option>
+                    <option value="CIMB">CIMB</option>
+                    <option value="Public Bank">Public Bank</option>
+                    <option value="RHB">RHB</option>
+                  </select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="account">Account Number (Last 4 digits)</Label>
-                  <Input
-                    id="account"
-                    placeholder="1234"
-                    maxLength={4}
-                    value={newPaymentData.details}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPaymentData({ ...newPaymentData, details: e.target.value })}
-                  />
+                  <Label>Account Last 4 digits</Label>
+                  <Input placeholder="1234" maxLength={4} value={newPaymentData.details} onChange={e => setNewPaymentData({ ...newPaymentData, details: e.target.value })} />
                 </div>
               </>
             )}
@@ -430,29 +390,21 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
             {newPaymentData.type === 'ewallet' && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="wallet">E-Wallet Provider</Label>
-                  <Select
+                  <Label>E-Wallet</Label>
+                  <select
+                    className="w-full rounded-md border bg-input-background px-3 py-2 text-sm"
                     value={newPaymentData.name}
-                    onValueChange={(value: string) => setNewPaymentData({ ...newPaymentData, name: value })}
+                    onChange={(e) => setNewPaymentData({ ...newPaymentData, name: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Touch 'n Go eWallet">Touch 'n Go eWallet</SelectItem>
-                      <SelectItem value="GrabPay">GrabPay</SelectItem>
-                      <SelectItem value="Boost">Boost</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select provider</option>
+                    <option value="TnG">Touch 'n Go</option>
+                    <option value="GrabPay">GrabPay</option>
+                    <option value="ShopeePay">ShopeePay</option>
+                  </select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    placeholder="012-345-6789"
-                    value={newPaymentData.details}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPaymentData({ ...newPaymentData, details: e.target.value })}
-                  />
+                  <Label>Wallet PIN</Label>
+                  <Input placeholder="1234" maxLength={4} value={newPaymentData.details} onChange={e => setNewPaymentData({ ...newPaymentData, details: e.target.value })} />
                 </div>
               </>
             )}
@@ -460,40 +412,19 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
             {newPaymentData.type === 'card' && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="cardType">Card Type</Label>
-                  <Select
-                    value={newPaymentData.name}
-                    onValueChange={(value: string) => setNewPaymentData({ ...newPaymentData, name: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select card type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Visa">Visa</SelectItem>
-                      <SelectItem value="Mastercard">Mastercard</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>Card Name</Label>
+                  <Input placeholder="Visa / Mastercard" value={newPaymentData.name} onChange={e => setNewPaymentData({ ...newPaymentData, name: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cardNumber">Card Number (Last 4 digits)</Label>
-                  <Input
-                    id="cardNumber"
-                    placeholder="5678"
-                    maxLength={4}
-                    value={newPaymentData.details}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPaymentData({ ...newPaymentData, details: e.target.value })}
-                  />
+                  <Label>Card Last 4 digits</Label>
+                  <Input placeholder="1234" maxLength={4} value={newPaymentData.details} onChange={e => setNewPaymentData({ ...newPaymentData, details: e.target.value })} />
                 </div>
               </>
             )}
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowAddPaymentDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddNewPayment} className="text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>
-              Add Method
-            </Button>
+          <div className="flex gap-2 mt-4">
+            <Button variant="outline" onClick={() => setShowAddPaymentDialog(false)} className="flex-1">Cancel</Button>
+            <Button onClick={handleAddNewPayment} className="flex-1 text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>Add Payment</Button>
           </div>
         </DialogContent>
       </Dialog>
