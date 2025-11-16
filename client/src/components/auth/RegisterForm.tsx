@@ -6,8 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient'; // correct path
-
 interface RegisterFormProps {
   onRegister: () => void;
   onSwitchToLogin: () => void;
@@ -26,7 +24,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match!');
       return;
@@ -34,52 +32,23 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
     setLoading(true);
 
-    // 1. Register user in Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          name: formData.name,
-          role: formData.role,
-        },
-      },
-    });
-
-    if (error) {
-      toast.error(error.message);
+    // Simulate API call
+    setTimeout(() => {
+      toast.success('Registration successful! Please check your email for verification.');
+      onRegister();
       setLoading(false);
-      return;
-    }
-
-    // 2. Insert user profile in the "profiles" table
-    if (data.user) {
-      const { error: profileError } = await supabase.from('profiles').insert([
-        {
-          id: data.user.id, // same as auth user ID
-          name: formData.name,
-          email: formData.email,
-          role: formData.role,
-        },
-      ]);
-
-      if (profileError) {
-        toast.error('Failed to create profile: ' + profileError.message);
-      } else {
-        toast.success('Registration successful! Please check your email for verification.');
-        onRegister();
-      }
-    }
-
-    setLoading(false);
+    }, 1000);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {/* Logo and Title */}
         <div className="text-center mb-8">
           <img src="/UTMMunch-Logo.jpg" alt="UTMMunch Logo" className="h-24 w-auto mx-auto mb-4" />
-          <p className="text-slate-600">Create your account to get started with UTMMunch</p>
+          <p className="text-slate-600">
+            Create your account to get started with UTMMunch
+          </p>
         </div>
 
         <Card className="shadow-xl border-slate-200">
@@ -96,7 +65,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                   type="text"
                   placeholder="John Doe"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
               </div>
@@ -108,7 +77,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                   type="email"
                   placeholder="your.email@utm.my"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, email: e.target.value })}
                   required
                 />
               </div>
@@ -134,7 +103,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Create a password"
                     value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, password: e.target.value })}
                     required
                   />
                   <button
@@ -154,7 +123,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                   type="password"
                   placeholder="Confirm your password"
                   value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
                 />
               </div>
@@ -170,7 +139,11 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
               <p className="text-sm text-center text-slate-600">
                 Already have an account?{' '}
-                <button type="button" onClick={onSwitchToLogin} className="text-purple-700 hover:underline">
+                <button
+                  type="button"
+                  onClick={onSwitchToLogin}
+                  className="text-purple-700 hover:underline"
+                >
                   Login here
                 </button>
               </p>

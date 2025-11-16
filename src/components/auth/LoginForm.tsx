@@ -5,6 +5,7 @@ import { Label } from '../ui/label.js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 
 interface LoginFormProps {
   onLogin: (user: any) => void;
@@ -21,35 +22,32 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
     e.preventDefault();
     setLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      // Mock validation
-      if (email && password) {
-        const mockUser = {
-          id: '1',
-          name: email.includes('cafeteria') ? 'Ahmad (Cafe Angkasa)' : 'John Doe',
-          email,
-          role: email.includes('cafeteria') ? 'staff' : 'student',
-        };
-        
-        toast.success('Login successful!');
-        onLogin(mockUser);
-      } else {
-        toast.error('Invalid credentials. Please try again.');
-      }
-      setLoading(false);
-    }, 1000);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      toast.error(error.message);
+    } else if (data.user) {
+      toast.success('Login successful!');
+      onLogin({
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.user_metadata.name || data.user.email,
+        role: data.user.user_metadata.role || 'student',
+      });
+    }
+
+    setLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo and Title */}
         <div className="text-center mb-8">
           <img src="/UTMMunch-Logo.jpg" alt="UTMMunch Logo" className="h-24 w-auto mx-auto mb-4" />
-          <p className="text-slate-600">
-            Welcome back! Please login to your account.
-          </p>
+          <p className="text-slate-600">Welcome back! Please login to your account.</p>
         </div>
 
         <Card className="shadow-xl border-slate-200">
@@ -64,9 +62,9 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
                 <Input
                   id="email"
                   type="email"
-                  placeholder="e.g., student@utm.my or cafeteria@utm.my"
+                  placeholder="e.g., student@utm.my"
                   value={email}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
@@ -79,7 +77,7 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                   />
                   <button
@@ -102,9 +100,6 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
               </Button>
 
               <div className="text-center space-y-2">
-                <p className="text-sm text-slate-600">
-                  Demo: Use any email (try "cafeteria@utm.my" for cafeteria staff role)
-                </p>
                 <p className="text-sm text-slate-600">
                   Don't have an account?{' '}
                   <button
