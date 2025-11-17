@@ -206,7 +206,7 @@ export default function StudentDashboard({ user, currentPage, onNavigate }: Stud
           >
             <div className="aspect-video w-full overflow-hidden bg-slate-100 relative">
               <img
-                src="/UTMMunch-Logo.jpg"
+                src={cafeteria.image || '/UTMMunch-Logo.jpg'}
                 alt={cafeteria.name}
                 className="w-full h-full object-cover"
               />

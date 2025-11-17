@@ -250,7 +250,7 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
             <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-video w-full overflow-hidden bg-slate-100">
                 <img
-                  src="/UTMMunch-Logo.jpg"
+                  src={item.imageUrl || '/UTMMunch-Logo.jpg'}
                   alt={item.name}
                   className="w-full h-full object-cover"
                 />

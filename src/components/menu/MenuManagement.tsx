@@ -263,7 +263,7 @@ export default function MenuManagement() {
               <div className="flex flex-col md:flex-row">
                 <div className="w-full md:w-48 h-48 bg-slate-100">
                   <img
-                    src="/UTMMunch-Logo.jpg"
+                    src={item.imageUrl || '/UTMMunch-Logo.jpg'}
                     alt={item.name}
                     className="w-full h-full object-cover"
                   />
