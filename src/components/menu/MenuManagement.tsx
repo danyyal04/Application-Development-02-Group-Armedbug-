@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '../ui/card.js';
 import { Input } from '../ui/input.js';
@@ -48,8 +48,10 @@ const initialMenuItems: MenuItem[] = [
 ];
 
 export default function MenuManagement() {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [formData, setFormData] = useState({
@@ -61,61 +63,118 @@ export default function MenuManagement() {
     available: true,
   });
 
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        setMenuItems(initialMenuItems);
+        setHasError(false);
+      } catch (error) {
+        setHasError(true);
+        toast.error('Unable to process requests. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchMenu();
+  }, []);
+
   const filteredItems = menuItems.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase())
+    item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAddItem = () => {
-    if (!formData.name || !formData.price) {
-      toast.error('Please fill in all required fields');
+  const validateForm = () => {
+    const priceValue = Number(formData.price);
+    if (!formData.name.trim() || Number.isNaN(priceValue) || priceValue <= 0) {
+      toast.error('Invalid input data. Please check your fields.');
+      return false;
+    }
+    return true;
+  };
+
+  const isDuplicateName = (name: string, excludeId?: string) => {
+    return menuItems.some(item =>
+      item.name.trim().toLowerCase() === name.trim().toLowerCase() &&
+      item.id !== excludeId
+    );
+  };
+
+  const handleSearchSubmit = () => {
+    if (!searchQuery.trim()) {
+      toast.error('Please enter a keyword to search.');
       return;
     }
+    if (filteredItems.length === 0) {
+      toast.error('No items found for your search.');
+    }
+  };
 
+  const handleAddItem = () => {
+    if (!validateForm()) return;
+    if (isDuplicateName(formData.name)) {
+      toast.error('Item already exists.');
+      return;
+    }
+    const priceValue = Number(formData.price);
     const newItem: MenuItem = {
       id: Date.now().toString(),
       name: formData.name,
       description: formData.description,
-      price: parseFloat(formData.price),
+      price: priceValue,
       category: formData.category,
       imageUrl: formData.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c',
       available: formData.available,
     };
 
-    setMenuItems([...menuItems, newItem]);
-    toast.success('Menu item added successfully!');
-    setIsAddDialogOpen(false);
-    resetForm();
+    try {
+      setMenuItems([...menuItems, newItem]);
+      toast.success('Menu item added successfully!');
+      setIsAddDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      toast.error('Unable to process requests. Please try again later.');
+    }
   };
 
   const handleEditItem = () => {
-    if (!editingItem || !formData.name || !formData.price) {
-      toast.error('Please fill in all required fields');
+    if (!editingItem || !validateForm()) return;
+    if (isDuplicateName(formData.name, editingItem.id)) {
+      toast.error('Item already exists.');
       return;
     }
 
-    setMenuItems(menuItems.map(item =>
-      item.id === editingItem.id
-        ? {
-            ...item,
-            name: formData.name,
-            description: formData.description,
-            price: parseFloat(formData.price),
-            category: formData.category,
-            imageUrl: formData.imageUrl || item.imageUrl,
-            available: formData.available,
-          }
-        : item
-    ));
-
-    toast.success('Menu item updated successfully!');
-    setEditingItem(null);
-    resetForm();
+    try {
+      const priceValue = Number(formData.price);
+      setMenuItems(menuItems.map(item =>
+        item.id === editingItem.id
+          ? {
+              ...item,
+              name: formData.name,
+              description: formData.description,
+              price: priceValue,
+              category: formData.category,
+              imageUrl: formData.imageUrl || item.imageUrl,
+              available: formData.available,
+            }
+          : item
+      ));
+      toast.success('Menu item updated successfully!');
+      setEditingItem(null);
+      resetForm();
+    } catch (error) {
+      toast.error('Unable to process requests. Please try again later.');
+    }
   };
 
   const handleDeleteItem = (id: string) => {
-    setMenuItems(menuItems.filter(item => item.id !== id));
-    toast.success('Menu item deleted successfully!');
+    try {
+      setMenuItems(menuItems.filter(item => item.id !== id));
+      toast.success('Menu item deleted successfully!');
+    } catch (error) {
+      toast.error('Unable to process requests. Please try again later.');
+    }
   };
 
   const openEditDialog = (item: MenuItem) => {
@@ -243,17 +302,36 @@ export default function MenuManagement() {
 
       {/* Search Bar */}
       <div className="mb-6">
-        <div className="relative max-w-2xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <Input
-            type="text"
-            placeholder="Search menu items..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col gap-3 max-w-2xl">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Search menu items..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={handleSearchSubmit}>Search</Button>
+            {searchQuery && (
+              <Button variant="outline" onClick={() => setSearchQuery('')}>Clear</Button>
+            )}
+          </div>
         </div>
+        {searchQuery && filteredItems.length === 0 && (
+          <p className="text-sm text-slate-500 mt-2">No items found for your search.</p>
+        )}
       </div>
+
+      {isLoading ? (
+        <div className="text-center py-12 text-slate-500">Loading menu items...</div>
+      ) : hasError ? (
+        <div className="text-center py-12 text-slate-500">Unable to process requests. Please try again later.</div>
+      ) : menuItems.length === 0 ? (
+        <div className="text-center py-12 text-slate-500">No menu items available at the moment.</div>
+      ) : null}
 
       {/* Menu Items List */}
       <div className="space-y-4">

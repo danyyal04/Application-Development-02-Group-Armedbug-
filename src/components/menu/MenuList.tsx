@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, ShoppingCart, Plus, Minus, ArrowLeft, Clock, MapPin, Star } from 'lucide-react';
 import { Card, CardContent } from '../ui/card.js';
 import { Input } from '../ui/input.js';
@@ -25,7 +25,7 @@ const mockMenuItems: MenuItem[] = [
     description: 'Traditional Malaysian rice dish with sambal, anchovies, peanuts, and egg',
     price: 8.50,
     category: 'Main Course',
-    imageUrl: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Nasi_Lemak_dengan_Chili_Nasi_Lemak_dan_Sotong_Pedas%2C_di_Penang_Summer_Restaurant.jpg/500px-Nasi_Lemak_dengan_Chili_Nasi_Lemak_dan_Sotong_Pedas%2C_di_Penang_Summer_Restaurant.jpg',
     available: true,
   },
   {
@@ -34,7 +34,7 @@ const mockMenuItems: MenuItem[] = [
     description: 'Tender chicken served with fragrant rice and special sauce',
     price: 10.00,
     category: 'Main Course',
-    imageUrl: 'https://images.unsplash.com/photo-1588137378633-dea1336ce1e2',
+    imageUrl: 'https://www.ajinomoto.com.my/sites/default/files/styles/large/public/content/recipe/image/2022-10/Honey-Chicken-Rice.jpg?itok=DtEbk8Be',
     available: true,
   },
   {
@@ -43,7 +43,7 @@ const mockMenuItems: MenuItem[] = [
     description: 'Spicy fried noodles with vegetables and your choice of protein',
     price: 7.50,
     category: 'Main Course',
-    imageUrl: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624',
+    imageUrl: 'https://resepichenom.com/images/recipes/mee_goreng.jpg',
     available: true,
   },
   {
@@ -52,7 +52,7 @@ const mockMenuItems: MenuItem[] = [
     description: 'Classic Malaysian pulled tea',
     price: 2.50,
     category: 'Beverages',
-    imageUrl: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f',
+    imageUrl: 'https://delishglobe.com/wp-content/uploads/2025/04/Teh-Tarik-.png',
     available: true,
   },
   {
@@ -70,7 +70,7 @@ const mockMenuItems: MenuItem[] = [
     description: 'Crispy flatbread served with curry dipping sauce',
     price: 4.00,
     category: 'Snacks',
-    imageUrl: 'https://images.unsplash.com/photo-1630383249896-424e482df921',
+    imageUrl: 'https://www.rotinrice.com/wp-content/uploads/2011/04/RotiCanai-1-500x500.jpg',
     available: true,
   },
 ];
@@ -89,14 +89,44 @@ interface MenuListProps {
 
 export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [cart, setCart] = useState<{ [key: string]: number }>({});
   const [pickupTime, setPickupTime] = useState('asap');
 
-  const filteredItems = mockMenuItems.filter(item =>
+  useEffect(() => {
+    const loadMenu = async () => {
+      try {
+        // Simulate database fetch since Supabase table is not yet available
+        await new Promise(resolve => setTimeout(resolve, 300));
+        setMenuItems(mockMenuItems);
+        setHasError(false);
+      } catch (error) {
+        setHasError(true);
+        toast.error('Unable to load menu. Please check your connection.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadMenu();
+  }, []);
+
+  const filteredItems = menuItems.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleSearchSubmit = () => {
+    if (!searchQuery.trim()) {
+      toast.error('Please enter a keyword to search.');
+      return;
+    }
+    if (filteredItems.length === 0) {
+      toast.error('No items found for your search.');
+    }
+  };
 
   const addToCart = (itemId: string) => {
     setCart(prev => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }));
@@ -118,7 +148,7 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
 
   const totalItems = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
   const totalPrice = Object.entries(cart).reduce((sum, [itemId, qty]) => {
-    const item = mockMenuItems.find(i => i.id === itemId);
+    const item = menuItems.find(i => i.id === itemId);
     return sum + (item?.price || 0) * qty;
   }, 0);
 
@@ -135,7 +165,7 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
 
     // Prepare cart items for checkout
     const cartItemsArray = Object.entries(cart).map(([itemId, quantity]) => {
-      const item = mockMenuItems.find(i => i.id === itemId);
+      const item = menuItems.find(i => i.id === itemId);
       return {
         id: itemId,
         name: item?.name || '',
@@ -184,17 +214,36 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
 
       {/* Search Bar */}
       <div className="mb-8">
-        <div className="relative max-w-2xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <Input
-            type="text"
-            placeholder="Search for food, drinks, or categories..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col gap-3 max-w-2xl">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Search for food, drinks, or categories..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={handleSearchSubmit}>Search</Button>
+            {searchQuery && (
+              <Button variant="outline" onClick={() => setSearchQuery('')}>Clear</Button>
+            )}
+          </div>
         </div>
+        {searchQuery && filteredItems.length === 0 && (
+          <p className="text-sm text-slate-500 mt-2">No items found for your search.</p>
+        )}
       </div>
+
+      {isLoading ? (
+        <div className="text-center py-12 text-slate-500">Loading menu items...</div>
+      ) : hasError ? (
+        <div className="text-center py-12 text-slate-500">Unable to load menu. Please check your connection.</div>
+      ) : menuItems.length === 0 ? (
+        <div className="text-center py-12 text-slate-500">No menu items available at the moment.</div>
+      ) : null}
 
       {/* Cart Summary with Pickup Time */}
       {totalItems > 0 && (
