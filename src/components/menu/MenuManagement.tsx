@@ -268,15 +268,26 @@ export default function MenuManagement() {
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="imageUrl">Image URL (optional)</Label>
-                <Input
-                  id="imageUrl"
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="imageUpload">Item Image</Label>
+              {formData.imageUrl && (
+                <img src={formData.imageUrl} alt="Preview" className="w-full h-40 object-cover rounded-md border" />
+              )}
+              <Input
+                id="imageUpload"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setFormData({ ...formData, imageUrl: reader.result as string });
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </div>
               <div className="flex items-center justify-between">
                 <Label htmlFor="available">Available</Label>
                 <input
@@ -423,6 +434,26 @@ export default function MenuManagement() {
                                 </SelectContent>
                               </Select>
                             </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-image">Item Image</Label>
+                            {formData.imageUrl && (
+                              <img src={formData.imageUrl} alt="Preview" className="w-full h-40 object-cover rounded-md border" />
+                            )}
+                            <Input
+                              id="edit-image"
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  setFormData({ ...formData, imageUrl: reader.result as string });
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                            />
                           </div>
                           <div className="flex items-center justify-between">
                             <Label htmlFor="edit-available">Available</Label>
