@@ -33,7 +33,7 @@ const initialMenuItems: MenuItem[] = [
     description: 'Traditional Malaysian rice dish with sambal, anchovies, peanuts, and egg',
     price: 8.50,
     category: 'Main Course',
-    imageUrl: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Nasi_Lemak_dengan_Chili_Nasi_Lemak_dan_Sotong_Pedas%2C_di_Penang_Summer_Restaurant.jpg/500px-Nasi_Lemak_dengan_Chili_Nasi_Lemak_dan_Sotong_Pedas%2C_di_Penang_Summer_Restaurant.jpg',
     available: true,
   },
   {
@@ -42,7 +42,7 @@ const initialMenuItems: MenuItem[] = [
     description: 'Tender chicken served with fragrant rice and special sauce',
     price: 10.00,
     category: 'Main Course',
-    imageUrl: 'https://images.unsplash.com/photo-1588137378633-dea1336ce1e2',
+    imageUrl: 'https://www.ajinomoto.com.my/sites/default/files/styles/large/public/content/recipe/image/2022-10/Honey-Chicken-Rice.jpg?itok=DtEbk8Be',
     available: true,
   },
 ];
@@ -302,21 +302,27 @@ export default function MenuManagement() {
 
       {/* Search Bar */}
       <div className="mb-6">
-        <div className="flex flex-col gap-3 max-w-2xl">
-          <div className="relative">
+        <div className="flex flex-col gap-3 w-full">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <Input
               type="text"
               placeholder="Search menu items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 w-full"
             />
           </div>
-          <div className="flex gap-3">
-            <Button onClick={handleSearchSubmit}>Search</Button>
+          <div className="flex flex-col sm:flex-row gap-3 w-full">
+            <Button className="w-full sm:w-auto" onClick={handleSearchSubmit}>Search</Button>
             {searchQuery && (
-              <Button variant="outline" onClick={() => setSearchQuery('')}>Clear</Button>
+              <Button
+                className="w-full sm:w-auto"
+                variant="outline"
+                onClick={() => setSearchQuery('')}
+              >
+                Clear
+              </Button>
             )}
           </div>
         </div>

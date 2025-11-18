@@ -31,6 +31,7 @@ interface PaymentMethod {
 
 interface CheckoutPageProps {
   cafeteria: {
+    id?: string;
     name: string;
     location: string;
   };
@@ -292,8 +293,12 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
         .from('orders')
         .insert([{
           user_id: user.id,
+          cafeteria_id: cafeteria?.id || null,
           total_amount: total,
           payment_id: payment.id,
+          payment_method: payment.type,
+          status: 'Pending',
+          paid_at: new Date().toISOString(),
           items: JSON.stringify(cartItems),
         }]);
 

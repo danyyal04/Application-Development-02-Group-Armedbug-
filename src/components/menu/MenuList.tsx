@@ -214,21 +214,21 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
 
       {/* Search Bar */}
       <div className="mb-8">
-        <div className="flex flex-col gap-3 max-w-2xl">
-          <div className="relative">
+        <div className="flex flex-col gap-3 w-full">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <Input
               type="text"
               placeholder="Search for food, drinks, or categories..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 w-full"
             />
           </div>
-          <div className="flex gap-3">
-            <Button onClick={handleSearchSubmit}>Search</Button>
+          <div className="flex flex-col sm:flex-row gap-3 w-full">
+            <Button className="w-full sm:w-auto" onClick={handleSearchSubmit}>Search</Button>
             {searchQuery && (
-              <Button variant="outline" onClick={() => setSearchQuery('')}>Clear</Button>
+              <Button className="w-full sm:w-auto" variant="outline" onClick={() => setSearchQuery('')}>Clear</Button>
             )}
           </div>
         </div>

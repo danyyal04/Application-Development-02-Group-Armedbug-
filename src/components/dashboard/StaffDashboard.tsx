@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Package, Users, TrendingUp, Clock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
 import MenuManagement from '../menu/MenuManagement.js';
 import OrderManagement from '../orders/OrderManagement.js';
 import ProfileSettings from '../profile/ProfileSettings.js';
+import PaymentManagement from '../payment/PaymentManagement.js';
+import { supabase } from '../../lib/supabaseClient.js';
 
 interface StaffDashboardProps {
   user: any;
@@ -11,28 +14,66 @@ interface StaffDashboardProps {
 }
 
 export default function StaffDashboard({ user, currentPage, onNavigate }: StaffDashboardProps) {
+  const [profile, setProfile] = useState<any>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchProfile = async () => {
+      setIsProfileLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (!isMounted) return;
+
+      if (!error && data) {
+        setProfile(data);
+      }
+      setIsProfileLoading(false);
+    };
+
+    fetchProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user.id]);
+
+  const cafeteriaId = profile?.cafeteria_id || null;
+
   if (currentPage === 'manage-menu') {
     return <MenuManagement />;
   }
 
   if (currentPage === 'manage-orders') {
-    return <OrderManagement />;
+    if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
+    return <OrderManagement cafeteriaId={cafeteriaId} />;
+  }
+
+  if (currentPage === 'manage-payments') {
+    if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
+    return <PaymentManagement cafeteriaId={cafeteriaId} />;
   }
 
   if (currentPage === 'profile') {
     return <ProfileSettings user={user} />;
   }
 
-  // Dashboard Home
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Welcome Section */}
       <div className="mb-8">
-        <h1 className="text-slate-900 mb-2">{user.name} - Dashboard 🍽️</h1>
-        <p className="text-slate-600">Manage your cafeteria menu and customer pre-orders efficiently.</p>
+        <h1 className="text-slate-900 mb-2">{user.name} - Dashboard ⭐</h1>
+        <p className="text-slate-600">
+          {profile?.cafeteria_name
+            ? `Managing ${profile.cafeteria_name}`
+            : 'Manage your cafeteria menu and customer pre-orders efficiently.'}
+        </p>
       </div>
 
-      {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card className="border-slate-200 hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -79,7 +120,6 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
         </Card>
       </div>
 
-      {/* Recent Activity */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Recent Pre-Orders</CardTitle>
@@ -114,8 +154,7 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate('manage-menu')}>
           <CardHeader>
             <CardTitle className="text-purple-900">Manage Menu</CardTitle>
@@ -127,6 +166,13 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
           <CardHeader>
             <CardTitle className="text-amber-900">Manage Orders</CardTitle>
             <CardDescription className="text-amber-700">Update order status and track progress</CardDescription>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate('manage-payments')}>
+          <CardHeader>
+            <CardTitle className="text-emerald-900">Manage Payments</CardTitle>
+            <CardDescription className="text-emerald-700">View revenue and received payments</CardDescription>
           </CardHeader>
         </Card>
       </div>

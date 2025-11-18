@@ -93,6 +93,17 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                         <ShoppingBag className="w-4 h-4 mr-2" />
                         Manage Orders
                       </Button>
+                      <Button
+                        variant={currentPage === 'manage-payments' ? 'default' : 'ghost'}
+                        onClick={() => {
+                          onNavigate('manage-payments');
+                          setOpen(false);
+                        }}
+                        className="w-full justify-start"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Manage Payments
+                      </Button>
                     </>
                   ) : (
                     <>
@@ -189,6 +200,14 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                 >
                   <ShoppingBag className="w-4 h-4 mr-2" />
                   Manage Orders
+                </Button>
+                <Button
+                  variant={currentPage === 'manage-payments' ? 'default' : 'ghost'}
+                  onClick={() => onNavigate('manage-payments')}
+                  className={currentPage === 'manage-payments' ? 'bg-gradient-to-r from-amber-600 to-orange-600' : ''}
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Manage Payments
                 </Button>
               </>
             ) : (
