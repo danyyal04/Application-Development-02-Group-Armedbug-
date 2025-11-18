@@ -257,7 +257,7 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                 <p className="font-medium">{user.name}</p>
                 <p className="text-sm text-slate-500">{user.email}</p>
                 <p className="text-xs text-slate-400 mt-1">
-                  {user.role === 'staff' ? 'Cafeteria Staff/Owner' : 'UTM Student/Staff'}
+                  {user.role === 'staff' ? 'Cafeteria Owner' : 'Customer'}
                 </p>
               </div>
               <DropdownMenuSeparator />

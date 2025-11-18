@@ -9,7 +9,8 @@ import PaymentMethods from '../payment/PaymentMethods.js';
 import ProfileSettings from '../profile/ProfileSettings.js';
 import CafeteriaList from '../cafeteria/CafeteriaList.js';
 import CheckoutPage from '../checkout/CheckoutPage.js';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabaseClient.js';
 
 interface StudentDashboardProps {
   user: any;
@@ -20,6 +21,19 @@ interface StudentDashboardProps {
 export default function StudentDashboard({ user, currentPage, onNavigate }: StudentDashboardProps) {
   const [selectedCafeteria, setSelectedCafeteria] = useState<any>(null);
   const [checkoutData, setCheckoutData] = useState<any>(null);
+  const [featuredCafeterias, setFeaturedCafeterias] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadFeatured = async () => {
+      const { data } = await supabase
+        .from('cafeterias')
+        .select('*')
+        .order('rating', { ascending: false })
+        .limit(3);
+      setFeaturedCafeterias(data || []);
+    };
+    loadFeatured();
+  }, []);
 
   if (currentPage === 'menu') {
     if (checkoutData) {
@@ -53,7 +67,7 @@ export default function StudentDashboard({ user, currentPage, onNavigate }: Stud
   }
 
   if (currentPage === 'orders') {
-    return <OrderTracking />;
+    return <OrderTracking userId={user.id} />;
   }
 
   if (currentPage === 'payment') {
@@ -65,41 +79,6 @@ export default function StudentDashboard({ user, currentPage, onNavigate }: Stud
   }
 
   // Dashboard Home
-  const featuredCafeterias = [
-    {
-    id: '1',
-    name: 'Sdap Kitchen',
-    location: 'Arked Angkasa',
-    description: 'Popular for Nasi Lemak and local delights',
-    image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTA1bBYahghWetnXzUAQg7Py1auc3ywlT56Jw&s',
-    rating: 4.5,
-    estimatedTime: '15-20 min',
-    isOpen: true,
-    category: 'Malaysian',
-  },
-  {
-    id: '2',
-    name: 'Tok Janggut Cafe',
-    location: 'Scholar Inn',
-    description: 'Western and Asian fusion cuisine',
-    image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSjN80oRsRWFMwUn0lsKpSd6BPg-kiRY1fswQ&s',
-    rating: 4.3,
-    estimatedTime: '10-15 min',
-    isOpen: true,
-    category: 'Western',
-  },
-  {
-    id: '3',
-    name: 'Pak Lah Cafe',
-    location: '',
-    description: 'Best chicken rice and drinks on campus',
-    image: 'https://lh3.googleusercontent.com/gps-cs-s/AG0ilSxc2OKZ_-3H3tUFJJIinRP189crOtOFSluQct7JIyX2ND05LyVXceeb-6MlkDFYoQKo2Mt8LO89Y8kEkhe3h3aynqVlMvqrw-bTs6EJSkzDFONGdCYzcuLIbhKMZlUyFiOm6sB3=s1360-w1360-h1020-rw',
-    rating: 4.7,
-    estimatedTime: '12-18 min',
-    isOpen: true,
-    category: 'Malaysian',
-  },
-  ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

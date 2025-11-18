@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
@@ -20,21 +20,69 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
     password: '',
     confirmPassword: '',
     role: 'student',
+    cafeteriaId: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [cafeterias, setCafeterias] = useState<{ id: string; name: string; location: string | null }[]>([]);
+  const [isLoadingCafeterias, setIsLoadingCafeterias] = useState(false);
+  const [cafeteriaError, setCafeteriaError] = useState('');
+
+  useEffect(() => {
+    const fetchCafeterias = async () => {
+      setIsLoadingCafeterias(true);
+      const { data, error } = await supabase
+        .from('cafeterias')
+        .select('id, name, location')
+        .order('name', { ascending: true });
+
+      if (error) {
+        setCafeteriaError('Unable to load cafeteria list. Please try again later.');
+        setCafeterias([]);
+      } else {
+        setCafeterias(data || []);
+        setCafeteriaError('');
+      }
+      setIsLoadingCafeterias(false);
+    };
+
+    fetchCafeterias();
+  }, []);
+  const emailRegex = useMemo(() => /\S+@\S+\.\S+/, []);
+
+  const validateInputs = () => {
+    if (!formData.name.trim()) {
+      toast.error('Full name is required.');
+      return false;
+    }
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Please provide a valid email address.');
+      return false;
+    }
+    if (formData.password.length < 8) {
+      toast.error('Password must be at least 8 characters long.');
+      return false;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match!');
+      return false;
+    }
+    if (formData.role === 'staff' && !formData.cafeteriaId) {
+      toast.error('Please select your cafeteria.');
+      return false;
+    }
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match!');
-      return;
-    }
+    if (!validateInputs()) return;
 
     setLoading(true);
 
     try {
+      const selectedCafeteria = cafeterias.find(cafeteria => cafeteria.id === formData.cafeteriaId);
+
       // 1. Register user in Supabase Auth without auto-login
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
@@ -56,20 +104,25 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
       // 2. Insert user profile in "profiles" table
       if (data.user) {
-        const { error: profileError } = await supabase.from('profiles').insert([
-          {
-            id: data.user.id,
-            name: formData.name,
-            email: formData.email,
-            role: formData.role,
-          },
-        ]);
+        const profileData: Record<string, any> = {
+          id: data.user.id,
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+        };
+
+        if (formData.role === 'staff') {
+          profileData.cafeteria_id = formData.cafeteriaId;
+          profileData.cafeteria_name = selectedCafeteria?.name || null;
+        }
+
+        const { error: profileError } = await supabase.from('profiles').insert([profileData]);
 
         if (profileError) {
           toast.error('Failed to create profile: ' + profileError.message);
         } else {
           await supabase.auth.signOut();
-          toast.success('Registration successful! Please login.');
+          toast.success('Registration successful! Please verify your email, then login.');
           onRegister(); // redirect to login page
         }
       }
@@ -124,17 +177,49 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                 <Label htmlFor="role">Role</Label>
                 <Select
                   value={formData.role}
-                  onValueChange={(value: string) => setFormData({ ...formData, role: value })}
+                  onValueChange={(value: string) =>
+                    setFormData(prev => ({
+                      ...prev,
+                      role: value,
+                      cafeteriaId: value === 'staff' ? prev.cafeteriaId : '',
+                    }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="student">UTM Student/UTM Staff</SelectItem>
-                    <SelectItem value="staff">Cafeteria Staff/Owner</SelectItem>
+                    <SelectItem value="student">Customer</SelectItem>
+                    <SelectItem value="staff">Cafeteria Owner</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {formData.role === 'staff' && (
+                <div className="space-y-2">
+                  <Label htmlFor="cafeteria">Cafeteria</Label>
+                  <Select
+                    value={formData.cafeteriaId}
+                    onValueChange={(value: string) => setFormData({ ...formData, cafeteriaId: value })}
+                    disabled={isLoadingCafeterias || !!cafeteriaError}
+                  >
+                    <SelectTrigger id="cafeteria">
+                      <SelectValue placeholder={isLoadingCafeterias ? 'Loading cafeterias...' : 'Select your cafeteria'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cafeterias.map(cafeteria => (
+                        <SelectItem key={cafeteria.id} value={cafeteria.id}>
+                          {cafeteria.name}
+                          {cafeteria.location ? ` - ${cafeteria.location}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {cafeteriaError && (
+                    <p className="text-sm text-red-600">{cafeteriaError}</p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>

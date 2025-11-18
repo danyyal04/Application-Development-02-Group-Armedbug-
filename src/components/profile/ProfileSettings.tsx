@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import { User, Mail, Lock, Save } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
 import { Input } from '../ui/input.js';
@@ -7,6 +7,7 @@ import { Button } from '../ui/button.js';
 import { Separator } from '../ui/separator.js';
 import { Switch } from '../ui/switch.js';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabaseClient.js';
 
 interface ProfileSettingsProps {
   user: {
@@ -21,7 +22,7 @@ export default function ProfileSettings({ user }: ProfileSettingsProps) {
   const [formData, setFormData] = useState({
     name: user.name,
     email: user.email,
-    phone: '012-345-6789',
+    phone: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
@@ -32,16 +33,81 @@ export default function ProfileSettings({ user }: ProfileSettingsProps) {
     orderUpdates: true,
     promotions: false,
   });
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
-  const handleSaveProfile = () => {
-    if (!formData.name || !formData.email) {
+  useEffect(() => {
+    let isMounted = true;
+    const loadProfile = async () => {
+      setLoadingProfile(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('name, email, phone, email_notifications, order_updates, promotions')
+        .eq('id', user.id)
+        .single();
+
+      if (!isMounted) return;
+
+      if (!error && data) {
+        setFormData(prev => ({
+          ...prev,
+          name: data.name ?? user.name,
+          email: data.email ?? user.email,
+          phone: data.phone ?? '',
+        }));
+        setPreferences({
+          emailNotifications: data.email_notifications ?? true,
+          orderUpdates: data.order_updates ?? true,
+          promotions: data.promotions ?? false,
+        });
+      }
+      setLoadingProfile(false);
+    };
+
+    loadProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [user.id, user.email, user.name]);
+
+  const handleSaveProfile = async () => {
+    if (!formData.name.trim() || !formData.email.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
-    toast.success('Profile updated successfully!');
+
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim() || null,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      if (formData.email.trim() !== user.email) {
+        const { error: authError } = await supabase.auth.updateUser({
+          email: formData.email.trim(),
+        });
+        if (authError) throw authError;
+        toast.info('Please verify your new email address from the link we just sent.');
+      }
+
+      toast.success('Profile updated successfully!');
+    } catch (err: any) {
+      toast.error(err.message ? `Unable to save profile: ${err.message}` : 'Unable to save profile.');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
       toast.error('Please fill in all password fields');
       return;
@@ -52,18 +118,55 @@ export default function ProfileSettings({ user }: ProfileSettingsProps) {
       return;
     }
 
-    toast.success('Password changed successfully!');
-    setFormData({
-      ...formData,
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    });
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: formData.newPassword,
+      });
+      if (error) throw error;
+      toast.success('Password changed successfully!');
+      setFormData({
+        ...formData,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    } catch (err: any) {
+      toast.error(err.message ? `Unable to change password: ${err.message}` : 'Unable to change password.');
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
-  const handleSavePreferences = () => {
-    toast.success('Preferences saved successfully!');
+  const handleSavePreferences = async () => {
+    setSavingPreferences(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          email_notifications: preferences.emailNotifications,
+          order_updates: preferences.orderUpdates,
+          promotions: preferences.promotions,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      toast.success('Preferences saved successfully!');
+    } catch (err: any) {
+      toast.error(err.message ? `Unable to save preferences: ${err.message}` : 'Unable to save preferences.');
+    } finally {
+      setSavingPreferences(false);
+    }
   };
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  if (loadingProfile) {
+    return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -84,12 +187,7 @@ export default function ProfileSettings({ user }: ProfileSettingsProps) {
             <Label htmlFor="name">Full Name</Label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
-                className="pl-10"
-              />
+              <Input id="name" value={formData.name} onChange={handleInputChange} className="pl-10" />
             </div>
           </div>
 
@@ -97,36 +195,31 @@ export default function ProfileSettings({ user }: ProfileSettingsProps) {
             <Label htmlFor="email">Email</Label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, email: e.target.value })}
-                className="pl-10"
-              />
+              <Input id="email" type="email" value={formData.email} onChange={handleInputChange} className="pl-10" />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              value={formData.phone}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
-            />
+            <Input id="phone" value={formData.phone} onChange={handleInputChange} placeholder="012-345-6789" />
           </div>
 
           <div className="space-y-2">
             <Label>Account Type</Label>
-            <Input 
-              value={user.role === 'staff' ? 'Cafeteria Staff/Owner' : 'UTM Student/Staff'} 
-              disabled 
+            <Input
+              value={user.role === 'staff' ? 'Cafeteria Owner' : 'Customer'}
+              disabled
             />
           </div>
 
-          <Button onClick={handleSaveProfile} className="text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>
+          <Button
+            onClick={handleSaveProfile}
+            className="text-white hover:opacity-90"
+            style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
+            disabled={savingProfile}
+          >
             <Save className="w-4 h-4 mr-2" />
-            Save Profile
+            {savingProfile ? 'Saving...' : 'Save Profile'}
           </Button>
         </CardContent>
       </Card>
@@ -146,7 +239,7 @@ export default function ProfileSettings({ user }: ProfileSettingsProps) {
                 id="currentPassword"
                 type="password"
                 value={formData.currentPassword}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, currentPassword: e.target.value })}
+                onChange={handleInputChange}
                 className="pl-10"
               />
             </div>
@@ -160,7 +253,7 @@ export default function ProfileSettings({ user }: ProfileSettingsProps) {
                 id="newPassword"
                 type="password"
                 value={formData.newPassword}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, newPassword: e.target.value })}
+                onChange={handleInputChange}
                 className="pl-10"
               />
             </div>
@@ -174,14 +267,14 @@ export default function ProfileSettings({ user }: ProfileSettingsProps) {
                 id="confirmPassword"
                 type="password"
                 value={formData.confirmPassword}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                onChange={handleInputChange}
                 className="pl-10"
               />
             </div>
           </div>
 
-          <Button onClick={handleChangePassword} variant="outline">
-            Change Password
+          <Button onClick={handleChangePassword} variant="outline" disabled={changingPassword}>
+            {changingPassword ? 'Updating...' : 'Change Password'}
           </Button>
         </CardContent>
       </Card>
@@ -230,9 +323,14 @@ export default function ProfileSettings({ user }: ProfileSettingsProps) {
             />
           </div>
 
-          <Button onClick={handleSavePreferences} className="text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>
+          <Button
+            onClick={handleSavePreferences}
+            className="text-white hover:opacity-90"
+            style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
+            disabled={savingPreferences}
+          >
             <Save className="w-4 h-4 mr-2" />
-            Save Preferences
+            {savingPreferences ? 'Saving...' : 'Save Preferences'}
           </Button>
         </CardContent>
       </Card>

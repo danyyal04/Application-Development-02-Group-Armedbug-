@@ -44,42 +44,6 @@ interface OrderManagementProps {
   cafeteriaId?: string | null;
 }
 
-const MOCK_ORDERS: Order[] = [
-  {
-    id: 'ORD-1001',
-    customer: 'Irfan Danial',
-    items: [{ name: 'Nasi Lemak', quantity: 1 }, { name: 'Teh Tarik', quantity: 1 }],
-    total: 12.5,
-    status: 'Pending',
-    createdAt: new Date().toISOString(),
-    paidAt: new Date().toISOString(),
-    paymentMethod: 'fpx',
-    queueNumber: 'A12',
-  },
-  {
-    id: 'ORD-1000',
-    customer: 'Kanade',
-    items: [{ name: 'Chicken Rice', quantity: 1 }],
-    total: 10,
-    status: 'Cooking',
-    createdAt: new Date(Date.now() - 15 * 60000).toISOString(),
-    paidAt: new Date(Date.now() - 15 * 60000).toISOString(),
-    paymentMethod: 'ewallet',
-    queueNumber: 'A11',
-  },
-  {
-    id: 'ORD-0999',
-    customer: 'Nurul Aina',
-    items: [{ name: 'Mee Goreng', quantity: 2 }],
-    total: 15,
-    status: 'Ready for Pickup',
-    createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
-    paidAt: null,
-    paymentMethod: 'card',
-    queueNumber: 'A10',
-  },
-];
-
 export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,7 +54,7 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
 
     const loadOrders = async () => {
       if (!cafeteriaId) {
-        setOrders(MOCK_ORDERS);
+        setOrders([]);
         setIsLoading(false);
         return;
       }
@@ -116,13 +80,13 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
           paymentMethod: order.payment_method,
           queueNumber: order.queue_number || '—',
         }));
-        setOrders(mapped.length ? mapped : MOCK_ORDERS);
+        setOrders(mapped);
         setHasError(false);
       } catch (error) {
         if (!isMounted) return;
         setHasError(true);
         toast.error('Unable to process requests. Please try again later.');
-        setOrders(MOCK_ORDERS);
+        setOrders([]);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -194,7 +158,7 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
 
       {!cafeteriaId && !isLoading && (
         <p className="text-center text-slate-500 mb-6">
-          No cafeteria assigned to your profile. Showing sample orders until your account is linked.
+          No cafeteria assigned to your profile. Link your cafeteria to start receiving orders here.
         </p>
       )}
       {isLoading && <p className="text-center text-slate-500 mb-6">Loading orders...</p>}

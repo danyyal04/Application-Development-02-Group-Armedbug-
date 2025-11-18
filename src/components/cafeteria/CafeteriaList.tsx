@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, Star, MapPin, Clock, Filter } from 'lucide-react';
 import { Card, CardContent } from '../ui/card.js';
 import { Input } from '../ui/input.js';
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select.js';
+import { supabase } from '../../lib/supabaseClient.js';
 
 interface Cafeteria {
   id: string;
@@ -24,75 +25,6 @@ interface Cafeteria {
   category: string;
 }
 
-const allCafeterias: Cafeteria[] = [
-  {
-    id: '1',
-    name: 'Sdap Kitchen',
-    location: 'Arked Angkasa',
-    description: 'Popular for Nasi Lemak and local delights',
-    image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTA1bBYahghWetnXzUAQg7Py1auc3ywlT56Jw&s',
-    rating: 4.5,
-    estimatedTime: '15-20 min',
-    isOpen: true,
-    category: 'Malaysian',
-  },
-  {
-    id: '2',
-    name: 'Tok Janggut Cafe',
-    location: 'Scholar Inn',
-    description: 'Western and Asian fusion cuisine',
-    image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSjN80oRsRWFMwUn0lsKpSd6BPg-kiRY1fswQ&s',
-    rating: 4.3,
-    estimatedTime: '10-15 min',
-    isOpen: true,
-    category: 'Western',
-  },
-  {
-    id: '3',
-    name: 'Pak Lah Cafe',
-    location: '',
-    description: 'Best chicken rice and drinks on campus',
-    image: 'https://lh3.googleusercontent.com/gps-cs-s/AG0ilSxc2OKZ_-3H3tUFJJIinRP189crOtOFSluQct7JIyX2ND05LyVXceeb-6MlkDFYoQKo2Mt8LO89Y8kEkhe3h3aynqVlMvqrw-bTs6EJSkzDFONGdCYzcuLIbhKMZlUyFiOm6sB3=s1360-w1360-h1020-rw',
-    rating: 4.7,
-    estimatedTime: '12-18 min',
-    isOpen: true,
-    category: 'Malaysian',
-  },
-  {
-    id: '4',
-    name: 'Deen Corner',
-    location: 'Arked Cengal',
-    description: 'Variety of noodles and rice dishes',
-    image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT2YCw_MmNlJsZqgPbrWRzZ70ZUs4tIcf5-AQ&s',
-    rating: 4.2,
-    estimatedTime: '15-25 min',
-    isOpen: true,
-    category: 'Asian',
-  },
-  {
-    id: '5',
-    name: 'He and She Coffee',
-    location: 'UTM Library',
-    description: 'Healthy options and vegetarian meals',
-    image: 'https://static.wixstatic.com/media/951be0_546fc4c361f24591a64f516f9944e4f1~mv2.jpeg',
-    rating: 4.4,
-    estimatedTime: '10-12 min',
-    isOpen: false,
-    category: 'Healthy',
-  },
-  {
-    id: '6',
-    name: 'Cafe Syantik',
-    location: 'KDSE',
-    description: 'Famous for breakfast and supper',
-    image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT-e_m-Svj8XtCkaWSpAVv3Ze0ldboN1RkznQ&s',
-    rating: 4.6,
-    estimatedTime: '8-15 min',
-    isOpen: true,
-    category: 'Malaysian',
-  },
-];
-
 interface CafeteriaListProps {
   onSelectCafeteria: (cafeteria: Cafeteria) => void;
 }
@@ -101,20 +33,56 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [cafeterias, setCafeterias] = useState<Cafeteria[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-  const filteredCafeterias = allCafeterias.filter(cafeteria => {
-    const matchesSearch = 
-      cafeteria.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cafeteria.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cafeteria.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesCategory = filterCategory === 'all' || cafeteria.category === filterCategory;
-    const matchesStatus = filterStatus === 'all' || 
-      (filterStatus === 'open' && cafeteria.isOpen) ||
-      (filterStatus === 'closed' && !cafeteria.isOpen);
+  useEffect(() => {
+    const fetchCafeterias = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('cafeterias')
+        .select('*')
+        .order('name', { ascending: true });
 
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+      if (error) {
+        setHasError(true);
+        setCafeterias([]);
+      } else {
+        setHasError(false);
+        setCafeterias((data || []).map(row => ({
+          id: row.id,
+          name: row.name,
+          location: row.location ?? 'UTM',
+          description: row.description ?? '',
+          image: row.image ?? '/UTMMunch-Logo.jpg',
+          rating: row.rating ?? 4.5,
+          estimatedTime: row.estimated_time ?? '15-20 min',
+          isOpen: row.is_open ?? true,
+          category: row.category ?? 'Malaysian',
+        })));
+      }
+      setIsLoading(false);
+    };
+
+    fetchCafeterias();
+  }, []);
+
+  const filteredCafeterias = useMemo(() => {
+    return cafeterias.filter(cafeteria => {
+      const matchesSearch = 
+        cafeteria.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        cafeteria.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        cafeteria.description.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesCategory = filterCategory === 'all' || cafeteria.category === filterCategory;
+      const matchesStatus = filterStatus === 'all' || 
+        (filterStatus === 'open' && cafeteria.isOpen) ||
+        (filterStatus === 'closed' && !cafeteria.isOpen);
+
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [cafeterias, searchQuery, filterCategory, filterStatus]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -185,12 +153,26 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
       {/* Results Count */}
       <div className="mb-4">
         <p className="text-sm text-slate-600">
-          Showing {filteredCafeterias.length} of {allCafeterias.length} cafeterias
+          {isLoading
+            ? 'Loading cafeterias...'
+            : `Showing ${filteredCafeterias.length} of ${cafeterias.length} cafeterias`}
         </p>
       </div>
 
       {/* Cafeteria Grid */}
-      {filteredCafeterias.length === 0 ? (
+      {hasError ? (
+        <Card>
+          <CardContent className="py-12 text-center text-red-600">
+            Unable to load cafeterias. Please try again later.
+          </CardContent>
+        </Card>
+      ) : isLoading ? (
+        <Card>
+          <CardContent className="py-12 text-center text-slate-500">
+            Loading cafeterias...
+          </CardContent>
+        </Card>
+      ) : filteredCafeterias.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-slate-500">No cafeterias found matching your criteria.</p>

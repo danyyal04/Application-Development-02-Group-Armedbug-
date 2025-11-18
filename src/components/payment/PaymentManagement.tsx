@@ -18,13 +18,6 @@ interface PaymentRecord {
   paymentMethod: string | null;
 }
 
-const MOCK_PAYMENTS: PaymentRecord[] = [
-  { id: 'ORD-1001', amount: 32.5, paidAt: new Date().toISOString(), paymentMethod: 'fpx' },
-  { id: 'ORD-1000', amount: 18, paidAt: new Date(Date.now() - 3600 * 1000).toISOString(), paymentMethod: 'ewallet' },
-  { id: 'ORD-0999', amount: 24.75, paidAt: new Date(Date.now() - 86400 * 1000).toISOString(), paymentMethod: 'card' },
-  { id: 'ORD-0998', amount: 12, paidAt: new Date(Date.now() - 2 * 86400 * 1000).toISOString(), paymentMethod: 'qr' },
-];
-
 export default function PaymentManagement({ cafeteriaId }: PaymentManagementProps) {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,7 +25,7 @@ export default function PaymentManagement({ cafeteriaId }: PaymentManagementProp
 
   const fetchPayments = async () => {
     if (!cafeteriaId) {
-      setPayments(MOCK_PAYMENTS);
+      setPayments([]);
       setIsLoading(false);
       return;
     }
@@ -55,12 +48,12 @@ export default function PaymentManagement({ cafeteriaId }: PaymentManagementProp
         paymentMethod: row.payment_method,
       }));
 
-      setPayments(mapped.length ? mapped : MOCK_PAYMENTS);
+      setPayments(mapped);
       setHasError(false);
     } catch (error) {
       setHasError(true);
       toast.error('Unable to load payment data. Please try again later.');
-      setPayments(MOCK_PAYMENTS);
+      setPayments([]);
     } finally {
       setIsLoading(false);
     }
@@ -106,7 +99,7 @@ export default function PaymentManagement({ cafeteriaId }: PaymentManagementProp
       {!cafeteriaId && (
         <Card className="mb-6">
           <CardContent className="py-6 text-center text-slate-600">
-            No cafeteria is assigned to your profile. Showing sample payment data until your account is linked.
+            No cafeteria is assigned to your profile yet. Link your cafeteria to start tracking real payments.
           </CardContent>
         </Card>
       )}

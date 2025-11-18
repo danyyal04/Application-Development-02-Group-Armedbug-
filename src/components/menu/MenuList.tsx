@@ -7,6 +7,7 @@ import { Badge } from '../ui/badge.js';
 import { Label } from '../ui/label.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabaseClient.js';
 
 interface MenuItem {
   id: string;
@@ -18,62 +19,17 @@ interface MenuItem {
   available: boolean;
 }
 
-const mockMenuItems: MenuItem[] = [
-  {
-    id: '1',
-    name: 'Nasi Lemak',
-    description: 'Traditional Malaysian rice dish with sambal, anchovies, peanuts, and egg',
-    price: 8.50,
-    category: 'Main Course',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Nasi_Lemak_dengan_Chili_Nasi_Lemak_dan_Sotong_Pedas%2C_di_Penang_Summer_Restaurant.jpg/500px-Nasi_Lemak_dengan_Chili_Nasi_Lemak_dan_Sotong_Pedas%2C_di_Penang_Summer_Restaurant.jpg',
-    available: true,
-  },
-  {
-    id: '2',
-    name: 'Chicken Rice',
-    description: 'Tender chicken served with fragrant rice and special sauce',
-    price: 10.00,
-    category: 'Main Course',
-    imageUrl: 'https://www.ajinomoto.com.my/sites/default/files/styles/large/public/content/recipe/image/2022-10/Honey-Chicken-Rice.jpg?itok=DtEbk8Be',
-    available: true,
-  },
-  {
-    id: '3',
-    name: 'Mee Goreng',
-    description: 'Spicy fried noodles with vegetables and your choice of protein',
-    price: 7.50,
-    category: 'Main Course',
-    imageUrl: 'https://resepichenom.com/images/recipes/mee_goreng.jpg',
-    available: true,
-  },
-  {
-    id: '4',
-    name: 'Teh Tarik',
-    description: 'Classic Malaysian pulled tea',
-    price: 2.50,
-    category: 'Beverages',
-    imageUrl: 'https://delishglobe.com/wp-content/uploads/2025/04/Teh-Tarik-.png',
-    available: true,
-  },
-  {
-    id: '5',
-    name: 'Ice Lemon Tea',
-    description: 'Refreshing iced tea with lemon',
-    price: 3.00,
-    category: 'Beverages',
-    imageUrl: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc',
-    available: true,
-  },
-  {
-    id: '6',
-    name: 'Roti Canai',
-    description: 'Crispy flatbread served with curry dipping sauce',
-    price: 4.00,
-    category: 'Snacks',
-    imageUrl: 'https://www.rotinrice.com/wp-content/uploads/2011/04/RotiCanai-1-500x500.jpg',
-    available: true,
-  },
-];
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c';
+
+const mapMenuRowToItem = (row: any): MenuItem => ({
+  id: row.id,
+  name: row.name,
+  description: row.description ?? '',
+  price: Number(row.price) || 0,
+  category: row.category ?? 'Main Course',
+  imageUrl: row.image_url || FALLBACK_IMAGE,
+  available: row.available ?? true,
+});
 
 interface MenuListProps {
   cafeteria: {
@@ -97,10 +53,18 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
 
   useEffect(() => {
     const loadMenu = async () => {
+      setIsLoading(true);
       try {
-        // Simulate database fetch since Supabase table is not yet available
-        await new Promise(resolve => setTimeout(resolve, 300));
-        setMenuItems(mockMenuItems);
+        const { data, error } = await supabase
+          .from('menu_items')
+          .select('*')
+          .eq('cafeteria_id', cafeteria.id)
+          .eq('available', true)
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        setMenuItems((data || []).map(mapMenuRowToItem));
         setHasError(false);
       } catch (error) {
         setHasError(true);
@@ -110,7 +74,7 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
       }
     };
     loadMenu();
-  }, []);
+  }, [cafeteria.id]);
 
   const filteredItems = menuItems.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

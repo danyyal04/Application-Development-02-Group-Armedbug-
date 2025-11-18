@@ -17,6 +17,7 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,8 +31,22 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
       });
 
       if (error) {
-        toast.error(error.message);
+        if (error.message?.toLowerCase().includes('invalid login credentials')) {
+          toast.error('Invalid email or password.');
+        } else {
+          toast.error(error.message);
+        }
       } else if (data.user) {
+        if (!data.user.email_confirmed_at) {
+          toast.info('Please verify your email before logging in. We have resent the confirmation link.');
+          await supabase.auth.signOut();
+          await supabase.auth.resend({
+            type: 'signup',
+            email,
+            options: { emailRedirectTo: window.location.origin + '/login' },
+          });
+          return;
+        }
         // Fetch user profile from "profiles" table
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -60,14 +75,19 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
       return;
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + '/reset-password', // optional redirect page
-    });
+    setResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password', // optional redirect page
+      });
 
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Password reset email sent! Check your inbox.');
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Password reset email sent! Check your inbox.');
+      }
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -123,9 +143,10 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
                   <button
                     type="button"
                     onClick={handleForgotPassword}
-                    className="text-purple-700 hover:underline text-sm"
+                    className="text-purple-700 hover:underline text-sm disabled:opacity-60"
+                    disabled={resetting || !email}
                   >
-                    Forgot password?
+                    {resetting ? 'Sending reset link...' : 'Forgot password?'}
                   </button>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '../ui/card.js';
 import { Input } from '../ui/input.js';
@@ -15,6 +15,7 @@ import {
 import { Label } from '../ui/label.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabaseClient.js';
 
 interface MenuItem {
   id: string;
@@ -26,28 +27,24 @@ interface MenuItem {
   available: boolean;
 }
 
-const initialMenuItems: MenuItem[] = [
-  {
-    id: '1',
-    name: 'Nasi Lemak',
-    description: 'Traditional Malaysian rice dish with sambal, anchovies, peanuts, and egg',
-    price: 8.50,
-    category: 'Main Course',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Nasi_Lemak_dengan_Chili_Nasi_Lemak_dan_Sotong_Pedas%2C_di_Penang_Summer_Restaurant.jpg/500px-Nasi_Lemak_dengan_Chili_Nasi_Lemak_dan_Sotong_Pedas%2C_di_Penang_Summer_Restaurant.jpg',
-    available: true,
-  },
-  {
-    id: '2',
-    name: 'Chicken Rice',
-    description: 'Tender chicken served with fragrant rice and special sauce',
-    price: 10.00,
-    category: 'Main Course',
-    imageUrl: 'https://www.ajinomoto.com.my/sites/default/files/styles/large/public/content/recipe/image/2022-10/Honey-Chicken-Rice.jpg?itok=DtEbk8Be',
-    available: true,
-  },
-];
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c';
 
-export default function MenuManagement() {
+const mapMenuRowToItem = (row: any): MenuItem => ({
+  id: row.id,
+  name: row.name,
+  description: row.description ?? '',
+  price: Number(row.price) || 0,
+  category: row.category ?? 'Main Course',
+  imageUrl: row.image_url || FALLBACK_IMAGE,
+  available: row.available ?? true,
+});
+
+interface MenuManagementProps {
+  cafeteriaId?: string | null;
+  cafeteriaName?: string | null;
+}
+
+export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManagementProps) {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -63,21 +60,38 @@ export default function MenuManagement() {
     available: true,
   });
 
+  const hasAssignedCafeteria = Boolean(cafeteriaId);
+
+  const loadMenuItems = useCallback(async () => {
+    if (!hasAssignedCafeteria) {
+      setMenuItems([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('cafeteria_id', cafeteriaId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setMenuItems((data || []).map(mapMenuRowToItem));
+      setHasError(false);
+    } catch (error) {
+      setHasError(true);
+      toast.error('Unable to process requests. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cafeteriaId, hasAssignedCafeteria]);
+
   useEffect(() => {
-    const fetchMenu = async () => {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        setMenuItems(initialMenuItems);
-        setHasError(false);
-      } catch (error) {
-        setHasError(true);
-        toast.error('Unable to process requests. Please try again later.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchMenu();
-  }, []);
+    loadMenuItems();
+  }, [loadMenuItems]);
 
   const filteredItems = menuItems.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -111,25 +125,32 @@ export default function MenuManagement() {
     }
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
+    if (!hasAssignedCafeteria) {
+      toast.error('Please link your cafeteria before adding menu items.');
+      return;
+    }
     if (!validateForm()) return;
     if (isDuplicateName(formData.name)) {
       toast.error('Item already exists.');
       return;
     }
     const priceValue = Number(formData.price);
-    const newItem: MenuItem = {
-      id: Date.now().toString(),
-      name: formData.name,
-      description: formData.description,
-      price: priceValue,
-      category: formData.category,
-      imageUrl: formData.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c',
-      available: formData.available,
-    };
 
     try {
-      setMenuItems([...menuItems, newItem]);
+      const { error } = await supabase.from('menu_items').insert({
+        cafeteria_id: cafeteriaId,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        price: priceValue,
+        category: formData.category,
+        image_url: formData.imageUrl || FALLBACK_IMAGE,
+        available: formData.available,
+      });
+
+      if (error) throw error;
+
+      await loadMenuItems();
       toast.success('Menu item added successfully!');
       setIsAddDialogOpen(false);
       resetForm();
@@ -138,7 +159,11 @@ export default function MenuManagement() {
     }
   };
 
-  const handleEditItem = () => {
+  const handleEditItem = async () => {
+    if (!hasAssignedCafeteria) {
+      toast.error('Please link your cafeteria before updating menu items.');
+      return;
+    }
     if (!editingItem || !validateForm()) return;
     if (isDuplicateName(formData.name, editingItem.id)) {
       toast.error('Item already exists.');
@@ -147,19 +172,23 @@ export default function MenuManagement() {
 
     try {
       const priceValue = Number(formData.price);
-      setMenuItems(menuItems.map(item =>
-        item.id === editingItem.id
-          ? {
-              ...item,
-              name: formData.name,
-              description: formData.description,
-              price: priceValue,
-              category: formData.category,
-              imageUrl: formData.imageUrl || item.imageUrl,
-              available: formData.available,
-            }
-          : item
-      ));
+
+      const { error } = await supabase
+        .from('menu_items')
+        .update({
+          name: formData.name.trim(),
+          description: formData.description.trim(),
+          price: priceValue,
+          category: formData.category,
+          image_url: formData.imageUrl || editingItem.imageUrl,
+          available: formData.available,
+        })
+        .eq('id', editingItem.id)
+        .eq('cafeteria_id', cafeteriaId);
+
+      if (error) throw error;
+
+      await loadMenuItems();
       toast.success('Menu item updated successfully!');
       setEditingItem(null);
       resetForm();
@@ -168,8 +197,20 @@ export default function MenuManagement() {
     }
   };
 
-  const handleDeleteItem = (id: string) => {
+  const handleDeleteItem = async (id: string) => {
+    if (!hasAssignedCafeteria) {
+      toast.error('Please link your cafeteria before deleting menu items.');
+      return;
+    }
     try {
+      const { error } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('id', id)
+        .eq('cafeteria_id', cafeteriaId);
+
+      if (error) throw error;
+
       setMenuItems(menuItems.filter(item => item.id !== id));
       toast.success('Menu item deleted successfully!');
     } catch (error) {
@@ -303,13 +344,27 @@ export default function MenuManagement() {
               <Button variant="outline" onClick={() => { setIsAddDialogOpen(false); resetForm(); }}>
                 Cancel
               </Button>
-              <Button onClick={handleAddItem} className="text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>
+              <Button
+                onClick={handleAddItem}
+                className="text-white hover:opacity-90"
+                style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
+                disabled={!hasAssignedCafeteria}
+              >
                 Add Item
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
+
+      {!hasAssignedCafeteria && (
+        <Card className="mb-6 border-amber-200 bg-amber-50">
+          <CardContent className="text-amber-900">
+            Your staff profile is not linked to a cafeteria yet. Once an administrator assigns you,
+            you can start managing the live menu here.
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search Bar */}
       <div className="mb-6">
@@ -347,7 +402,9 @@ export default function MenuManagement() {
       ) : hasError ? (
         <div className="text-center py-12 text-slate-500">Unable to process requests. Please try again later.</div>
       ) : menuItems.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">No menu items available at the moment.</div>
+        <div className="text-center py-12 text-slate-500">
+          {hasAssignedCafeteria ? 'No menu items available at the moment.' : 'Awaiting cafeteria assignment.'}
+        </div>
       ) : null}
 
       {/* Menu Items List */}
@@ -495,3 +552,4 @@ export default function MenuManagement() {
     </div>
   );
 }
+

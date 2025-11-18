@@ -46,7 +46,8 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
   const cafeteriaId = profile?.cafeteria_id || null;
 
   if (currentPage === 'manage-menu') {
-    return <MenuManagement />;
+    if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
+    return <MenuManagement cafeteriaId={cafeteriaId} cafeteriaName={profile?.cafeteria_name || null} />;
   }
 
   if (currentPage === 'manage-orders') {
