@@ -68,6 +68,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
         if (profileError) {
           toast.error('Failed to create profile: ' + profileError.message);
         } else {
+          await supabase.auth.signOut();
           toast.success('Registration successful! Please login.');
           onRegister(); // redirect to login page
         }
