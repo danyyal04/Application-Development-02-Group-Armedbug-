@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useState } from 'react';
-import { User, Mail, Lock, Save } from 'lucide-react';
+import { User, Mail, Lock, Save, ImagePlus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
@@ -10,330 +10,381 @@ import { toast } from 'sonner';
 import { supabase } from '../../lib/supabaseClient.js';
 
 interface ProfileSettingsProps {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    role: 'student' | 'staff' | 'admin';
-  };
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: 'student' | 'staff' | 'admin';
+  };
 }
 
 export default function ProfileSettings({ user }: ProfileSettingsProps) {
-  const [formData, setFormData] = useState({
-    name: user.name,
-    email: user.email,
-    phone: '',
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+  const [selectedPic, setSelectedPic] = useState<File | null>(null);
 
-  const [preferences, setPreferences] = useState({
-    emailNotifications: true,
-    orderUpdates: true,
-    promotions: false,
-  });
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPreferences, setSavingPreferences] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    name: user.name,
+    email: user.email,
+    phone: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadProfile = async () => {
-      setLoadingProfile(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('name, email, phone, email_notifications, order_updates, promotions')
-        .eq('id', user.id)
-        .single();
+  const [preferences, setPreferences] = useState({
+    emailNotifications: true,
+    orderUpdates: true,
+    promotions: false,
+  });
 
-      if (!isMounted) return;
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
-      if (!error && data) {
-        setFormData(prev => ({
-          ...prev,
-          name: data.name ?? user.name,
-          email: data.email ?? user.email,
-          phone: data.phone ?? '',
-        }));
-        setPreferences({
-          emailNotifications: data.email_notifications ?? true,
-          orderUpdates: data.order_updates ?? true,
-          promotions: data.promotions ?? false,
-        });
-      }
-      setLoadingProfile(false);
-    };
+  // -----------------------------------------------------------
+  // LOAD PROFILE FROM DATABASE
+  // -----------------------------------------------------------
+  useEffect(() => {
+    let isMounted = true;
 
-    loadProfile();
-    return () => {
-      isMounted = false;
-    };
-  }, [user.id, user.email, user.name]);
+    const loadProfile = async () => {
+      setLoadingProfile(true);
 
-  const handleSaveProfile = async () => {
-    if (!formData.name.trim() || !formData.email.trim()) {
-      toast.error('Please fill in all required fields');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('name, email, phone, avatar_url, email_notifications, order_updates, promotions')
+        .eq('id', user.id)
+        .single();
+
+      if (!isMounted) return;
+
+      if (!error && data) {
+        setFormData(prev => ({
+          ...prev,
+          name: data.name ?? user.name,
+          email: data.email ?? user.email,
+          phone: data.phone ?? '',
+        }));
+
+        setProfilePic(data.avatar_url ? data.avatar_url : null);
+
+        setPreferences({
+          emailNotifications: data.email_notifications ?? true,
+          orderUpdates: data.order_updates ?? true,
+          promotions: data.promotions ?? false,
+        });
+      }
+
+      setLoadingProfile(false);
+    };
+
+    loadProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [user.id]);
+
+  // -----------------------------------------------------------
+  // UPLOAD PROFILE PICTURE
+  // -----------------------------------------------------------
+  const handleUploadProfilePic = async () => {
+    if (!selectedPic) {
+      toast.error("Please pick a picture first.");
       return;
     }
 
-    setSavingProfile(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          phone: formData.phone.trim() || null,
-        })
-        .eq('id', user.id);
+    const fileExt = selectedPic.name.split('.').pop();
+    const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+    const filePath = `avatars/${fileName}`;
 
-      if (error) throw error;
+    // Upload to Supabase storage bucket "avatar"
+    const { error: uploadError } = await supabase.storage
+      .from('avatar')
+      .upload(filePath, selectedPic, {
+        cacheControl: '3600',
+        upsert: true,
+      });
 
-      if (formData.email.trim() !== user.email) {
-        const { error: authError } = await supabase.auth.updateUser({
-          email: formData.email.trim(),
-        });
-        if (authError) throw authError;
-        toast.info('Please verify your new email address from the link we just sent.');
-      }
+    if (uploadError) {
+      toast.error("Upload failed.");
+      return;
+    }
 
-      toast.success('Profile updated successfully!');
-    } catch (err: any) {
-      toast.error(err.message ? `Unable to save profile: ${err.message}` : 'Unable to save profile.');
-    } finally {
-      setSavingProfile(false);
-    }
-  };
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from('avatar')
+      .getPublicUrl(filePath);
 
-  const handleChangePassword = async () => {
-    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
-      toast.error('Please fill in all password fields');
-      return;
-    }
+    const publicUrl = publicUrlData.publicUrl;
 
-    if (formData.newPassword !== formData.confirmPassword) {
-      toast.error('New passwords do not match');
-      return;
-    }
+    // Save URL in database
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl })
+      .eq('id', user.id);
 
-    setChangingPassword(true);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: formData.newPassword,
-      });
-      if (error) throw error;
-      toast.success('Password changed successfully!');
-      setFormData({
-        ...formData,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      });
-    } catch (err: any) {
-      toast.error(err.message ? `Unable to change password: ${err.message}` : 'Unable to change password.');
-    } finally {
-      setChangingPassword(false);
-    }
-  };
+    if (updateError) {
+      toast.error("Failed to update profile picture in database.");
+      return;
+    }
 
-  const handleSavePreferences = async () => {
-    setSavingPreferences(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          email_notifications: preferences.emailNotifications,
-          order_updates: preferences.orderUpdates,
-          promotions: preferences.promotions,
-        })
-        .eq('id', user.id);
+    setProfilePic(publicUrl);
+    setSelectedPic(null);
 
-      if (error) throw error;
-      toast.success('Preferences saved successfully!');
-    } catch (err: any) {
-      toast.error(err.message ? `Unable to save preferences: ${err.message}` : 'Unable to save preferences.');
-    } finally {
-      setSavingPreferences(false);
-    }
-  };
+    toast.success("Profile picture updated!");
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target;
-    setFormData(prev => ({ ...prev, [id]: value }));
-  };
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
 
-  if (loadingProfile) {
-    return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
-  }
+    setProfilePic(`${publicUrl}?t=${Date.now()}`);
+  };
 
-  return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-slate-900 mb-2">Profile Settings ⚙️</h1>
-        <p className="text-slate-600">Manage your account settings and preferences</p>
-      </div>
+  // -----------------------------------------------------------
+  // SAVE PROFILE
+  // -----------------------------------------------------------
+  const handleSaveProfile = async () => {
+    if (!formData.name.trim() || !formData.email.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
-      {/* Personal Information */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Update your personal details</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input id="name" value={formData.name} onChange={handleInputChange} className="pl-10" />
-            </div>
-          </div>
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim() || null,
+        })
+        .eq('id', user.id);
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input id="email" type="email" value={formData.email} onChange={handleInputChange} className="pl-10" />
-            </div>
-          </div>
+      if (error) throw error;
 
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input id="phone" value={formData.phone} onChange={handleInputChange} placeholder="012-345-6789" />
-          </div>
+      toast.success('Profile updated successfully!');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
-          <div className="space-y-2">
-            <Label>Account Type</Label>
-            <Input
-              value={user.role === 'staff' ? 'Cafeteria Owner' : 'Customer'}
-              disabled
-            />
-          </div>
+  // -----------------------------------------------------------
+  // CHANGE PASSWORD
+  // -----------------------------------------------------------
+  const handleChangePassword = async () => {
+    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
+      toast.error('Please fill in all password fields');
+      return;
+    }
 
-          <Button
-            onClick={handleSaveProfile}
-            className="text-white hover:opacity-90"
-            style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
-            disabled={savingProfile}
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {savingProfile ? 'Saving...' : 'Save Profile'}
-          </Button>
-        </CardContent>
-      </Card>
+    if (formData.newPassword !== formData.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
 
-      {/* Change Password */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-          <CardDescription>Update your password for better security</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="currentPassword">Current Password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                id="currentPassword"
-                type="password"
-                value={formData.currentPassword}
-                onChange={handleInputChange}
-                className="pl-10"
-              />
-            </div>
-          </div>
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: formData.newPassword,
+      });
+      if (error) throw error;
 
-          <div className="space-y-2">
-            <Label htmlFor="newPassword">New Password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                id="newPassword"
-                type="password"
-                value={formData.newPassword}
-                onChange={handleInputChange}
-                className="pl-10"
-              />
-            </div>
-          </div>
+      toast.success('Password changed successfully!');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm New Password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                className="pl-10"
-              />
-            </div>
-          </div>
+  // -----------------------------------------------------------
+  // SAVE NOTIFICATION PREFERENCES
+  // -----------------------------------------------------------
+  const handleSavePreferences = async () => {
+    setSavingPreferences(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          email_notifications: preferences.emailNotifications,
+          order_updates: preferences.orderUpdates,
+          promotions: preferences.promotions,
+        })
+        .eq('id', user.id);
 
-          <Button onClick={handleChangePassword} variant="outline" disabled={changingPassword}>
-            {changingPassword ? 'Updating...' : 'Change Password'}
-          </Button>
-        </CardContent>
-      </Card>
+      if (error) throw error;
 
-      {/* Notification Preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Notification Preferences</CardTitle>
-          <CardDescription>Manage how you receive notifications</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-slate-900">Email Notifications</p>
-              <p className="text-sm text-slate-600">Receive updates via email</p>
-            </div>
-            <Switch
-              checked={preferences.emailNotifications}
-              onCheckedChange={(checked: boolean) => setPreferences({ ...preferences, emailNotifications: checked })}
-            />
-          </div>
+      toast.success('Preferences saved!');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSavingPreferences(false);
+    }
+  };
 
-          <Separator />
+  if (loadingProfile) {
+    return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
+  }
 
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-slate-900">Order Updates</p>
-              <p className="text-sm text-slate-600">Get notified about order status changes</p>
-            </div>
-            <Switch
-              checked={preferences.orderUpdates}
-              onCheckedChange={(checked: boolean) => setPreferences({ ...preferences, orderUpdates: checked })}
-            />
-          </div>
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
 
-          <Separator />
+      {/* ---------------- Profile Picture Section ---------------- */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Profile Picture</CardTitle>
+          <CardDescription>Upload a new profile picture</CardDescription>
+        </CardHeader>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-slate-900">Promotions & Offers</p>
-              <p className="text-sm text-slate-600">Receive promotional emails</p>
-            </div>
-            <Switch
-              checked={preferences.promotions}
-              onCheckedChange={(checked: boolean) => setPreferences({ ...preferences, promotions: checked })}
-            />
-          </div>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-6">
+            <img
+              key={profilePic} 
+                src={
+                selectedPic 
+                ? URL.createObjectURL(selectedPic) 
+                : (profilePic ? `${profilePic}?t=${Date.now()}` : '/default-avatar.png')
+            }
+            alt="Profile"
+            className="w-28 h-28 rounded-full object-cover border bg-slate-100" // Added bg-slate-100 so it looks nice even if empty
+            />
 
-          <Button
-            onClick={handleSavePreferences}
-            className="text-white hover:opacity-90"
-            style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
-            disabled={savingPreferences}
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {savingPreferences ? 'Saving...' : 'Save Preferences'}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
+            <div className="space-y-3">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setSelectedPic(e.target.files?.[0] || null)}
+              />
+
+              <Button
+                onClick={handleUploadProfilePic}
+                disabled={!selectedPic}
+                className="bg-purple-600 text-white hover:bg-purple-700"
+              >
+                <ImagePlus className="w-4 h-4 mr-2" />
+                Upload Picture
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ---------------- Personal Information ---------------- */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Personal Information</CardTitle>
+          <CardDescription>Update your personal details</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+
+          <div>
+            <Label htmlFor="name">Full Name</Label>
+            <Input id="name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+          </div>
+
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+          </div>
+
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input id="phone" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+          </div>
+
+          <Button onClick={handleSaveProfile} className="bg-purple-600 text-white hover:bg-purple-700">
+            <Save className="w-4 h-4 mr-2" />
+            {savingProfile ? "Saving..." : "Save Profile"}
+          </Button>
+
+        </CardContent>
+      </Card>
+
+      {/* ---------------- Change Password ---------------- */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Change Password</CardTitle>
+          <CardDescription>Update your login password</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <Input
+            type="password"
+            placeholder="Current Password"
+            value={formData.currentPassword}
+            onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+          />
+
+          <Input
+            type="password"
+            placeholder="New Password"
+            value={formData.newPassword}
+            onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+          />
+
+          <Input
+            type="password"
+            placeholder="Confirm Password"
+            value={formData.confirmPassword}
+            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+          />
+
+          <Button onClick={handleChangePassword} variant="outline">
+            {changingPassword ? "Updating..." : "Change Password"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ---------------- Preferences ---------------- */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Notification Preferences</CardTitle>
+          <CardDescription>Manage how you receive alerts</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+
+          <div className="flex justify-between items-center">
+            Email Notifications
+            <Switch
+              checked={preferences.emailNotifications}
+              onCheckedChange={(v) => setPreferences({ ...preferences, emailNotifications: v })}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex justify-between items-center">
+            Order Updates
+            <Switch
+              checked={preferences.orderUpdates}
+              onCheckedChange={(v) => setPreferences({ ...preferences, orderUpdates: v })}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex justify-between items-center">
+            Promotions
+            <Switch
+              checked={preferences.promotions}
+              onCheckedChange={(v) => setPreferences({ ...preferences, promotions: v })}
+            />
+          </div>
+
+          <Button onClick={handleSavePreferences} className="bg-purple-600 text-white hover:bg-purple-700">
+            <Save className="w-4 h-4 mr-2" />
+            {savingPreferences ? "Saving..." : "Save Preferences"}
+          </Button>
+
+        </CardContent>
+      </Card>
+
+    </div>
+  );
 }
+
