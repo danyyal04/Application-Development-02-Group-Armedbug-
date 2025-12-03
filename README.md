@@ -3,7 +3,7 @@
 Developer: Fathurrahman
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Login Form](src/components/auth/LoginForm.tsx) <br>[Register Form](src/components/auth/RegisterForm.tsx)</br> [Staff Dashboard](src/components/dashboard/StaffDashboard.tsx)</br> [Student Dashboard](src/components/dashboard/StudentDashboard.tsx)</br> [Profile Setting](src/components/profile/ProfileSettings.tsx)</br>     | [Supabase Connection](src/lib/supabaseClient.ts) <br>        |
+| Sprint 1 | User Authethication            |  [Login Form](src/components/auth/LoginForm.tsx) <br>[Register Form](src/components/auth/RegisterForm.tsx)</br> [Staff Dashboard](src/components/dashboard/StaffDashboard.tsx)</br> [Student Dashboard](src/components/dashboard/StudentDashboard.tsx)</br> [Profile Setting](src/components/profile/ProfileSettings.tsx)</br>     | [Supabase Connection](src/lib/supabaseClient.ts) <br>        |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
@@ -13,7 +13,7 @@ Developer: Fathurrahman
 Developer: Thayaallan
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Cafeteria](src/components/cafeteria/CafeteriaList.tsx)</br> [Menu List](src/components/menu/MenuList.tsx)</br> [Menu Management](src/components/menu/MenuManagement.tsx)</br>  | [Supabase Connection](src/lib/supabaseClient.ts)        |         |         |
+| Sprint 1 | Dynamic Menu Display            |  [Cafeteria](src/components/cafeteria/CafeteriaList.tsx)</br> [Menu List](src/components/menu/MenuList.tsx)</br> [Menu Management](src/components/menu/MenuManagement.tsx)</br>  | [Supabase Connection](src/lib/supabaseClient.ts)        |         |         |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
@@ -23,7 +23,7 @@ Developer: Thayaallan
 Developer: Irfan Danial
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Payment Management](src/components/payment/PaymentManagement.tsx)</br> [Payment Method](src/components/payment/PaymentMethods.tsx)</br> [Checkout Page](src/components/checkout/CheckoutPage.tsx)</br>|         |         |         |
+| Sprint 1 | Multiple Payment Options            |  [Payment Management](src/components/payment/PaymentManagement.tsx)</br> [Payment Method](src/components/payment/PaymentMethods.tsx)</br> [Checkout Page](src/components/checkout/CheckoutPage.tsx)</br>| [Supabase Connection](src/lib/supabaseClient.ts)         |         |         |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
@@ -33,7 +33,7 @@ Developer: Irfan Danial
 Developer: Mustaqim
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Order Management](src/components/orders/OrderManagement.tsx)</br>  [Order Tracking](src/components/orders/OrderTracking.tsx)</br>|         |         |         |
+| Sprint 1 | Real-time Order Tracking            |  [Order Management](src/components/orders/OrderManagement.tsx)</br>  [Order Tracking](src/components/orders/OrderTracking.tsx)</br>| [Supabase Connection](src/lib/supabaseClient.ts)        |         |         |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
