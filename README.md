@@ -13,7 +13,7 @@ Developer: Fathurrahman
 Developer: Thayaallan
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Cafeteria](src/components/cafeteria/CafeteriaList.tsx)</br> [Menu List](src/components/menu/MenuList.tsx)</br> [Menu Management](src/components/menu/MenuManagement.tsx)</br>  |         |         |         |
+| Sprint 1 |             |  [Cafeteria](src/components/cafeteria/CafeteriaList.tsx)</br> [Menu List](src/components/menu/MenuList.tsx)</br> [Menu Management](src/components/menu/MenuManagement.tsx)</br>  | [Supabase Connection](src/lib/supabaseClient.ts)        |         |         |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
