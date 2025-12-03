@@ -28,12 +28,12 @@ Developer: Irfan Danial
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
 
-**Subsystem 1: Authentication and User Management**
+**Subsystem 1: Order Tracking and Notification Subsystem**
 
-Developer: Fathurrahman
+Developer: Mustaqim
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Cafeteria Components](https://github.com/danyyal04/Application-Development-02-Group-Armedbug-/tree/main/src/components/cafeteria) |         |         |         |
+| Sprint 1 |             |  [Order Management](src/components/orders/OrderManagement.tsx)</br>  [Order Tracking](src/components/orders/OrderTracking.tsx)</br>|         |         |         |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
