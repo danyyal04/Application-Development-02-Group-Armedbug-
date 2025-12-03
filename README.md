@@ -3,7 +3,7 @@
 Developer: Fathurrahman
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Login Form](src/components/auth/LoginForm.tsx) <br>[Register Form](src/components/auth/RegisterForm.tsx)</br>        |         |
+| Sprint 1 |             |  [Login Form](src/components/auth/LoginForm.tsx) <br>[Register Form](src/components/auth/RegisterForm.tsx)</br> [Staff Dashboard](src/components/dashboard/StaffDashboard.tsx)</br> [Student Dashboard](src/components/dashboard/StudentDashboard.tsx)</br> [Profile Setting](src/components/profile/ProfileSettings.tsx)</br>     |         |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
