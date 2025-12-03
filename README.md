@@ -3,8 +3,7 @@
 Developer: Fathurrahman
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Login Form](https://github.com/danyyal04/Application-Development-02-Group-Armedbug-/blob/main/src/components/auth/LoginForm.tsx)
-|[Register Form]([https://github.com/danyyal04/Application-Development-02-Group-Armedbug-/blob/main/src/components/auth/LoginForm.tsx](https://github.com/danyyal04/Application-Development-02-Group-Armedbug-/blob/main/src/components/auth/RegisterForm.tsx))         |         |
+| Sprint 1 |             |  [Login Form](src/components/auth/LoginForm.tsx)         |         |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
