@@ -8,12 +8,12 @@ Developer: Fathurrahman
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
 
-**Subsystem 1: Authentication and User Management**
+**Subsystem 2: Dynamic Menu and Ordering Subsystem**
 
-Developer: Fathurrahman
+Developer: Thayaallan
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Cafeteria Components](https://github.com/danyyal04/Application-Development-02-Group-Armedbug-/tree/main/src/components/cafeteria) |         |         |         |
+| Sprint 1 |             |  [Cafeteria](src/components/cafeteria/CafeteriaList.tsx)</br> [Menu List](src/components/menu/MenuList.tsx)</br> [Menu Management](src/components/menu/MenuManagement.tsx)</br>  |         |         |         |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
