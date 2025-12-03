@@ -1,4 +1,4 @@
-Subsystem 1: Authentication and User Management
+**Subsystem 1: Authentication and User Management**
 
 Developer: Fathurrahman
 | Sprint   | Module Name | Frontend | Backend |
