@@ -1,4 +1,4 @@
-**Subsystem 1: Authentication and User Management**
+**Subsystem 1: Authentication and User Management Subsystem**
 
 Developer: Fathurrahman
 | Sprint   | Module Name | Frontend | Backend |
@@ -18,12 +18,12 @@ Developer: Thayaallan
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
 
-**Subsystem 1: Authentication and User Management**
+**Subsystem 3: Payment and Transaction Subsystem**
 
-Developer: Fathurrahman
+Developer: Irfan Danial
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
-| Sprint 1 |             |  [Cafeteria Components](https://github.com/danyyal04/Application-Development-02-Group-Armedbug-/tree/main/src/components/cafeteria) |         |         |         |
+| Sprint 1 |             |  [Payment Management](src/components/payment/PaymentManagement.tsx)</br> [Payment Method](src/components/payment/PaymentMethods.tsx)</br> [Checkout Page](src/components/checkout/CheckoutPage.tsx)</br>|         |         |         |
 | Sprint 2 |             |          |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
