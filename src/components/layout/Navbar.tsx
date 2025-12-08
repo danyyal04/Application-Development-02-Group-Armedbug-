@@ -1,42 +1,52 @@
-import { useState } from 'react';
-import { Menu, User, ShoppingBag, CreditCard, Settings, LogOut, Home, UtensilsCrossed } from 'lucide-react';
-import { Button } from '../ui/button.js';
+import { useState } from "react";
+import {
+  Menu,
+  User,
+  ShoppingBag,
+  CreditCard,
+  Settings,
+  LogOut,
+  Home,
+  UtensilsCrossed,
+} from "lucide-react";
+import { Button } from "../ui/button.js";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../ui/dropdown-menu.js';
-import { Avatar, AvatarFallback } from '../ui/avatar.js';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from '../ui/sheet.js';
+} from "../ui/dropdown-menu.js";
+import { Avatar, AvatarFallback } from "../ui/avatar.js";
+import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet.js";
 
 interface NavbarProps {
   user: {
     id: string;
     name: string;
     email: string;
-    role: 'student' | 'staff' | 'admin';
+    role: "student" | "staff" | "admin";
   };
   onLogout: () => void;
   currentPage: string;
   onNavigate: (page: any) => void;
 }
 
-export default function Navbar({ user, onLogout, currentPage, onNavigate }: NavbarProps) {
+export default function Navbar({
+  user,
+  onLogout,
+  currentPage,
+  onNavigate,
+}: NavbarProps) {
   const [open, setOpen] = useState(false);
-  
+
   const initials = user.name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
     .toUpperCase();
 
-  const isStaff = user.role === 'staff';
+  const isStaff = user.role === "staff";
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 shadow-sm">
@@ -44,8 +54,15 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
         <div className="flex justify-between items-center h-16">
           {/* Logo + Mobile Menu Button */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('dashboard')}>
-              <img src="/UTMMunch-Logo.jpg" alt="UTMMunch Logo" className="h-10 w-auto" />
+            <div
+              className="flex items-center gap-3 cursor-pointer"
+              onClick={() => onNavigate("dashboard")}
+            >
+              <img
+                src="/UTMMunch-Logo.jpg"
+                alt="UTMMunch Logo"
+                className="h-10 w-auto"
+              />
             </div>
 
             {/* Mobile Menu Sheet - positioned right after logo */}
@@ -58,9 +75,9 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
               <SheetContent side="right">
                 <div className="flex flex-col gap-4 mt-8">
                   <Button
-                    variant={currentPage === 'dashboard' ? 'default' : 'ghost'}
+                    variant={currentPage === "dashboard" ? "default" : "ghost"}
                     onClick={() => {
-                      onNavigate('dashboard');
+                      onNavigate("dashboard");
                       setOpen(false);
                     }}
                     className="w-full justify-start"
@@ -68,13 +85,15 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                     <Home className="w-4 h-4 mr-2" />
                     Dashboard
                   </Button>
-                  
+
                   {isStaff ? (
                     <>
                       <Button
-                        variant={currentPage === 'manage-menu' ? 'default' : 'ghost'}
+                        variant={
+                          currentPage === "manage-menu" ? "default" : "ghost"
+                        }
                         onClick={() => {
-                          onNavigate('manage-menu');
+                          onNavigate("manage-menu");
                           setOpen(false);
                         }}
                         className="w-full justify-start"
@@ -83,9 +102,11 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                         Manage Menu
                       </Button>
                       <Button
-                        variant={currentPage === 'manage-orders' ? 'default' : 'ghost'}
+                        variant={
+                          currentPage === "manage-orders" ? "default" : "ghost"
+                        }
                         onClick={() => {
-                          onNavigate('manage-orders');
+                          onNavigate("manage-orders");
                           setOpen(false);
                         }}
                         className="w-full justify-start"
@@ -94,9 +115,13 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                         Manage Orders
                       </Button>
                       <Button
-                        variant={currentPage === 'manage-payments' ? 'default' : 'ghost'}
+                        variant={
+                          currentPage === "manage-payments"
+                            ? "default"
+                            : "ghost"
+                        }
                         onClick={() => {
-                          onNavigate('manage-payments');
+                          onNavigate("manage-payments");
                           setOpen(false);
                         }}
                         className="w-full justify-start"
@@ -108,9 +133,9 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                   ) : (
                     <>
                       <Button
-                        variant={currentPage === 'menu' ? 'default' : 'ghost'}
+                        variant={currentPage === "menu" ? "default" : "ghost"}
                         onClick={() => {
-                          onNavigate('menu');
+                          onNavigate("menu");
                           setOpen(false);
                         }}
                         className="w-full justify-start"
@@ -119,9 +144,9 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                         Menu
                       </Button>
                       <Button
-                        variant={currentPage === 'orders' ? 'default' : 'ghost'}
+                        variant={currentPage === "orders" ? "default" : "ghost"}
                         onClick={() => {
-                          onNavigate('orders');
+                          onNavigate("orders");
                           setOpen(false);
                         }}
                         className="w-full justify-start"
@@ -130,9 +155,11 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                         My Orders
                       </Button>
                       <Button
-                        variant={currentPage === 'payment' ? 'default' : 'ghost'}
+                        variant={
+                          currentPage === "payment" ? "default" : "ghost"
+                        }
                         onClick={() => {
-                          onNavigate('payment');
+                          onNavigate("payment");
                           setOpen(false);
                         }}
                         className="w-full justify-start"
@@ -142,12 +169,12 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                       </Button>
                     </>
                   )}
-                  
+
                   <div className="border-t pt-4 mt-4">
                     <Button
                       variant="ghost"
                       onClick={() => {
-                        onNavigate('profile');
+                        onNavigate("profile");
                         setOpen(false);
                       }}
                       className="w-full justify-start"
@@ -175,36 +202,56 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
           {/* Navigation Links - Desktop */}
           <div className="hidden md:flex items-center gap-1">
             <Button
-              variant={currentPage === 'dashboard' ? 'default' : 'ghost'}
-              onClick={() => onNavigate('dashboard')}
-              className={currentPage === 'dashboard' ? 'bg-gradient-to-r from-amber-600 to-orange-600' : ''}
+              variant={currentPage === "dashboard" ? "default" : "ghost"}
+              onClick={() => onNavigate("dashboard")}
+              className={
+                currentPage === "dashboard"
+                  ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                  : ""
+              }
             >
               <Home className="w-4 h-4 mr-2" />
               Dashboard
             </Button>
-            
+
             {isStaff ? (
               <>
                 <Button
-                  variant={currentPage === 'manage-menu' ? 'default' : 'ghost'}
-                  onClick={() => onNavigate('manage-menu')}
-                  className={currentPage === 'manage-menu' ? 'bg-gradient-to-r from-amber-600 to-orange-600' : ''}
+                  variant={currentPage === "manage-menu" ? "default" : "ghost"}
+                  onClick={() => onNavigate("manage-menu")}
+                  className={
+                    currentPage === "manage-menu"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                      : ""
+                  }
                 >
                   <UtensilsCrossed className="w-4 h-4 mr-2" />
                   Manage Menu
                 </Button>
                 <Button
-                  variant={currentPage === 'manage-orders' ? 'default' : 'ghost'}
-                  onClick={() => onNavigate('manage-orders')}
-                  className={currentPage === 'manage-orders' ? 'bg-gradient-to-r from-amber-600 to-orange-600' : ''}
+                  variant={
+                    currentPage === "manage-orders" ? "default" : "ghost"
+                  }
+                  onClick={() => onNavigate("manage-orders")}
+                  className={
+                    currentPage === "manage-orders"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                      : ""
+                  }
                 >
                   <ShoppingBag className="w-4 h-4 mr-2" />
                   Manage Orders
                 </Button>
                 <Button
-                  variant={currentPage === 'manage-payments' ? 'default' : 'ghost'}
-                  onClick={() => onNavigate('manage-payments')}
-                  className={currentPage === 'manage-payments' ? 'bg-gradient-to-r from-amber-600 to-orange-600' : ''}
+                  variant={
+                    currentPage === "manage-payments" ? "default" : "ghost"
+                  }
+                  onClick={() => onNavigate("manage-payments")}
+                  className={
+                    currentPage === "manage-payments"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                      : ""
+                  }
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
                   Manage Payments
@@ -213,25 +260,37 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
             ) : (
               <>
                 <Button
-                  variant={currentPage === 'menu' ? 'default' : 'ghost'}
-                  onClick={() => onNavigate('menu')}
-                  className={currentPage === 'menu' ? 'bg-gradient-to-r from-amber-600 to-orange-600' : ''}
+                  variant={currentPage === "menu" ? "default" : "ghost"}
+                  onClick={() => onNavigate("menu")}
+                  className={
+                    currentPage === "menu"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                      : ""
+                  }
                 >
                   <Menu className="w-4 h-4 mr-2" />
                   Menu
                 </Button>
                 <Button
-                  variant={currentPage === 'orders' ? 'default' : 'ghost'}
-                  onClick={() => onNavigate('orders')}
-                  className={currentPage === 'orders' ? 'bg-gradient-to-r from-amber-600 to-orange-600' : ''}
+                  variant={currentPage === "orders" ? "default" : "ghost"}
+                  onClick={() => onNavigate("orders")}
+                  className={
+                    currentPage === "orders"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                      : ""
+                  }
                 >
                   <ShoppingBag className="w-4 h-4 mr-2" />
                   My Orders
                 </Button>
                 <Button
-                  variant={currentPage === 'payment' ? 'default' : 'ghost'}
-                  onClick={() => onNavigate('payment')}
-                  className={currentPage === 'payment' ? 'bg-gradient-to-r from-amber-600 to-orange-600' : ''}
+                  variant={currentPage === "payment" ? "default" : "ghost"}
+                  onClick={() => onNavigate("payment")}
+                  className={
+                    currentPage === "payment"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                      : ""
+                  }
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
                   Payment
@@ -257,11 +316,11 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
                 <p className="font-medium">{user.name}</p>
                 <p className="text-sm text-slate-500">{user.email}</p>
                 <p className="text-xs text-slate-400 mt-1">
-                  {user.role === 'staff' ? 'Cafeteria Owner' : 'Customer'}
+                  {user.role === "staff" ? "Cafeteria Owner" : "Customer"}
                 </p>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onNavigate('profile')}>
+              <DropdownMenuItem onClick={() => onNavigate("profile")}>
                 <Settings className="w-4 h-4 mr-2" />
                 Profile Settings
               </DropdownMenuItem>
