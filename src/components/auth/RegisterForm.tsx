@@ -5,7 +5,7 @@ import { Label } from '../ui/label.js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
 import { toast } from 'sonner';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient'; // adjust path
 
 interface RegisterFormProps {
@@ -171,6 +171,9 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
                 />
+                {formData.role === 'student' && (
+                  <p className="text-xs text-slate-500">Must be a valid UTM email address</p>
+                )}
               </div>
 
               <div className="space-y-2">

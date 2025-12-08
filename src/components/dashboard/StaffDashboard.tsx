@@ -7,6 +7,7 @@ import ProfileSettings from '../profile/ProfileSettings.js';
 import PaymentManagement from '../payment/PaymentManagement.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import LiveQueueDashboard from '../queue/LiveQueueDashboard.js';
+import CafeteriaInformation from '../profile/CafeteriaInformation.js';
 
 interface StaffDashboardProps {
   user: any;
@@ -59,6 +60,11 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
   if (currentPage === 'queue-dashboard') {
     if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
     return <LiveQueueDashboard />;
+  }
+
+  if (currentPage === 'cafeteria-info') {
+    if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
+    return <CafeteriaInformation user={{ ...user, businessName: profile?.cafeteria_name }} />;
   }
 
   if (currentPage === 'manage-payments') {
@@ -187,6 +193,13 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
           <CardHeader>
             <CardTitle className="text-emerald-900">Manage Payments</CardTitle>
             <CardDescription className="text-emerald-700">View revenue and received payments</CardDescription>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate('cafeteria-info')}>
+          <CardHeader>
+            <CardTitle className="text-blue-900">Cafeteria Information</CardTitle>
+            <CardDescription className="text-blue-700">Business details & documents</CardDescription>
           </CardHeader>
         </Card>
       </div>

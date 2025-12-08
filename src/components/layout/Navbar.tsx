@@ -11,6 +11,7 @@ import {
   UtensilsCrossed,
   Mail,
   BarChart3,
+  Building2,
 } from "lucide-react";
 import { Button } from "../ui/button.js";
 import { Badge } from "../ui/badge";
@@ -387,6 +388,13 @@ export default function Navbar({
                   </p>
                 </div>
                 <DropdownMenuSeparator />
+                {isStaff && (
+                  <DropdownMenuItem onClick={() => onNavigate("cafeteria-info")}>
+                    <Building2 className="w-4 h-4 mr-2" />
+                    Cafeteria Information
+                  </DropdownMenuItem>
+                )}
+                {isStaff && <DropdownMenuSeparator />}
                 <DropdownMenuItem onClick={() => onNavigate("profile")}>
                   <Settings className="w-4 h-4 mr-2" />
                   Profile Settings

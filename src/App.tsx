@@ -29,6 +29,7 @@ type Page =
   | 'manage-menu'
   | 'manage-orders'
   | 'queue-dashboard'
+  | 'cafeteria-info'
   | 'cart-preview'
   | 'split-bill-initiation'
   | 'split-bill-tracking'

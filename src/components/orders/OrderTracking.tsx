@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, CheckCircle, ChefHat, Package } from "lucide-react";
+import { Clock, CheckCircle, ChefHat, Package, Bell } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -178,11 +178,28 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
     toast.success("Your order has been marked as completed!");
   };
 
+  const stages: OrderStatus[] = [
+    "Pending",
+    "Cooking",
+    "Ready for Pickup",
+    "Completed",
+  ];
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-slate-900 mb-2">My Orders 🍽️</h1>
-        <p className="text-slate-600">Track your orders in real-time</p>
+      <div className="mb-8 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-slate-900 mb-1">My Orders</h1>
+          <p className="text-slate-600">Track your orders in real-time</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full border-slate-300 text-slate-50 bg-slate-900 hover:bg-slate-800 gap-2"
+        >
+          <Bell className="w-4 h-4 text-white" />
+          <span className="text-white">Notifications On</span>
+        </Button>
       </div>
 
       {isLoading ? (
@@ -209,86 +226,130 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
           )}
 
           <div className="space-y-6">
-            {activeOrders.map((order) => (
-              <Card key={order.id} className="overflow-hidden border-2">
-                <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        {order.id}
-                        <Badge className={getStatusColor(order.status)}>
-                          {getStatusIcon(order.status)}
-                          <span className="ml-1">{order.status}</span>
-                        </Badge>
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        {order.cafeteria} · Queue #{order.queueNumber} ·{" "}
-                        {order.estimatedTime &&
-                          formatEstimatedPickupTime(order.estimatedTime)}
-                      </CardDescription>
+            {activeOrders.map((order) => {
+              const progress = getStatusProgress(order.status);
+              return (
+                <Card
+                  key={order.id}
+                  className="overflow-hidden border border-slate-200 bg-white shadow-sm"
+                >
+                  <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          {order.id}
+                          <Badge className={getStatusColor(order.status)}>
+                            {getStatusIcon(order.status)}
+                            <span className="ml-1">{order.status}</span>
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          {order.cafeteria} • Queue #{order.queueNumber}
+                        </CardDescription>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-slate-600">
+                          {order.createdAt
+                            ? new Date(order.createdAt).toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                }
+                              )
+                            : ""}
+                        </p>
+                        <p className="text-purple-700">
+                          RM {order.total.toFixed(2)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-slate-600">
-                        {order.createdAt
-                          ? new Date(order.createdAt).toLocaleTimeString()
-                          : ""}
-                      </p>
-                      <p className="text-purple-700">
-                        RM {order.total.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-slate-600">
-                        Order Progress
-                      </span>
-                      <span className="text-sm text-slate-900">
-                        {getStatusProgress(order.status)}%
-                      </span>
-                    </div>
-                    <Progress
-                      value={getStatusProgress(order.status)}
-                      className="h-2"
-                    />
-                  </div>
+                  </CardHeader>
 
-                  <div className="space-y-2 mb-6">
-                    <p className="text-sm text-slate-600">Items:</p>
-                    {order.items.length === 0 ? (
-                      <p className="text-sm text-slate-400">
-                        No items recorded.
-                      </p>
+                  <CardContent className="pt-6 space-y-6">
+                    {order.status === "Ready for Pickup" ? (
+                      <div className="border border-emerald-400 bg-emerald-50 text-emerald-800 rounded-lg p-3 text-sm">
+                        Your Order is Ready! Please proceed to {order.cafeteria} to
+                        collect your order.
+                      </div>
                     ) : (
-                      order.items.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between items-center py-2 px-3 bg-slate-50 rounded"
-                        >
-                          <span className="text-sm text-slate-900">
-                            {item.quantity}x {item.name}
-                          </span>
-                          <span className="text-sm text-slate-600">
-                            RM {item.price.toFixed(2)}
-                          </span>
+                      <div className="border border-blue-200 bg-blue-50 text-blue-800 rounded-lg p-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          <span>Estimated Pickup Time</span>
                         </div>
-                      ))
+                        <p className="text-xs mt-1">
+                          Ready in approximately{" "}
+                          {order.estimatedTime
+                            ? `${order.estimatedTime} minutes`
+                            : formatEstimatedPickupTime(0)}
+                        </p>
+                      </div>
                     )}
-                  </div>
 
-                  {order.status === "Ready for Pickup" && (
-                    <Button
-                      onClick={() => handleConfirmPickup(order.id)}
-                      className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" /> Confirm Pickup
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-slate-600">
+                          Order Progress
+                        </span>
+                        <span className="text-sm text-slate-900">{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2 bg-slate-200 [&>div]:bg-slate-900" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm text-slate-600">Items:</p>
+                      {order.items.length === 0 ? (
+                        <p className="text-sm text-slate-400">No items recorded.</p>
+                      ) : (
+                        order.items.map((item, index) => (
+                          <div
+                            key={index}
+                            className="flex justify-between items-center py-2 px-3 bg-slate-50 rounded"
+                          >
+                            <span className="text-sm text-slate-900">
+                              {item.quantity}x {item.name}
+                            </span>
+                            <span className="text-sm text-slate-600">
+                              RM {(item.price * item.quantity).toFixed(2)}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-4 text-center text-xs text-slate-600">
+                      {stages.map((label) => (
+                        <div
+                          key={label}
+                          className="flex flex-col items-center gap-2 py-3"
+                        >
+                          <span
+                            className={`h-9 w-9 rounded-full flex items-center justify-center border ${
+                              order.status === label
+                                ? "border-purple-600 text-purple-700 bg-purple-50"
+                                : "border-slate-200 text-slate-400 bg-white"
+                            }`}
+                          >
+                            {getStatusIcon(label)}
+                          </span>
+                          <span>{label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {order.status === "Ready for Pickup" && (
+                      <Button
+                        onClick={() => handleConfirmPickup(order.id)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" /> Confirm Pickup
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {completedOrders.length > 0 && (
@@ -296,13 +357,13 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
               <h2 className="text-slate-900 mb-4">Order History</h2>
               <div className="space-y-4">
                 {completedOrders.map((order) => (
-                  <Card key={order.id} className="opacity-75">
+                  <Card key={order.id} className="opacity-80">
                     <CardContent className="py-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-slate-900">{order.id}</p>
                           <p className="text-sm text-slate-600">
-                            {order.cafeteria} · {order.items.length} items
+                            {order.cafeteria} • {order.items.length} items
                           </p>
                         </div>
                         <div className="text-right">
