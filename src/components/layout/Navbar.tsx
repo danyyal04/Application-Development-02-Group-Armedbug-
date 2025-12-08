@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Menu, User, ShoppingBag, ShoppingCart, CreditCard, Settings, LogOut, Home, UtensilsCrossed, Mail } from 'lucide-react';
 import { Button } from '../ui/button.js';
-import { Badge } from '../ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +14,7 @@ import {
   SheetContent,
   SheetTrigger,
 } from '../ui/sheet.js';
+import { Badge } from '../ui/badge';
 
 interface NavbarProps {
   user: {
@@ -174,6 +174,7 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate, cartCo
               </SheetContent>
             </Sheet>
           </div>
+
           {/* Navigation Links - Desktop */}
           <div className="hidden md:flex items-center gap-1">
             <Button
@@ -242,7 +243,7 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate, cartCo
             )}
           </div>
 
-          {/* User Menu - Desktop */}
+          {/* Right Side: Invitations, Cart, User menu */}
           <div className="flex items-center gap-1">
             {!isStaff && (
               <Button
