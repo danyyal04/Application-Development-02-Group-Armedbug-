@@ -63,16 +63,17 @@ export default function App() {
           const user = session.user;
           setCurrentUser({
             id: user.id,
-          email: user.email || '',
-          name: user.user_metadata?.name || user.email || '',
-          role: user.user_metadata?.role || 'student',
-        });
-        setCurrentPage('dashboard');
-      } else {
-        setCurrentUser(null);
-        setCurrentPage('login');
+            email: user.email || '',
+            name: user.user_metadata?.name || user.email || '',
+            role: user.user_metadata?.role || 'student',
+          });
+          setCurrentPage('dashboard');
+        } else {
+          setCurrentUser(null);
+          setCurrentPage('login');
+        }
       }
-    });
+    );
 
     return () => {
       listener.subscription.unsubscribe();
