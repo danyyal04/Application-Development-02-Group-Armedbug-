@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { Toaster } from './components/ui/sonner.js';
 import LoginForm from './components/auth/LoginForm.js';
 import RegisterForm from './components/auth/RegisterForm.js';
@@ -26,7 +27,10 @@ type Page =
   | 'payment'
   | 'profile'
   | 'manage-menu'
-  | 'manage-orders';
+  | 'manage-orders'
+  | 'cart-preview'
+  | 'split-bill-initiation'
+  | 'split-bill-tracking';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -51,11 +55,12 @@ export default function App() {
     loadSession();
 
     // Listen to auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const user = session.user;
-        setCurrentUser({
-          id: user.id,
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        if (session?.user) {
+          const user = session.user;
+          setCurrentUser({
+            id: user.id,
           email: user.email || '',
           name: user.user_metadata?.name || user.email || '',
           role: user.user_metadata?.role || 'student',

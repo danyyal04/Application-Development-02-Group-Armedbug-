@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, ShoppingCart, Plus, Minus, ArrowLeft, Clock, MapPin, Star } from 'lucide-react';
-import { Card, CardContent } from '../ui/card.js';
-import { Input } from '../ui/input.js';
-import { Button } from '../ui/button.js';
-import { Badge } from '../ui/badge.js';
-import { Label } from '../ui/label.js';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
+import { Card, CardContent } from '../ui/card';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabaseClient.js';
+import { supabase } from '../../lib/supabaseClient';
 
 interface MenuItem {
   id: string;
@@ -31,6 +31,16 @@ const mapMenuRowToItem = (row: any): MenuItem => ({
   available: row.available ?? true,
 });
 
+export interface CartSummaryItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  quantity: number;
+  imageUrl: string;
+  category: string;
+}
+
 interface MenuListProps {
   cafeteria: {
     id: string;
@@ -40,16 +50,28 @@ interface MenuListProps {
     estimatedTime: string;
   };
   onBack: () => void;
-  onCheckout: (cartItems: any[], pickupTime: string) => void;
+  onCheckout: (cartItems: CartSummaryItem[], pickupTime: string) => void;
+  cartItems: CartSummaryItem[];
+  pickupTime: string;
+  onPickupTimeChange: (value: string) => void;
+  onAddToCart: (item: Omit<CartSummaryItem, 'quantity'>) => void;
+  onDecreaseItem: (itemId: string) => void;
 }
 
-export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProps) {
+export default function MenuList({
+  cafeteria,
+  onBack,
+  onCheckout,
+  cartItems,
+  pickupTime,
+  onPickupTimeChange,
+  onAddToCart,
+  onDecreaseItem,
+}: MenuListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [cart, setCart] = useState<{ [key: string]: number }>({});
-  const [pickupTime, setPickupTime] = useState('asap');
 
   useEffect(() => {
     const loadMenu = async () => {
@@ -76,10 +98,11 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
     loadMenu();
   }, [cafeteria.id]);
 
-  const filteredItems = menuItems.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredItems = menuItems.filter(
+    item =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSearchSubmit = () => {
@@ -92,53 +115,55 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
     }
   };
 
-  const addToCart = (itemId: string) => {
-    setCart(prev => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }));
-    toast.success('Item added to cart');
-  };
+  const cartQuantities = useMemo(() => {
+    return cartItems.reduce<Record<string, number>>((acc, item) => {
+      acc[item.id] = item.quantity;
+      return acc;
+    }, {});
+  }, [cartItems]);
 
-  const removeFromCart = (itemId: string) => {
-    setCart(prev => {
-      const newCart = { ...prev };
-      if (newCart[itemId] && newCart[itemId] > 1) {
-        newCart[itemId]--;
-      } else {
-        delete newCart[itemId];
-      }
-      return newCart;
-    });
-    toast.success('Item removed from cart');
-  };
+  const totalItems = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    [cartItems]
+  );
 
-  const totalItems = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
-  const totalPrice = Object.entries(cart).reduce((sum, [itemId, qty]) => {
-    const item = menuItems.find(i => i.id === itemId);
-    return sum + (item?.price || 0) * qty;
-  }, 0);
+  const totalPrice = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cartItems]
+  );
 
   const handleCheckout = () => {
     if (totalItems === 0) {
       toast.error('Your cart is empty');
       return;
     }
-    
+
     if (pickupTime === '') {
       toast.error('Please select a pickup time');
       return;
     }
 
-    // Prepare cart items for checkout
-    const cartItemsArray = Object.entries(cart).map(([itemId, quantity]) => {
-      const item = menuItems.find(i => i.id === itemId);
-      return {
-        id: itemId,
-        name: item?.name || '',
-        price: item?.price || 0,
-        quantity,
-      };
-    });
+    onCheckout(cartItems, pickupTime);
+  };
 
-    onCheckout(cartItemsArray, pickupTime);
+  const handleAddToCart = (item: MenuItem) => {
+    if (!item.available) {
+      toast.error('This item is currently unavailable');
+      return;
+    }
+
+    onAddToCart({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      price: item.price,
+      imageUrl: item.imageUrl,
+      category: item.category,
+    });
+  };
+
+  const handleDecreaseFromCart = (itemId: string) => {
+    onDecreaseItem(itemId);
   };
 
   return (
@@ -185,14 +210,18 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
               type="text"
               placeholder="Search for food, drinks, or categories..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="pl-10 w-full"
             />
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full">
-            <Button className="w-full sm:w-auto" onClick={handleSearchSubmit}>Search</Button>
+            <Button className="w-full sm:w-auto" onClick={handleSearchSubmit}>
+              Search
+            </Button>
             {searchQuery && (
-              <Button className="w-full sm:w-auto" variant="outline" onClick={() => setSearchQuery('')}>Clear</Button>
+              <Button className="w-full sm:w-auto" variant="outline" onClick={() => setSearchQuery('')}>
+                Clear
+              </Button>
             )}
           </div>
         </div>
@@ -224,8 +253,10 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="pickupTime" className="text-purple-900">Pickup Time</Label>
-              <Select value={pickupTime} onValueChange={setPickupTime}>
+              <Label htmlFor="pickupTime" className="text-purple-900">
+                Pickup Time
+              </Label>
+              <Select value={pickupTime} onValueChange={onPickupTimeChange}>
                 <SelectTrigger id="pickupTime" className="bg-white">
                   <SelectValue />
                 </SelectTrigger>
@@ -239,7 +270,7 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
               </Select>
             </div>
 
-            <Button 
+            <Button
               className="w-full text-white hover:opacity-90"
               style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
               onClick={handleCheckout}
@@ -259,40 +290,38 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems.map((item) => (
+          {filteredItems.map(item => (
             <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-video w-full overflow-hidden bg-slate-100">
-                <img
-                  src={item.imageUrl || '/UTMMunch-Logo.jpg'}
-                  alt={item.name}
-                  className="w-full h-full object-cover"
-                />
+                <img src={item.imageUrl || '/UTMMunch-Logo.jpg'} alt={item.name} className="w-full h-full object-cover" />
               </div>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
                     <h3 className="text-slate-900 mb-1">{item.name}</h3>
-                    <Badge variant="secondary" className="mb-2">{item.category}</Badge>
+                    <Badge variant="secondary" className="mb-2">
+                      {item.category}
+                    </Badge>
                   </div>
                   <p className="text-purple-700">RM {item.price.toFixed(2)}</p>
                 </div>
                 <p className="text-sm text-slate-600 mb-4">{item.description}</p>
-                
-                {cart[item.id] ? (
+
+                {cartQuantities[item.id] ? (
                   <div className="flex items-center justify-between gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => removeFromCart(item.id)}
+                      onClick={() => handleDecreaseFromCart(item.id)}
                       className="flex-1"
                     >
                       <Minus className="w-4 h-4" />
                     </Button>
-                    <span className="text-slate-900 px-4">{cart[item.id]}</span>
+                    <span className="text-slate-900 px-4">{cartQuantities[item.id]}</span>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => addToCart(item.id)}
+                      onClick={() => handleAddToCart(item)}
                       className="flex-1"
                     >
                       <Plus className="w-4 h-4" />
@@ -300,7 +329,7 @@ export default function MenuList({ cafeteria, onBack, onCheckout }: MenuListProp
                   </div>
                 ) : (
                   <Button
-                    onClick={() => addToCart(item.id)}
+                    onClick={() => handleAddToCart(item)}
                     className="w-full text-white hover:opacity-90"
                     style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
                   >
