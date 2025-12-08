@@ -12,7 +12,7 @@ import {
   calculateAverageWaitTime,
   getOrderStatusBreakdown,
   isBulkOrder,
-} from '../../utils/queueCalculations';
+} from "../../utils/queueCalculations.js";
 
 interface Order {
   id: string;

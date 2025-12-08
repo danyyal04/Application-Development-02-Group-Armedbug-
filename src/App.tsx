@@ -28,6 +28,7 @@ type Page =
   | 'profile'
   | 'manage-menu'
   | 'manage-orders'
+  | 'queue-dashboard'
   | 'cart-preview'
   | 'split-bill-initiation'
   | 'split-bill-tracking'

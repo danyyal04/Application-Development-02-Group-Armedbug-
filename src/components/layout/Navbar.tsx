@@ -10,6 +10,7 @@ import {
   Home,
   UtensilsCrossed,
   Mail,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "../ui/button.js";
 import { Badge } from "../ui/badge";
@@ -120,6 +121,21 @@ export default function Navbar({
                       >
                         <ShoppingBag className="w-4 h-4 mr-2" />
                         Manage Orders
+                      </Button>
+                      <Button
+                        variant={
+                          currentPage === "queue-dashboard"
+                            ? "default"
+                            : "ghost"
+                        }
+                        onClick={() => {
+                          onNavigate("queue-dashboard");
+                          setOpen(false);
+                        }}
+                        className="w-full justify-start"
+                      >
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        Queue Dashboard
                       </Button>
                       <Button
                         variant={
@@ -247,6 +263,20 @@ export default function Navbar({
                 >
                   <ShoppingBag className="w-4 h-4 mr-2" />
                   Manage Orders
+                </Button>
+                <Button
+                  variant={
+                    currentPage === "queue-dashboard" ? "default" : "ghost"
+                  }
+                  onClick={() => onNavigate("queue-dashboard")}
+                  className={
+                    currentPage === "queue-dashboard"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                      : ""
+                  }
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Queue Dashboard
                 </Button>
                 <Button
                   variant={

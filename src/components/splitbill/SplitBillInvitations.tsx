@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Users, Clock, Mail, CheckCircle, XCircle, ArrowRight, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import InvitationDetailView from './InvitationDetailView';
+import InvitationDetailView from './InvitationDetailView.js';
 
 interface SplitBillInvitation {
   id: string;

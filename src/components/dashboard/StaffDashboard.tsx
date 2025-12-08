@@ -6,6 +6,7 @@ import OrderManagement from '../orders/OrderManagement.js';
 import ProfileSettings from '../profile/ProfileSettings.js';
 import PaymentManagement from '../payment/PaymentManagement.js';
 import { supabase } from '../../lib/supabaseClient.js';
+import LiveQueueDashboard from '../queue/LiveQueueDashboard.js';
 
 interface StaffDashboardProps {
   user: any;
@@ -53,6 +54,11 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
   if (currentPage === 'manage-orders') {
     if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
     return <OrderManagement cafeteriaId={cafeteriaId} />;
+  }
+
+  if (currentPage === 'queue-dashboard') {
+    if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
+    return <LiveQueueDashboard />;
   }
 
   if (currentPage === 'manage-payments') {
@@ -167,6 +173,13 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
           <CardHeader>
             <CardTitle className="text-amber-900">Manage Orders</CardTitle>
             <CardDescription className="text-amber-700">Update order status and track progress</CardDescription>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate('queue-dashboard')}>
+          <CardHeader>
+            <CardTitle className="text-blue-900">Queue Dashboard</CardTitle>
+            <CardDescription className="text-blue-700">Live queue and prep status</CardDescription>
           </CardHeader>
         </Card>
 
