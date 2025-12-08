@@ -30,11 +30,13 @@ type Page =
   | 'manage-orders'
   | 'cart-preview'
   | 'split-bill-initiation'
-  | 'split-bill-tracking';
+  | 'split-bill-tracking'
+  | 'splitbill-invitations';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('login');
+  const [cartCount, setCartCount] = useState(0);
 
   // Load Supabase session on mount
   useEffect(() => {
@@ -103,6 +105,8 @@ export default function App() {
           onLogout={handleLogout}
           currentPage={currentPage}
           onNavigate={setCurrentPage}
+          cartCount={cartCount}
+          onCartClick={() => setCurrentPage('cart-preview')}
         />
       )}
 
@@ -116,7 +120,12 @@ export default function App() {
         ) : currentUser.role === 'staff' ? (
           <StaffDashboard user={currentUser} currentPage={currentPage} onNavigate={setCurrentPage} />
         ) : (
-          <StudentDashboard user={currentUser} currentPage={currentPage} onNavigate={setCurrentPage} />
+          <StudentDashboard
+            user={currentUser}
+            currentPage={currentPage}
+            onNavigate={setCurrentPage}
+            onCartCountChange={setCartCount}
+          />
         )}
       </main>
 

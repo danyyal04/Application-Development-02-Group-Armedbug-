@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, CreditCard, AlertCircle, Clock, CheckCircle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
-import { Button } from '../ui/button.js';
-import { Badge } from '../ui/badge.js';
-import { Separator } from '../ui/separator.js';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group.js';
-import { Label } from '../ui/label.js';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog.js';
-import { Input } from '../ui/input.js';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, CreditCard, AlertCircle, Clock, CheckCircle, Users } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Separator } from '../ui/separator';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Label } from '../ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Input } from '../ui/input';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabaseClient.js';
+import { supabase } from '../../lib/supabaseClient';
 
 interface CartItem {
   id: string;
@@ -39,9 +39,19 @@ interface CheckoutPageProps {
   pickupTime: string;
   onBack: () => void;
   onSuccess: () => void;
+  onSplitBill?: () => void;
+  initialMode?: 'normal' | 'split';
 }
 
-export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack, onSuccess }: CheckoutPageProps) {
+export default function CheckoutPage({
+  cafeteria,
+  cartItems,
+  pickupTime,
+  onBack,
+  onSuccess,
+  onSplitBill,
+  initialMode = 'normal',
+}: CheckoutPageProps) {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string>('');
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -59,20 +69,27 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [paymentSummary, setPaymentSummary] = useState({ amount: 0, method: '' });
+  const [checkoutMode, setCheckoutMode] = useState<'normal' | 'split'>(initialMode);
+  const [splitMethod, setSplitMethod] = useState<'even' | 'items'>('even');
+  const [participantCount, setParticipantCount] = useState<number>(2);
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const serviceFee = 0.50;
+  const serviceFee = 0.5;
   const total = subtotal + serviceFee;
   const selectedPayment = paymentMethods.find(pm => pm.id === selectedPaymentId);
   const requiresManualCredentials = selectedPayment?.type !== 'card';
-  const placeOrderLabel = isProcessing
-    ? 'Processing...'
-    : selectedPayment?.type === 'card'
-      ? 'Charge Card & Place Order'
-      : 'Place Order';
+  const placeOrderLabel =
+    isProcessing && checkoutMode === 'normal'
+      ? 'Processing...'
+      : selectedPayment?.type === 'card'
+        ? 'Charge Card & Place Order'
+        : 'Place Order';
   const confirmButtonLabel = requiresManualCredentials ? 'Confirm Payment' : 'Charge Card';
+  const splitPerPerson = useMemo(
+    () => (participantCount > 0 ? total / participantCount : total),
+    [total, participantCount]
+  );
 
-  // Fetch payment methods
   const fetchPayments = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -86,7 +103,6 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
     if (error) return toast.error('Failed to load payment methods');
     if (data) setPaymentMethods(data as PaymentMethod[]);
 
-    // Select default payment if exists
     const defaultMethod = (data as PaymentMethod[]).find(pm => pm.is_default);
     if (defaultMethod) setSelectedPaymentId(defaultMethod.id);
   };
@@ -94,24 +110,26 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
   useEffect(() => {
     fetchPayments();
 
-    // Subscribe to real-time payment method changes
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const channel = supabase.channel('payment-changes').on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'payment', filter: `user_id=eq.${user.id}` },
-        () => {
-          fetchPayments();
-        }
-      ).subscribe();
+      const channel = supabase
+        .channel('payment-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'payment', filter: `user_id=eq.${user.id}` },
+          () => fetchPayments()
+        )
+        .subscribe();
 
-      return () => {
-        channel.unsubscribe();
-      };
+      return () => channel.unsubscribe();
     })();
   }, []);
+
+  useEffect(() => {
+    setCheckoutMode(initialMode);
+  }, [initialMode]);
 
   const getPaymentTypeLabel = (type: string) => {
     switch (type) {
@@ -133,7 +151,6 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
     }
   };
 
-  // Add new payment method
   const handleAddNewPayment = async () => {
     const expiryPattern = /^(0[1-9]|1[0-2])\/\d{2}$/;
     const cvvPattern = /^\d{3}$/;
@@ -142,30 +159,17 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
     const sanitizedDetails = newPaymentData.details.replace(/\D/g, '');
 
     if (newPaymentData.type === 'card') {
-      if (
-        !newPaymentData.name ||
-        sanitizedCard.length < 12 ||
-        !expiryPattern.test(newPaymentData.expiry) ||
-        !cvvPattern.test(newPaymentData.securityCode)
-      ) {
+      if (!newPaymentData.name || sanitizedCard.length < 12 || !expiryPattern.test(newPaymentData.expiry) || !cvvPattern.test(newPaymentData.securityCode)) {
         toast.error('Invalid payment information.');
         return;
       }
     } else if (newPaymentData.type === 'fpx') {
-      if (
-        !newPaymentData.name ||
-        sanitizedDetails.length < 10 ||
-        !sixDigitPinPattern.test(newPaymentData.pin)
-      ) {
+      if (!newPaymentData.name || sanitizedDetails.length < 10 || !sixDigitPinPattern.test(newPaymentData.pin)) {
         toast.error('Invalid payment information.');
         return;
       }
     } else if (newPaymentData.type === 'ewallet') {
-      if (
-        !newPaymentData.name ||
-        sanitizedDetails.length < 9 ||
-        !sixDigitPinPattern.test(newPaymentData.pin)
-      ) {
+      if (!newPaymentData.name || sanitizedDetails.length < 9 || !sixDigitPinPattern.test(newPaymentData.pin)) {
         toast.error('Invalid payment information.');
         return;
       }
@@ -202,32 +206,24 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
       credit_limit: newPaymentData.type === 'card' ? 500 : null,
     };
 
-    try {
-      const { data, error } = await supabase
-        .from('payment')
-        .insert([payload])
-        .select()
-        .single();
+    const { data, error } = await supabase.from('payment').insert([payload]).select().single();
+    if (error) return toast.error('Unable to save payment method. Please try again later.');
 
-      if (error) {
-        toast.error('Unable to save payment method. Please try again later.');
-        return;
-      }
+    const addedMethod = data as PaymentMethod;
+    setPaymentMethods([...paymentMethods, addedMethod]);
+    setSelectedPaymentId(addedMethod.id);
 
-      const addedMethod = data as PaymentMethod;
-      setPaymentMethods([...paymentMethods, addedMethod]);
-      setSelectedPaymentId(addedMethod.id);
-
-      setShowAddPaymentDialog(false);
-      setNewPaymentData({ type: 'fpx', name: '', details: '', cardNumber: '', expiry: '', securityCode: '', pin: '' });
-      toast.success('Payment method added successfully.');
-    } catch (err) {
-      toast.error('Unable to save payment method. Please try again later.');
-    }
+    setShowAddPaymentDialog(false);
+    setNewPaymentData({ type: 'fpx', name: '', details: '', cardNumber: '', expiry: '', securityCode: '', pin: '' });
+    toast.success('Payment method added successfully.');
   };
 
   const handlePlaceOrderClick = () => {
     if (isProcessing) return;
+    if (checkoutMode === 'split') {
+      onSplitBill?.();
+      return;
+    }
     if (!selectedPaymentId) {
       toast.error('Please select a payment method');
       return;
@@ -254,7 +250,6 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
     }
   };
 
-  // Confirm payment and place order
   const handleConfirmPayment = async () => {
     if (!selectedPaymentId) return toast.error('Please select a payment method');
 
@@ -289,19 +284,16 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
         return;
       }
 
-      const { error: orderError } = await supabase
-        .from('orders')
-        .insert([{
-          user_id: user.id,
-          cafeteria_id: cafeteria?.id || null,
-          total_amount: total,
-          payment_id: payment.id,
-          payment_method: payment.type,
-          status: 'Pending',
-          paid_at: new Date().toISOString(),
-          items: JSON.stringify(cartItems),
-        }]);
-
+      const { error: orderError } = await supabase.from('orders').insert([{
+        user_id: user.id,
+        cafeteria_id: cafeteria?.id || null,
+        total_amount: total,
+        payment_id: payment.id,
+        payment_method: payment.type,
+        status: 'Pending',
+        paid_at: new Date().toISOString(),
+        items: JSON.stringify(cartItems),
+      }]);
       if (orderError) {
         toast.error('Unable to connect to payment service. Please try again later.');
         return;
@@ -314,7 +306,6 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
           credit_limit: typeof payment.credit_limit === 'number' ? payment.credit_limit - total : payment.credit_limit,
         })
         .eq('id', selectedPaymentId);
-
       if (updateError) {
         toast.error('Payment failed or cancelled');
         return;
@@ -325,7 +316,7 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
       setPaymentCredentials('');
       setPaymentSummary({ amount: total, method: payment.name });
       setShowSuccessDialog(true);
-    } catch (error) {
+    } catch {
       toast.error('Unable to connect to payment service. Please try again later.');
     } finally {
       setIsProcessing(false);
@@ -334,19 +325,37 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
       <div className="mb-8">
         <Button variant="ghost" onClick={onBack} className="mb-4 -ml-2">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Menu
         </Button>
-        <h1 className="text-slate-900 mb-2">Checkout 💳</h1>
-        <p className="text-slate-600">Review your order and complete payment</p>
+        <h1 className="text-slate-900 mb-1">Checkout</h1>
+        <p className="text-slate-600 mb-3">
+          {checkoutMode === 'normal' ? 'Review your order and complete payment' : 'Review your order and start split bill'}
+        </p>
+        <div className="inline-flex rounded-full border border-slate-200 overflow-hidden text-sm bg-slate-100">
+          <Button
+            type="button"
+            variant="ghost"
+            className={`rounded-none px-4 ${checkoutMode === 'normal' ? 'bg-white text-slate-900 font-semibold shadow-sm' : 'text-slate-700'}`}
+            onClick={() => setCheckoutMode('normal')}
+          >
+            Normal Checkout
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className={`rounded-none px-4 ${checkoutMode === 'split' ? 'bg-white text-purple-700 font-semibold shadow-sm' : 'text-slate-700'}`}
+            onClick={() => setCheckoutMode('split')}
+            disabled={!onSplitBill}
+          >
+            Split Bill
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Order & Payment */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Pickup Details */}
           <Card>
             <CardHeader>
               <CardTitle>Pickup Details</CardTitle>
@@ -354,13 +363,12 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
             <CardContent className="space-y-3">
               <div className="flex justify-between"><span className="text-slate-600">Cafeteria</span><span className="text-slate-900">{cafeteria.name}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">Location</span><span className="text-slate-900">{cafeteria.location}</span></div>
-              <div className="flex justify-between"><span className="text-slate-600">Pickup Time</span>
+              <div className="flex justify-between items-center"><span className="text-slate-600">Pickup Time</span>
                 <Badge className="bg-purple-600"><Clock className="w-3 h-3 mr-1" />{getPickupTimeLabel(pickupTime)}</Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* Order Summary */}
           <Card>
             <CardHeader>
               <CardTitle>Order Summary</CardTitle>
@@ -376,41 +384,91 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
             </CardContent>
           </Card>
 
-          {/* Payment Method */}
-          <Card>
-            <CardHeader className="flex justify-between">
-              <div><CardTitle>Payment Method</CardTitle><CardDescription>Select your preferred payment option</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={() => setShowAddPaymentDialog(true)}>Add New</Button>
-            </CardHeader>
-            <CardContent>
-              {paymentMethods.length === 0 ? (
-                <div className="text-center py-8">
-                  <CreditCard className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                  <p className="text-slate-500 mb-4">No payment methods found.</p>
-                  <Button onClick={() => setShowAddPaymentDialog(true)}>Add Payment Method</Button>
-                </div>
-              ) : (
-                <RadioGroup value={selectedPaymentId} onValueChange={setSelectedPaymentId} className="space-y-3">
-                  {paymentMethods.map(pm => (
-                    <div key={pm.id} className={`flex items-center space-x-3 p-4 border rounded-lg cursor-pointer ${selectedPaymentId === pm.id ? 'border-purple-600 bg-purple-50' : 'border-slate-200 hover:border-slate-300'}`} onClick={() => setSelectedPaymentId(pm.id)}>
-                      <RadioGroupItem value={pm.id} id={pm.id} />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor={pm.id} className="cursor-pointer text-slate-900">{pm.name}</Label>
-                          {pm.is_default && <Badge variant="secondary" className="text-xs">Default</Badge>}
+          {checkoutMode === 'normal' ? (
+            <Card>
+              <CardHeader className="flex justify-between">
+                <div><CardTitle>Payment Method</CardTitle><CardDescription>Select your preferred payment option</CardDescription></div>
+                <Button variant="outline" size="sm" onClick={() => setShowAddPaymentDialog(true)}>Add New</Button>
+              </CardHeader>
+              <CardContent>
+                {paymentMethods.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CreditCard className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                    <p className="text-slate-500 mb-4">No payment methods found.</p>
+                    <Button onClick={() => setShowAddPaymentDialog(true)}>Add Payment Method</Button>
+                  </div>
+                ) : (
+                  <RadioGroup value={selectedPaymentId} onValueChange={setSelectedPaymentId} className="space-y-3">
+                    {paymentMethods.map(pm => (
+                      <div key={pm.id} className={`flex items-center space-x-3 p-4 border rounded-lg cursor-pointer ${selectedPaymentId === pm.id ? 'border-purple-600 bg-purple-50' : 'border-slate-200 hover:border-slate-300'}`} onClick={() => setSelectedPaymentId(pm.id)}>
+                        <RadioGroupItem value={pm.id} id={pm.id} />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor={pm.id} className="cursor-pointer text-slate-900">{pm.name}</Label>
+                            {pm.is_default && <Badge variant="secondary" className="text-xs">Default</Badge>}
+                          </div>
+                          <p className="text-sm text-slate-600">
+                            {getPaymentTypeLabel(pm.type)} - {(pm.type === 'fpx' || pm.type === 'ewallet')
+                              ? `Balance: RM ${pm.balance?.toFixed(2)}`
+                              : `Limit: RM ${pm.credit_limit?.toFixed(2)}`}
+                          </p>
                         </div>
-                        <p className="text-sm text-slate-600">{getPaymentTypeLabel(pm.type)} - {(pm.type === 'fpx' || pm.type === 'ewallet') ? `Balance: RM ${pm.balance?.toFixed(2)}` : `Limit: RM ${pm.credit_limit?.toFixed(2)}`}</p>
+                        <CreditCard className="w-5 h-5 text-slate-400" />
                       </div>
-                      <CreditCard className="w-5 h-5 text-slate-400" />
-                    </div>
-                  ))}
-                </RadioGroup>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </RadioGroup>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Split Bill</CardTitle>
+                <CardDescription>Set up how the bill will be divided</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
+                  <p className="text-purple-900 font-medium">Split the bill with friends!</p>
+                  <p className="text-sm text-purple-800">
+                    Share the cost with your dining companions. Each person pays their portion.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Split Method</Label>
+                  <select
+                    className="w-full rounded-md border bg-input-background px-3 py-2 text-sm"
+                    value={splitMethod}
+                    onChange={e => setSplitMethod(e.target.value as 'even' | 'items')}
+                  >
+                    <option value="even">Split Evenly</option>
+                    <option value="items">Split by Items (coming soon)</option>
+                  </select>
+                  <p className="text-xs text-slate-600">
+                    {splitMethod === 'even'
+                      ? 'Total bill will be divided equally among all participants'
+                      : 'Assign items per participant (coming soon)'}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Number of Participants</Label>
+                  <select
+                    className="w-full rounded-md border bg-input-background px-3 py-2 text-sm"
+                    value={participantCount}
+                    onChange={e => setParticipantCount(Math.max(1, Number(e.target.value)))}
+                  >
+                    {[2, 3, 4, 5, 6].map(count => (
+                      <option key={count} value={count}>{count} people</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-600">
+                    Each person pays: RM {splitPerPerson.toFixed(2)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* Price Summary */}
         <div className="lg:col-span-1">
           <Card className="sticky top-20">
             <CardHeader><CardTitle>Price Summary</CardTitle></CardHeader>
@@ -421,15 +479,28 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
               </div>
               <Separator />
               <div className="flex justify-between text-slate-900"><span>Total</span><span>RM {total.toFixed(2)}</span></div>
-              <Button
-                className="w-full text-white hover:opacity-90"
-                style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
-                onClick={handlePlaceOrderClick}
-                disabled={!selectedPaymentId || isProcessing}
-              >
-                {placeOrderLabel}
-              </Button>
-              {selectedPayment?.type === 'card' && (
+              {checkoutMode === 'split' && onSplitBill && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-purple-600 text-purple-700 hover:bg-purple-50 flex items-center justify-center gap-2"
+                  onClick={onSplitBill}
+                >
+                  <Users className="w-4 h-4" />
+                  Create Split Bill
+                </Button>
+              )}
+              {checkoutMode === 'normal' && (
+                <Button
+                  className="w-full text-white hover:opacity-90"
+                  style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
+                  onClick={handlePlaceOrderClick}
+                  disabled={!selectedPaymentId || isProcessing}
+                >
+                  {placeOrderLabel}
+                </Button>
+              )}
+              {checkoutMode === 'normal' && selectedPayment?.type === 'card' && (
                 <div className="flex items-start gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                   <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5" />
                   <p className="text-xs text-emerald-800">Credit/debit cards are auto-charged when you place your order.</p>
@@ -437,17 +508,20 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
               )}
               <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
-                <p className="text-xs text-blue-800">Your payment will be processed securely. Please collect your order at the specified pickup time.</p>
+                <p className="text-xs text-blue-800">
+                  {checkoutMode === 'normal'
+                    ? 'Your payment will be processed securely. Please collect your order at the specified pickup time.'
+                    : 'Split bill will be created; participants pay individually after you proceed.'}
+                </p>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Payment Dialog */}
       <Dialog
         open={showPaymentDialog}
-        onOpenChange={(open) => {
+        onOpenChange={open => {
           setShowPaymentDialog(open);
           if (!open) setPaymentCredentials('');
         }}
@@ -505,7 +579,6 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
         </DialogContent>
       </Dialog>
 
-      {/* Add Payment Dialog */}
       <Dialog open={showAddPaymentDialog} onOpenChange={setShowAddPaymentDialog}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add New Payment Method</DialogTitle><DialogDescription>Add a payment method to use for your orders</DialogDescription></DialogHeader>
@@ -515,16 +588,18 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
               <select
                 className="w-full rounded-md border bg-input-background px-3 py-2 text-sm"
                 value={newPaymentData.type}
-                onChange={(e) => setNewPaymentData({
-                  ...newPaymentData,
-                  type: e.target.value as any,
-                  name: '',
-                  details: '',
-                  cardNumber: '',
-                  expiry: '',
-                  securityCode: '',
-                  pin: ''
-                })}
+                onChange={e =>
+                  setNewPaymentData({
+                    ...newPaymentData,
+                    type: e.target.value as any,
+                    name: '',
+                    details: '',
+                    cardNumber: '',
+                    expiry: '',
+                    securityCode: '',
+                    pin: '',
+                  })
+                }
               >
                 <option value="fpx">FPX Online Banking</option>
                 <option value="ewallet">E-Wallet</option>
@@ -532,7 +607,6 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
               </select>
             </div>
 
-            {/* Conditional fields */}
             {newPaymentData.type === 'fpx' && (
               <>
                 <div className="space-y-2">
@@ -540,7 +614,7 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
                   <select
                     className="w-full rounded-md border bg-input-background px-3 py-2 text-sm"
                     value={newPaymentData.name}
-                    onChange={(e) => setNewPaymentData({ ...newPaymentData, name: e.target.value })}
+                    onChange={e => setNewPaymentData({ ...newPaymentData, name: e.target.value })}
                   >
                     <option value="">Select bank</option>
                     <option value="Maybank">Maybank</option>
@@ -579,7 +653,7 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
                   <select
                     className="w-full rounded-md border bg-input-background px-3 py-2 text-sm"
                     value={newPaymentData.name}
-                    onChange={(e) => setNewPaymentData({ ...newPaymentData, name: e.target.value })}
+                    onChange={e => setNewPaymentData({ ...newPaymentData, name: e.target.value })}
                   >
                     <option value="">Select provider</option>
                     <option value="TnG">Touch 'n Go</option>
@@ -612,7 +686,11 @@ export default function CheckoutPage({ cafeteria, cartItems, pickupTime, onBack,
               <>
                 <div className="space-y-2">
                   <Label>Card Name</Label>
-                  <Input placeholder="Visa / Mastercard" value={newPaymentData.name} onChange={e => setNewPaymentData({ ...newPaymentData, name: e.target.value })} />
+                  <Input
+                    placeholder="Visa / Mastercard"
+                    value={newPaymentData.name}
+                    onChange={e => setNewPaymentData({ ...newPaymentData, name: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Card Number</Label>

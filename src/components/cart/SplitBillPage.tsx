@@ -5,7 +5,6 @@ import {
   Check,
   Clock,
   AlertCircle,
-  Copy,
   CheckCircle,
   XCircle,
   Wallet,
@@ -45,6 +44,7 @@ interface Participant {
   paymentTime?: string | undefined;
   paymentMethod?: string | undefined;
   paymentStatus: 'pending' | 'paid' | 'failed';
+  invitationStatus: 'pending' | 'accepted' | 'rejected';
 }
 
 interface SplitBillPageProps {
@@ -83,6 +83,7 @@ export default function SplitBillPage({
       amount: totalAmount / 2,
       paid: false,
       paymentStatus: 'pending',
+      invitationStatus: 'accepted',
     },
     {
       id: '2',
@@ -91,6 +92,7 @@ export default function SplitBillPage({
       amount: totalAmount / 2,
       paid: false,
       paymentStatus: 'pending',
+      invitationStatus: 'pending',
     },
   ]);
 
@@ -99,7 +101,6 @@ export default function SplitBillPage({
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [paymentCredentials, setPaymentCredentials] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   const currentParticipant = participants.find(p => p.email === currentUserEmail);
@@ -155,17 +156,20 @@ export default function SplitBillPage({
     }
   };
 
-  const handleCopyLink = () => {
-    const link = `${window.location.origin}/split-bill/${splitBillId}`;
-    navigator.clipboard.writeText(link);
-    setLinkCopied(true);
-    toast.success('Link copied to clipboard!');
-    setTimeout(() => setLinkCopied(false), 3000);
+  const getInvitationBadge = (status: Participant['invitationStatus']) => {
+    if (status === 'accepted') return <Badge className="bg-green-100 text-green-700 border border-green-200">Accepted</Badge>;
+    if (status === 'rejected') return <Badge className="bg-red-100 text-red-700 border border-red-200">Rejected</Badge>;
+    return <Badge className="bg-amber-100 text-amber-700 border border-amber-200">Pending Invite</Badge>;
   };
 
   const handlePayMyPortion = () => {
     if (!currentParticipant) {
       toast.error('Unable to identify your payment portion');
+      return;
+    }
+
+    if (currentParticipant.invitationStatus !== 'accepted') {
+      toast.error('Please accept the invitation before paying.');
       return;
     }
 
@@ -260,6 +264,7 @@ export default function SplitBillPage({
             paymentStatus: 'paid',
             paymentTime: p.paid ? p.paymentTime : new Date().toLocaleTimeString(),
             paymentMethod: p.paid ? p.paymentMethod : 'Covered by initiator',
+            invitationStatus: 'accepted',
           }))
         );
 
@@ -376,36 +381,6 @@ export default function SplitBillPage({
             </CardContent>
           </Card>
 
-          {/* Share Link */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Share with Participants</CardTitle>
-              <CardDescription>Send this link to participants who haven't paid yet</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Input
-                  readOnly
-                  value={`${window.location.origin}/split-bill/${splitBillId}`}
-                  className="bg-slate-50"
-                />
-                <Button variant="outline" onClick={handleCopyLink} className="flex-shrink-0">
-                  {linkCopied ? (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* UC020: Participants Payment Status */}
           <Card>
             <CardHeader>
@@ -434,7 +409,7 @@ export default function SplitBillPage({
                         {getStatusIcon(participant.paymentStatus)}
                       </div>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <p className="text-slate-900">
                             {participant.name}
                             {participant.email === currentUserEmail && (
@@ -446,12 +421,44 @@ export default function SplitBillPage({
                               Initiator
                             </Badge>
                           )}
+                          {getInvitationBadge(participant.invitationStatus)}
                         </div>
                         <p className="text-sm text-slate-600">{participant.email}</p>
                         {participant.paymentTime && (
                           <p className="text-xs text-slate-500 mt-1">
                             Paid at {participant.paymentTime} via {participant.paymentMethod}
                           </p>
+                        )}
+                        {participant.email === currentUserEmail && participant.invitationStatus === 'pending' && (
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() =>
+                                setParticipants(prev =>
+                                  prev.map(p =>
+                                    p.email === currentUserEmail ? { ...p, invitationStatus: 'accepted' } : p
+                                  )
+                                )
+                              }
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-red-500 text-red-600"
+                              onClick={() =>
+                                setParticipants(prev =>
+                                  prev.map(p =>
+                                    p.email === currentUserEmail ? { ...p, invitationStatus: 'rejected' } : p
+                                  )
+                                )
+                              }
+                            >
+                              Reject
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -545,7 +552,7 @@ export default function SplitBillPage({
               {/* Action Buttons */}
               <div className="space-y-2">
                 {/* Pay My Portion Button */}
-                {currentParticipant && !currentParticipant.paid && (
+                {currentParticipant && !currentParticipant.paid && currentParticipant.invitationStatus === 'accepted' && (
                   <Button
                     onClick={handlePayMyPortion}
                     className="w-full bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"

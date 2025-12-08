@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Menu, User, ShoppingBag, CreditCard, Settings, LogOut, Home, UtensilsCrossed } from 'lucide-react';
+import { Menu, User, ShoppingBag, ShoppingCart, CreditCard, Settings, LogOut, Home, UtensilsCrossed, Mail } from 'lucide-react';
 import { Button } from '../ui/button.js';
+import { Badge } from '../ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,9 +26,11 @@ interface NavbarProps {
   onLogout: () => void;
   currentPage: string;
   onNavigate: (page: any) => void;
+  cartCount?: number;
+  onCartClick?: () => void;
 }
 
-export default function Navbar({ user, onLogout, currentPage, onNavigate }: NavbarProps) {
+export default function Navbar({ user, onLogout, currentPage, onNavigate, cartCount = 0, onCartClick }: NavbarProps) {
   const [open, setOpen] = useState(false);
   
   const initials = user.name
@@ -171,7 +174,6 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
               </SheetContent>
             </Sheet>
           </div>
-
           {/* Navigation Links - Desktop */}
           <div className="hidden md:flex items-center gap-1">
             <Button
@@ -241,37 +243,69 @@ export default function Navbar({ user, onLogout, currentPage, onNavigate }: Navb
           </div>
 
           {/* User Menu - Desktop */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2">
-                <Avatar className="h-8 w-8 bg-gradient-to-br from-purple-600 to-pink-600">
-                  <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-white">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="hidden sm:inline">{user.name}</span>
+          <div className="flex items-center gap-1">
+            {!isStaff && (
+              <Button
+                variant="ghost"
+                className="relative"
+                onClick={() => onNavigate('splitbill-invitations')}
+              >
+                <Mail className="w-5 h-5" />
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-orange-600 hover:bg-orange-600">
+                  2
+                </Badge>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <div className="px-2 py-1.5">
-                <p className="font-medium">{user.name}</p>
-                <p className="text-sm text-slate-500">{user.email}</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {user.role === 'staff' ? 'Cafeteria Owner' : 'Customer'}
-                </p>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onNavigate('profile')}>
-                <Settings className="w-4 h-4 mr-2" />
-                Profile Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onLogout} className="text-red-600">
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            <Button
+              variant="ghost"
+              className="relative"
+              onClick={() => {
+                if (onCartClick) {
+                  onCartClick();
+                } else {
+                  onNavigate('cart-preview');
+                }
+              }}
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[11px] flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="gap-2">
+                  <Avatar className="h-8 w-8 bg-gradient-to-br from-purple-600 to-pink-600">
+                    <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-white">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden sm:inline">{user.name}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-1.5">
+                  <p className="font-medium">{user.name}</p>
+                  <p className="text-sm text-slate-500">{user.email}</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {user.role === 'staff' ? 'Cafeteria Owner' : 'Customer'}
+                  </p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onNavigate('profile')}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Profile Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onLogout} className="text-red-600">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </nav>
