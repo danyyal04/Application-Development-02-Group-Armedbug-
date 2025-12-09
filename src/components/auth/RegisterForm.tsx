@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.js';
+import { Separator } from '../ui/separator.js';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Info } from 'lucide-react';
+import { Eye, EyeOff, Info, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient'; // adjust path
 
 interface RegisterFormProps {
@@ -19,36 +20,17 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'student',
-    cafeteriaId: '',
+    role: 'student', // student = customer, staff = cafeteria owner
+    businessName: '',
+    businessAddress: '',
+    contactNumber: '',
+    ownerIdFile: '',
+    businessLogoFile: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [cafeterias, setCafeterias] = useState<{ id: string; name: string; location: string | null }[]>([]);
-  const [isLoadingCafeterias, setIsLoadingCafeterias] = useState(false);
-  const [cafeteriaError, setCafeteriaError] = useState('');
-
-  useEffect(() => {
-    const fetchCafeterias = async () => {
-      setIsLoadingCafeterias(true);
-      const { data, error } = await supabase
-        .from('cafeterias')
-        .select('id, name, location')
-        .order('name', { ascending: true });
-
-      if (error) {
-        setCafeteriaError('Unable to load cafeteria list. Please try again later.');
-        setCafeterias([]);
-      } else {
-        setCafeterias(data || []);
-        setCafeteriaError('');
-      }
-      setIsLoadingCafeterias(false);
-    };
-
-    fetchCafeterias();
-  }, []);
   const emailRegex = useMemo(() => /\S+@\S+\.\S+/, []);
+  const utmEmailRegex = useMemo(() => /@(?:utm\.my|graduate\.utm\.my)$/i, []);
 
   const validateInputs = () => {
     if (!formData.name.trim()) {
@@ -59,6 +41,10 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
       toast.error('Please provide a valid email address.');
       return false;
     }
+    if (formData.role === 'student' && !utmEmailRegex.test(formData.email)) {
+      toast.error('Customer accounts must use a valid UTM email address.');
+      return false;
+    }
     if (formData.password.length < 8) {
       toast.error('Password must be at least 8 characters long.');
       return false;
@@ -67,9 +53,23 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
       toast.error('Passwords do not match!');
       return false;
     }
-    if (formData.role === 'staff' && !formData.cafeteriaId) {
-      toast.error('Please select your cafeteria.');
-      return false;
+    if (formData.role === 'staff') {
+      if (!formData.businessName.trim()) {
+        toast.error('Business name is required.');
+        return false;
+      }
+      if (!formData.businessAddress.trim()) {
+        toast.error('Business address is required.');
+        return false;
+      }
+      if (!formData.contactNumber.trim()) {
+        toast.error('Contact number is required.');
+        return false;
+      }
+      if (!formData.ownerIdFile) {
+        toast.error('Owner identification document is required.');
+        return false;
+      }
     }
     return true;
   };
@@ -81,8 +81,6 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
     setLoading(true);
 
     try {
-      const selectedCafeteria = cafeterias.find(cafeteria => cafeteria.id === formData.cafeteriaId);
-
       // 1. Register user in Supabase Auth without auto-login
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
@@ -91,6 +89,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
           data: {
             name: formData.name,
             role: formData.role,
+            status: formData.role === 'staff' ? 'pending' : 'active',
           },
           emailRedirectTo: window.location.origin + '/login', // stay on login page
         },
@@ -102,29 +101,36 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
         return;
       }
 
-      // 2. Insert user profile in "profiles" table
-      if (data.user) {
-        const profileData: Record<string, any> = {
-          id: data.user.id,
-          name: formData.name,
+      const user = data.user;
+      if (user && formData.role === 'staff') {
+        const { error: reqErr } = await supabase.from('registration_request').insert({
+          // Assumes registration_request.user_id now references auth.users(id)
+          user_id: user.id,
+          business_name: formData.businessName,
+          business_address: formData.businessAddress,
+          contact_number: formData.contactNumber,
           email: formData.email,
-          role: formData.role,
-        };
-
-        if (formData.role === 'staff') {
-          profileData.cafeteria_id = formData.cafeteriaId;
-          profileData.cafeteria_name = selectedCafeteria?.name || null;
+          documents: {
+            owner_identification: formData.ownerIdFile,
+            business_logo: formData.businessLogoFile || null,
+          },
+          status: 'pending',
+        });
+        if (reqErr) {
+          toast.error('Failed to submit application: ' + reqErr.message);
+          setLoading(false);
+          return;
         }
+      }
 
-        const { error: profileError } = await supabase.from('profiles').insert([profileData]);
-
-        if (profileError) {
-          toast.error('Failed to create profile: ' + profileError.message);
-        } else {
-          await supabase.auth.signOut();
-          toast.success('Registration successful! Please verify your email, then login.');
-          onRegister(); // redirect to login page
-        }
+      if (user) {
+        await supabase.auth.signOut(); // ensure no auto-login
+        toast.success(
+          formData.role === 'staff'
+            ? 'Application submitted. Please wait for admin approval.'
+            : 'Registration successful! Please verify your email, then login.'
+        );
+        onRegister(); // redirect to login page
       }
     } catch (err: any) {
       toast.error('Unexpected error: ' + err.message);
@@ -150,6 +156,27 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="role">Register As</Label>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value: string) =>
+                    setFormData(prev => ({
+                      ...prev,
+                      role: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="student">Customer (UTM Student/Staff)</SelectItem>
+                    <SelectItem value="staff">Cafeteria Owner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
                 <Input
                   id="name"
@@ -166,7 +193,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                 <Input
                   id="email"
                   type="email"
-                  placeholder="your.email@utm.my"
+                  placeholder={formData.role === 'student' ? 'your.email@utm.my' : 'owner@email.com'}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
@@ -174,54 +201,84 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                 {formData.role === 'student' && (
                   <p className="text-xs text-slate-500">Must be a valid UTM email address</p>
                 )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value: string) =>
-                    setFormData(prev => ({
-                      ...prev,
-                      role: value,
-                      cafeteriaId: value === 'staff' ? prev.cafeteriaId : '',
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="student">Customer</SelectItem>
-                    <SelectItem value="staff">Cafeteria Owner</SelectItem>
-                  </SelectContent>
-                </Select>
+                {formData.role === 'staff' && (
+                  <div className="flex gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+                    <Info className="w-4 h-4 mt-0.5" />
+                    <span>Additional business information and verification documents are required for cafeteria owner registration.</span>
+                  </div>
+                )}
               </div>
 
               {formData.role === 'staff' && (
-                <div className="space-y-2">
-                  <Label htmlFor="cafeteria">Cafeteria</Label>
-                  <Select
-                    value={formData.cafeteriaId}
-                    onValueChange={(value: string) => setFormData({ ...formData, cafeteriaId: value })}
-                    disabled={isLoadingCafeterias || !!cafeteriaError}
-                  >
-                    <SelectTrigger id="cafeteria">
-                      <SelectValue placeholder={isLoadingCafeterias ? 'Loading cafeterias...' : 'Select your cafeteria'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cafeterias.map(cafeteria => (
-                        <SelectItem key={cafeteria.id} value={cafeteria.id}>
-                          {cafeteria.name}
-                          {cafeteria.location ? ` - ${cafeteria.location}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {cafeteriaError && (
-                    <p className="text-sm text-red-600">{cafeteriaError}</p>
-                  )}
-                </div>
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="businessName">Cafeteria/Business Name</Label>
+                      <Input
+                        id="businessName"
+                        placeholder="e.g., Cafe Angkasa"
+                        value={formData.businessName}
+                        onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="businessAddress">Business Address</Label>
+                      <Input
+                        id="businessAddress"
+                        placeholder="e.g., Faculty of Computing, UTM"
+                        value={formData.businessAddress}
+                        onChange={(e) => setFormData({ ...formData, businessAddress: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contactNumber">Contact Number</Label>
+                      <Input
+                        id="contactNumber"
+                        placeholder="e.g., +6012 345 6789"
+                        value={formData.contactNumber}
+                        onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <Separator />
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Business Verification Documents</Label>
+                      <p className="text-xs text-slate-500">Owner ID is required. Business logo is optional for display.</p>
+                      <div className="space-y-2">
+                        <Label>Owner Identification (IC/Passport) *</Label>
+                        <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
+                          <Upload className="w-4 h-4 text-slate-500" />
+                          <span>{formData.ownerIdFile || 'Choose file'}</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) =>
+                              setFormData({ ...formData, ownerIdFile: e.target.files?.[0]?.name || '' })
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Business Logo (optional)</Label>
+                        <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
+                          <Upload className="w-4 h-4 text-slate-500" />
+                          <span>{formData.businessLogoFile || 'Choose file'}</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) =>
+                              setFormData({ ...formData, businessLogoFile: e.target.files?.[0]?.name || '' })
+                            }
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
               <div className="space-y-2">
@@ -260,10 +317,14 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
               <Button
                 type="submit"
                 className="w-full text-white hover:opacity-90"
-                style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
+                style={{ background: 'linear-gradient(90deg, #7e22ce, #ec4899)' }}
                 disabled={loading}
               >
-                {loading ? 'Creating account...' : 'Create Account'}
+                {loading
+                  ? 'Creating account...'
+                  : formData.role === 'staff'
+                  ? 'Submit for Approval'
+                  : 'Register'}
               </Button>
 
               <p className="text-sm text-center text-slate-600">

@@ -56,6 +56,7 @@ export default function Navbar({
     .toUpperCase();
 
   const isStaff = user.role === "staff";
+  const isAdmin = user.role === "admin";
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 shadow-sm">
@@ -153,6 +154,10 @@ export default function Navbar({
                         <CreditCard className="w-4 h-4 mr-2" />
                         Manage Payments
                       </Button>
+                    </>
+                  ) : isAdmin ? (
+                    <>
+                      {/* Admin sees only dashboard here */}
                     </>
                   ) : (
                     <>
@@ -294,6 +299,10 @@ export default function Navbar({
                   Manage Payments
                 </Button>
               </>
+            ) : isAdmin ? (
+              <>
+                {/* Admin sees only dashboard link here */}
+              </>
             ) : (
               <>
                 <Button
@@ -338,7 +347,7 @@ export default function Navbar({
 
           {/* User Menu - Desktop */}
           <div className="flex items-center gap-1">
-            {!isStaff && (
+            {!isStaff && !isAdmin && (
               <Button
                 variant="ghost"
                 className="relative"
@@ -350,24 +359,26 @@ export default function Navbar({
                 </Badge>
               </Button>
             )}
-            <Button
-              variant="ghost"
-              className="relative"
-              onClick={() => {
-                if (onCartClick) {
-                  onCartClick();
-                } else {
-                  onNavigate("cart-preview");
-                }
-              }}
-            >
-              <ShoppingCart className="w-5 h-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[11px] flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </Button>
+            {!isAdmin && (
+              <Button
+                variant="ghost"
+                className="relative"
+                onClick={() => {
+                  if (onCartClick) {
+                    onCartClick();
+                  } else {
+                    onNavigate("cart-preview");
+                  }
+                }}
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[11px] flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
@@ -379,25 +390,25 @@ export default function Navbar({
                   <span className="hidden sm:inline">{user.name}</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <div className="px-2 py-1.5">
-                  <p className="font-medium">{user.name}</p>
-                  <p className="text-sm text-slate-500">{user.email}</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {user.role === "staff" ? "Cafeteria Owner" : "Customer"}
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5">
+                    <p className="font-medium">{user.name}</p>
+                    <p className="text-sm text-slate-500">{user.email}</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                    {user.role === "staff" ? "Cafeteria Owner" : user.role === "admin" ? "Admin" : "Customer"}
                   </p>
-                </div>
-                <DropdownMenuSeparator />
-                {isStaff && (
-                  <DropdownMenuItem onClick={() => onNavigate("cafeteria-info")}>
-                    <Building2 className="w-4 h-4 mr-2" />
-                    Cafeteria Information
-                  </DropdownMenuItem>
-                )}
-                {isStaff && <DropdownMenuSeparator />}
-                <DropdownMenuItem onClick={() => onNavigate("profile")}>
-                  <Settings className="w-4 h-4 mr-2" />
-                  Profile Settings
+                  </div>
+                  <DropdownMenuSeparator />
+                  {isStaff && (
+                    <DropdownMenuItem onClick={() => onNavigate("cafeteria-info")}>
+                      <Building2 className="w-4 h-4 mr-2" />
+                      Cafeteria Information
+                    </DropdownMenuItem>
+                  )}
+                  {isStaff && <DropdownMenuSeparator />}
+                  <DropdownMenuItem onClick={() => onNavigate("profile")}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Profile Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onLogout} className="text-red-600">

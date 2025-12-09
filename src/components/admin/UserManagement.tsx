@@ -1,11 +1,4 @@
-import { useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
+import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
@@ -45,13 +38,14 @@ import {
 } from "lucide-react";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
+import { supabase } from "../../lib/supabaseClient";
 
 interface User {
   id: string;
   name: string;
   email: string;
   role: "customer" | "cafeteria_owner";
-  accountStatus: "active" | "suspended";
+  accountStatus: "active" | "suspended" | "pending";
   registeredAt: string;
   businessName?: string;
   suspensionReason?: string;
@@ -59,65 +53,15 @@ interface User {
 
 interface UserManagementProps {
   onStatsUpdate: (stats: any) => void;
+  refreshKey?: number;
 }
 
-export default function UserManagement({ onStatsUpdate }: UserManagementProps) {
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: "1",
-      name: "Ahmad bin Ibrahim",
-      email: "ahmadOwner@gmail.com",
-      role: "cafeteria_owner",
-      accountStatus: "active",
-      registeredAt: "2025-11-15T10:30:00Z",
-      businessName: "Cafe Angkasa",
-    },
-    {
-      id: "2",
-      name: "John Doe",
-      email: "johndoe@student.utm.my",
-      role: "customer",
-      accountStatus: "active",
-      registeredAt: "2025-10-20T14:15:00Z",
-    },
-    {
-      id: "3",
-      name: "Siti Nurhaliza",
-      email: "sitiOwner@gmail.com",
-      role: "cafeteria_owner",
-      accountStatus: "suspended",
-      registeredAt: "2025-09-05T09:00:00Z",
-      businessName: "Warung Siti",
-      suspensionReason:
-        "Multiple customer complaints about food quality and service.",
-    },
-    {
-      id: "4",
-      name: "Jane Smith",
-      email: "janesmith@utm.my",
-      role: "customer",
-      accountStatus: "active",
-      registeredAt: "2025-11-01T11:45:00Z",
-    },
-    {
-      id: "5",
-      name: "Lee Wei Ming",
-      email: "leeOwner@gmail.com",
-      role: "cafeteria_owner",
-      accountStatus: "active",
-      registeredAt: "2025-10-10T16:20:00Z",
-      businessName: "Lee's Kitchen",
-    },
-    {
-      id: "6",
-      name: "Ali Rahman",
-      email: "alirahman@graduate.utm.my",
-      role: "customer",
-      accountStatus: "suspended",
-      registeredAt: "2025-08-15T13:30:00Z",
-      suspensionReason: "Fraudulent payment activities detected.",
-    },
-  ]);
+export default function UserManagement({
+  onStatsUpdate,
+  refreshKey = 0,
+}: UserManagementProps) {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
@@ -127,6 +71,59 @@ export default function UserManagement({ onStatsUpdate }: UserManagementProps) {
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState("");
   const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    const activeCount = users.filter((u) => u.accountStatus === "active").length;
+    const suspendedCount = users.filter(
+      (u) => u.accountStatus === "suspended"
+    ).length;
+    // Avoid infinite loops by not depending on onStatsUpdate identity
+    onStatsUpdate?.({
+      totalUsers: users.length,
+      activeUsers: activeCount,
+      suspendedUsers: suspendedCount,
+    });
+  }, [users, onStatsUpdate]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("registration_request")
+        .select(
+          "id, user_id, business_name, business_address, contact_number, email, status, submitted_at, rejection_reason"
+        )
+        .order("submitted_at", { ascending: false });
+
+      if (error) {
+        toast.error("Failed to load users: " + error.message);
+        setLoading(false);
+        return;
+      }
+
+      const mapped: User[] =
+        data?.map((row: any) => ({
+          id: row.user_id || row.id,
+          name: row.business_name || "Cafeteria Owner",
+          email: row.email || "Not provided",
+          role: "cafeteria_owner",
+          accountStatus:
+            row.status === "approved"
+              ? "active"
+              : row.status === "rejected"
+              ? "suspended"
+              : "pending",
+          registeredAt: row.submitted_at,
+          businessName: row.business_name || undefined,
+          suspensionReason: row.rejection_reason || undefined,
+        })) || [];
+
+      setUsers(mapped);
+      setLoading(false);
+    };
+
+    fetchUsers();
+  }, [refreshKey]);
 
   const handleSuspendClick = (user: User) => {
     setSelectedUser(user);
@@ -139,7 +136,7 @@ export default function UserManagement({ onStatsUpdate }: UserManagementProps) {
     setShowActivateDialog(true);
   };
 
-  const handleSuspend = () => {
+  const handleSuspend = async () => {
     if (!selectedUser) return;
 
     if (!suspensionReason.trim()) {
@@ -148,49 +145,65 @@ export default function UserManagement({ onStatsUpdate }: UserManagementProps) {
     }
 
     setProcessing(true);
-    // Simulate API call
-    setTimeout(() => {
-      // Update user status
-      const updatedUsers = users.map((u) =>
+    const { error } = await supabase
+      .from("registration_request")
+      .update({
+        status: "rejected",
+        rejection_reason: suspensionReason,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("user_id", selectedUser.id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      toast.error("Failed to suspend user: " + error.message);
+      setProcessing(false);
+      return;
+    }
+
+    setUsers((prev) =>
+      prev.map((u) =>
         u.id === selectedUser.id
           ? { ...u, accountStatus: "suspended" as const, suspensionReason }
           : u
-      );
-      setUsers(updatedUsers);
+      )
+    );
 
-      // Update stats
-      const suspendedCount = updatedUsers.filter(
-        (u) => u.accountStatus === "suspended"
-      ).length;
-      const activeCount = updatedUsers.filter(
-        (u) => u.accountStatus === "active"
-      ).length;
+    toast.success(
+      `Account suspended. ${selectedUser.name} has been notified via email.`,
+      { duration: 5000 }
+    );
 
-      onStatsUpdate({
-        suspendedUsers: suspendedCount,
-        activeUsers: activeCount,
-      });
-
-      toast.success(
-        `Account suspended. ${selectedUser.name} has been notified via email.`,
-        { duration: 5000 }
-      );
-
-      setProcessing(false);
-      setShowSuspendDialog(false);
-      setSelectedUser(null);
-      setSuspensionReason("");
-    }, 1000);
+    setProcessing(false);
+    setShowSuspendDialog(false);
+    setSelectedUser(null);
+    setSuspensionReason("");
   };
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     if (!selectedUser) return;
 
     setProcessing(true);
-    // Simulate API call
-    setTimeout(() => {
-      // Update user status
-      const updatedUsers = users.map((u) =>
+    const { error } = await supabase
+      .from("registration_request")
+      .update({
+        status: "approved",
+        rejection_reason: null,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("user_id", selectedUser.id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      toast.error("Failed to activate user: " + error.message);
+      setProcessing(false);
+      return;
+    }
+
+    setUsers((prev) =>
+      prev.map((u) =>
         u.id === selectedUser.id
           ? {
               ...u,
@@ -198,31 +211,17 @@ export default function UserManagement({ onStatsUpdate }: UserManagementProps) {
               suspensionReason: undefined,
             }
           : u
-      );
-      setUsers(updatedUsers);
+      )
+    );
 
-      // Update stats
-      const suspendedCount = updatedUsers.filter(
-        (u) => u.accountStatus === "suspended"
-      ).length;
-      const activeCount = updatedUsers.filter(
-        (u) => u.accountStatus === "active"
-      ).length;
-
-      onStatsUpdate({
-        suspendedUsers: suspendedCount,
-        activeUsers: activeCount,
-      });
-
-      toast.success(
-        `Account reactivated. ${selectedUser.name} has been notified via email.`,
-        { duration: 5000 }
-      );
+    toast.success(
+      `Account reactivated. ${selectedUser.name} has been notified via email.`,
+      { duration: 5000 }
+    );
 
       setProcessing(false);
-      setShowActivateDialog(false);
-      setSelectedUser(null);
-    }, 1000);
+    setShowActivateDialog(false);
+    setSelectedUser(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -257,19 +256,27 @@ export default function UserManagement({ onStatsUpdate }: UserManagementProps) {
         </Badge>
       );
     }
+    if (status === "suspended") {
+      return (
+        <Badge variant="outline" className="text-red-600 border-red-200">
+          Suspended
+        </Badge>
+      );
+    }
     return (
-      <Badge variant="outline" className="text-red-600 border-red-200">
-        Suspended
+      <Badge variant="outline" className="text-amber-600 border-amber-200">
+        Pending
       </Badge>
     );
   };
 
   // Filter users based on search and filters
   const filteredUsers = users.filter((user) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.businessName?.toLowerCase().includes(searchQuery.toLowerCase());
+      user.name.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q) ||
+      (user.businessName || "").toLowerCase().includes(q);
 
     const matchesRole = filterRole === "all" || user.role === filterRole;
     const matchesStatus =
@@ -320,7 +327,11 @@ export default function UserManagement({ onStatsUpdate }: UserManagementProps) {
       </div>
 
       {/* Users Table */}
-      {filteredUsers.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-12 border border-slate-200 rounded-lg">
+          <p className="text-slate-600 mb-2">Loading users...</p>
+        </div>
+      ) : filteredUsers.length === 0 ? (
         <div className="text-center py-12 border border-slate-200 rounded-lg">
           <Search className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-600 mb-2">No users found</p>
@@ -378,7 +389,28 @@ export default function UserManagement({ onStatsUpdate }: UserManagementProps) {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    {user.accountStatus === "active" ? (
+                    {user.accountStatus === "pending" ? (
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleSuspendClick(user)}
+                        >
+                          <Ban className="w-4 h-4 mr-2" />
+                          Reject
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          onClick={() => handleActivateClick(user)}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Approve
+                        </Button>
+                      </div>
+                    ) : user.accountStatus === "active" ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -491,7 +523,7 @@ export default function UserManagement({ onStatsUpdate }: UserManagementProps) {
             </DialogDescription>
           </DialogHeader>
 
-          {selectedUser && (
+        {selectedUser && (
             <div className="space-y-4">
               <Alert className="border-green-200 bg-green-50">
                 <CheckCircle className="h-4 w-4 text-green-600" />

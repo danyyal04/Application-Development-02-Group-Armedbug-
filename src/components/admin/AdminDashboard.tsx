@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Card,
   CardContent,
@@ -17,7 +17,7 @@ import {
   Shield,
   LogOut,
 } from "lucide-react";
-import PendingRegistrations from "./PendingRegistrations";
+import PendingRegistration from "./PendingRegistration";
 import UserManagement from "./UserManagement";
 
 interface User {
@@ -39,15 +39,19 @@ export default function AdminDashboard({
   onLogout,
 }: AdminDashboardProps) {
   const [stats, setStats] = useState({
-    pendingRegistrations: 3,
-    totalUsers: 48,
-    activeUsers: 45,
-    suspendedUsers: 2,
+    pendingRegistrations: 0,
+    totalUsers: 0,
+    activeUsers: 0,
+    suspendedUsers: 0,
   });
+  const [refreshUsersKey, setRefreshUsersKey] = useState<number>(0);
 
-  const updateStats = (newStats: Partial<typeof stats>) => {
-    setStats({ ...stats, ...newStats });
-  };
+  const updateStats = useCallback(
+    (newStats: Partial<typeof stats>) => {
+      setStats((prev) => ({ ...prev, ...newStats }));
+    },
+    []
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -167,11 +171,19 @@ export default function AdminDashboard({
               </TabsList>
 
               <TabsContent value="pending" className="mt-6">
-                <PendingRegistrations onStatsUpdate={updateStats} />
+                <PendingRegistration
+                  onStatsUpdate={updateStats}
+                  onApprovedOrRejected={() =>
+                    setRefreshUsersKey((k) => k + 1)
+                  }
+                />
               </TabsContent>
 
               <TabsContent value="users" className="mt-6">
-                <UserManagement onStatsUpdate={updateStats} />
+                <UserManagement
+                  onStatsUpdate={updateStats}
+                  refreshKey={refreshUsersKey}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>

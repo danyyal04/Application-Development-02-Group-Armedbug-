@@ -1,17 +1,23 @@
-import { useState } from 'react';
-import { Button } from '../ui/button.js';
-import { Input } from '../ui/input.js';
-import { Label } from '../ui/label.js';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
-import { toast } from 'sonner';
-import { Eye, EyeOff, Info } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient'; // correct path
+import { useState } from "react";
+import { Button } from "../ui/button.js";
+import { Input } from "../ui/input.js";
+import { Label } from "../ui/label.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card.js";
+import { toast } from "sonner";
+import { Eye, EyeOff, Info } from "lucide-react";
+import { supabase } from "../../lib/supabaseClient"; // correct path
 
 const ALLOWED_ADMIN_EMAILS = [
-  'danialDev@gmail.com',
-  'amanDev@gmail.com',
-  'thayaallanDev@gmail.com',
-  'mustaqimDev@gmail.com',
+  "danialdev@gmail.com",
+  "amandev@gmail.com",
+  "thayaallandev@gmail.com",
+  "mustaqimdev@gmail.com",
 ];
 
 interface LoginFormProps {
@@ -19,9 +25,12 @@ interface LoginFormProps {
   onSwitchToRegister: () => void;
 }
 
-export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export default function LoginForm({
+  onLogin,
+  onSwitchToRegister,
+}: LoginFormProps) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -38,43 +47,95 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
       });
 
       if (error) {
-        if (error.message?.toLowerCase().includes('invalid login credentials')) {
-          toast.error('Invalid email or password.');
+        if (
+          error.message?.toLowerCase().includes("invalid login credentials")
+        ) {
+          toast.error("Invalid email or password.");
         } else {
           toast.error(error.message);
         }
       } else if (data.user) {
-        if (!data.user.email_confirmed_at) {
-          toast.info('Please verify your email before logging in. We have resent the confirmation link.');
+        const emailLower = (data.user.email || "").toLowerCase();
+        const isAdmin =
+          ALLOWED_ADMIN_EMAILS.includes(emailLower) ||
+          data.user.app_metadata?.role === "admin" ||
+          data.user.user_metadata?.role === "admin";
+
+        // Default role/status
+        let role = isAdmin
+          ? "admin"
+          : data.user.app_metadata?.role ||
+            data.user.user_metadata?.role ||
+            "student";
+        let status =
+          (data.user.app_metadata?.status as string) ||
+          (data.user.user_metadata?.status as string) ||
+          "active";
+
+        // Fetch registration_request; any row => staff, use its status
+        const { data: regData, error: regError } = await supabase
+          .from("registration_request")
+          .select("status")
+          .or(
+            `user_id.eq.${data.user.id}${
+              data.user.email ? `,email.ilike.${data.user.email}` : ""
+            }`
+          )
+          .order("submitted_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (regError) {
+          // If select blocked by RLS, do not block login
+          status = "active";
+        } else if (regData?.status) {
+          role = isAdmin ? "admin" : "staff";
+          status = regData.status.toLowerCase();
+        } else if (role === "staff") {
+          // staff with no registration row -> treat as pending to block
+          status = "pending";
+        }
+
+        status = (status || "active").toLowerCase();
+
+        if (role === "staff" && status === "pending") {
+          toast.info(
+            "Your cafeteria owner application is pending approval. Please wait for admin review."
+          );
           await supabase.auth.signOut();
-          await supabase.auth.resend({
-            type: 'signup',
-            email,
-            options: { emailRedirectTo: window.location.origin + '/login' },
-          });
           return;
         }
-        // Fetch user profile from "profiles" table
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profileError) {
-          toast.error('Failed to fetch profile: ' + profileError.message);
-        } else {
-          if (profileData?.role === 'admin' && !ALLOWED_ADMIN_EMAILS.includes(data.user.email || '')) {
-            toast.error('This admin account is not allowed to sign in.');
-            await supabase.auth.signOut();
-            return;
-          }
-          toast.success('Login successful!');
-          onLogin(profileData);
+        if (role === "staff" && status === "rejected") {
+          toast.error(
+            "Your cafeteria owner application was rejected. Please contact support."
+          );
+          await supabase.auth.signOut();
+          return;
         }
+
+        if (
+          role === "admin" &&
+          !ALLOWED_ADMIN_EMAILS.includes(emailLower)
+        ) {
+          toast.error("This admin account is not allowed to sign in.");
+          await supabase.auth.signOut();
+          return;
+        }
+
+        const userPayload = {
+          id: data.user.id,
+          email: data.user.email || "",
+          name: data.user.user_metadata?.name || data.user.email || "",
+          role,
+          avatar: data.user.user_metadata?.avatar_url,
+          status,
+        };
+
+        toast.success("Login successful!");
+        onLogin(userPayload);
       }
     } catch (err: any) {
-      toast.error('Unexpected error: ' + err.message);
+      toast.error("Unexpected error: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -83,20 +144,20 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
   // Handle forgot password
   const handleForgotPassword = async () => {
     if (!email) {
-      toast.error('Please enter your email first.');
+      toast.error("Please enter your email first.");
       return;
     }
 
     setResetting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/reset-password', // optional redirect page
+        redirectTo: window.location.origin + "/reset-password", // optional redirect page
       });
 
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success('Password reset email sent! Check your inbox.');
+        toast.success("Password reset email sent! Check your inbox.");
       }
     } finally {
       setResetting(false);
@@ -107,14 +168,22 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/UTMMunch-Logo.jpg" alt="UTMMunch Logo" className="h-24 w-auto mx-auto mb-4" />
-          <p className="text-slate-600">Welcome back! Please login to your account.</p>
+          <img
+            src="/UTMMunch-Logo.jpg"
+            alt="UTMMunch Logo"
+            className="h-24 w-auto mx-auto mb-4"
+          />
+          <p className="text-slate-600">
+            Welcome back! Please login to your account.
+          </p>
         </div>
 
         <Card className="shadow-xl border-slate-200">
           <CardHeader>
             <CardTitle>Login to UTMMunch</CardTitle>
-            <CardDescription>Enter your credentials to access your account</CardDescription>
+            <CardDescription>
+              Enter your credentials to access your account
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -135,7 +204,7 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
                 <div className="relative">
                   <Input
                     id="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -146,7 +215,11 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
 
@@ -158,7 +231,7 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
                     className="text-purple-700 hover:underline text-sm disabled:opacity-60"
                     disabled={resetting || !email}
                   >
-                    {resetting ? 'Sending reset link...' : 'Forgot password?'}
+                    {resetting ? "Sending reset link..." : "Forgot password?"}
                   </button>
                 </div>
               </div>
@@ -166,10 +239,12 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
               <Button
                 type="submit"
                 className="w-full text-white font-semibold"
-                style={{ background: 'linear-gradient(90deg, #7e22ce, #ec4899)' }}
+                style={{
+                  background: "linear-gradient(90deg, #7e22ce, #ec4899)",
+                }}
                 disabled={loading}
               >
-                {loading ? 'Logging in...' : 'Login'}
+                {loading ? "Logging in..." : "Login"}
               </Button>
 
               <div className="space-y-3">
@@ -188,7 +263,7 @@ export default function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProp
                   Admin access is limited to approved emails.
                 </p>
                 <p className="text-center text-sm text-slate-600">
-                  Don’t have an account?{' '}
+                  Don’t have an account?{" "}
                   <button
                     type="button"
                     onClick={onSwitchToRegister}
