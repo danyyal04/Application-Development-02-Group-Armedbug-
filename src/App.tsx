@@ -42,7 +42,6 @@ const ALLOWED_ADMIN_EMAILS = [
   'amandev@gmail.com',
   'thayaallandev@gmail.com',
   'mustaqimdev@gmail.com',
-  'thayaallannaidu@graduate.utm.my',
 ];
 
 export default function App() {
