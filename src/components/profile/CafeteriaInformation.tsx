@@ -9,6 +9,7 @@ import {
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Alert, AlertDescription } from "../ui/alert";
+
 import {
   Building2,
   MapPin,
@@ -22,61 +23,81 @@ import {
   Upload,
   Calendar,
 } from "lucide-react";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
+
 import { toast } from "sonner";
 
-interface CafeteriaInformationProps {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    businessName?: string;
-    accountStatus?: string;
-  };
+// ================================
+// Types
+// ================================
+
+interface CafeteriaUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  businessName?: string;
+  accountStatus?: string;
 }
 
-export default function CafeteriaInformation({
-  user,
-}: CafeteriaInformationProps) {
-  // Mock data - would come from database in real application
+interface CafeteriaDocument {
+  name: string;
+  uploadDate: string;
+  expiryDate: string;
+}
+
+interface CafeteriaInformationProps {
+  user: CafeteriaUser;
+}
+
+// ================================
+// Component
+// ================================
+
+export default function CafeteriaInformation({ user }: CafeteriaInformationProps) {
+  // In real implementation: fetch from DB
   const [cafeteriaData] = useState({
-    businessName: user.businessName || "Cafe Angkasa",
+    businessName: user.businessName || "Your Cafeteria",
     ownerName: user.name,
     email: user.email,
     contactNumber: "012-345-6789",
     businessAddress: "Faculty of Computing, UTM Johor Bahru",
     registrationDate: "2024-11-15",
-    approvalStatus: user.accountStatus || "approved", // approved, pending, rejected
-    ssmNumber: "SSM-1234567890",
-    businessLicenseNumber: "BL-2024-UTM-001",
+    approvalStatus: user.accountStatus || "pending",
+
     documents: {
       ssmCertificate: {
-        name: "SSM_Certificate_CafeAngkasa.pdf",
+        name: "SSM_Certificate.pdf",
         uploadDate: "2024-11-15",
-        status: "valid",
         expiryDate: "2025-11-15",
       },
       businessLicense: {
-        name: "Business_License_CafeAngkasa.pdf",
+        name: "Business_License.pdf",
         uploadDate: "2024-11-15",
-        status: "valid",
         expiryDate: "2025-11-15",
       },
       ownerIdentification: {
-        name: "Owner_IC_Ahmad.pdf",
+        name: "Owner_IC.pdf",
         uploadDate: "2024-11-15",
-        status: "valid",
         expiryDate: "2030-12-31",
       },
-    },
+    } as Record<string, CafeteriaDocument>,
   });
 
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  // ================================
+  // Helpers
+  // ================================
 
-  // UC015 - Get approval status details
-  const getApprovalStatusBadge = (status: string) => {
+  const getDocumentStatus = (expiry: string) => {
+    const today = new Date();
+    const exp = new Date(expiry);
+    const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 86400));
+
+    if (diffDays < 0) return "expired";
+    if (diffDays <= 30) return "expiring";
+    return "valid";
+  };
+
+  const renderStatusBadge = (status: string) => {
     switch (status) {
       case "approved":
         return (
@@ -104,388 +125,169 @@ export default function CafeteriaInformation({
     }
   };
 
-  // UC015 - Check document status
-  const checkDocumentExpiry = (
-    expiryDate: string
-  ): "valid" | "expiring-soon" | "expired" => {
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const daysUntilExpiry = Math.ceil(
-      (expiry.getTime() - today.getTime()) / (1000 * 3600 * 24)
-    );
-
-    if (daysUntilExpiry < 0) return "expired";
-    if (daysUntilExpiry <= 30) return "expiring-soon";
-    return "valid";
+  const handleUploadDocuments = () => {
+    toast.info("Document upload feature coming soon.");
   };
 
-  const handleUpdateDocuments = () => {
-    setShowUploadDialog(true);
-    toast.info("Document upload feature will be available soon");
-  };
-
-  // UC015 - AF1: Missing or Expired Business Documents
-  const hasExpiredDocuments = Object.values(cafeteriaData.documents).some(
-    (doc) => checkDocumentExpiry(doc.expiryDate) === "expired"
+  const expiredDocs = Object.values(cafeteriaData.documents).some(
+    (doc) => getDocumentStatus(doc.expiryDate) === "expired"
   );
 
-  const hasExpiringSoonDocuments = Object.values(cafeteriaData.documents).some(
-    (doc) => checkDocumentExpiry(doc.expiryDate) === "expiring-soon"
+  const expiringDocs = Object.values(cafeteriaData.documents).some(
+    (doc) => getDocumentStatus(doc.expiryDate) === "expiring"
   );
+
+  // ================================
+  // UI
+  // ================================
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-slate-900 mb-2">Cafeteria Information</h1>
-            <p className="text-slate-600">
-              View and manage your business profile and verification documents
-            </p>
-          </div>
-          {getApprovalStatusBadge(cafeteriaData.approvalStatus)}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl text-slate-900 mb-1">Cafeteria Information</h1>
+          <p className="text-slate-600">Business profile and verification details</p>
         </div>
+        {renderStatusBadge(cafeteriaData.approvalStatus)}
       </div>
 
-      {/* UC015 - AF1: Alert for Expired Documents */}
-      {hasExpiredDocuments && (
-        <Alert className="mb-6 border-red-200 bg-red-50">
-          <AlertCircle className="h-4 w-4 text-red-600" />
+      {/* Alerts */}
+      {expiredDocs && (
+        <Alert className="border-red-200 bg-red-50">
+          <AlertCircle className="w-4 h-4 text-red-600" />
           <AlertDescription className="text-red-800">
-            Your documents are incomplete or expired. Please update your
-            documents.
-            <Button
-              variant="link"
-              className="text-red-600 hover:text-red-800 p-0 ml-2"
-              onClick={handleUpdateDocuments}
-            >
-              Upload Updated Documents
+            Some documents have expired. Please upload updated versions.
+            <Button variant="link" onClick={handleUploadDocuments}>
+              Upload Now
             </Button>
           </AlertDescription>
         </Alert>
       )}
 
-      {/* UC015 - Alert for Expiring Soon Documents */}
-      {hasExpiringSoonDocuments && !hasExpiredDocuments && (
-        <Alert className="mb-6 border-amber-200 bg-amber-50">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
+      {!expiredDocs && expiringDocs && (
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertCircle className="w-4 h-4 text-amber-600" />
           <AlertDescription className="text-amber-800">
-            Some of your documents will expire soon. Please prepare updated
-            documents.
+            Some documents will expire soon. Prepare updated versions.
           </AlertDescription>
         </Alert>
       )}
 
-      {/* UC015 - AF2: Documents Rejected */}
       {cafeteriaData.approvalStatus === "rejected" && (
-        <Alert className="mb-6 border-red-200 bg-red-50">
-          <XCircle className="h-4 w-4 text-red-600" />
+        <Alert className="border-red-200 bg-red-50">
+          <XCircle className="w-4 h-4 text-red-600" />
           <AlertDescription className="text-red-800">
-            The verification documents were rejected. Please resubmit valid
-            business documents.
-            <Button
-              variant="link"
-              className="text-red-600 hover:text-red-800 p-0 ml-2"
-              onClick={handleUpdateDocuments}
-            >
+            Your verification documents were rejected. Please upload valid replacements.
+            <Button variant="link" onClick={handleUploadDocuments}>
               Resubmit Documents
             </Button>
           </AlertDescription>
         </Alert>
       )}
 
-      {/* UC015 - Pending Review Message */}
-      {cafeteriaData.approvalStatus === "pending" && (
-        <Alert className="mb-6 border-blue-200 bg-blue-50">
-          <Clock className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
-            Your registration is currently under review. You will be notified of
-            the approval result within 48 hours.
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Business Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-purple-700" />
+            Business Details
+          </CardTitle>
+          <CardDescription>Cafeteria information on record</CardDescription>
+        </CardHeader>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Business Information Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-purple-700" />
-              Business Details
-            </CardTitle>
-            <CardDescription>
-              Basic information about your cafeteria
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <CardContent className="space-y-4">
+          <p><strong>Business Name:</strong> {cafeteriaData.businessName}</p>
+          <p><strong>Owner:</strong> {cafeteriaData.ownerName}</p>
+
+          <div className="flex gap-2 items-start">
+            <MapPin className="w-4 h-4 text-slate-400 mt-1" />
             <div>
-              <p className="text-sm text-slate-600">Business Name</p>
-              <p className="text-slate-900">{cafeteriaData.businessName}</p>
+              <p className="text-sm text-slate-600">Business Address</p>
+              <p className="text-slate-900">{cafeteriaData.businessAddress}</p>
             </div>
+          </div>
 
+          <div className="flex gap-2 items-start">
+            <Phone className="w-4 h-4 text-slate-400 mt-1" />
             <div>
-              <p className="text-sm text-slate-600">Owner Name</p>
-              <p className="text-slate-900">{cafeteriaData.ownerName}</p>
+              <p className="text-sm text-slate-600">Contact Number</p>
+              <p className="text-slate-900">{cafeteriaData.contactNumber}</p>
             </div>
+          </div>
 
-            <div className="flex items-start gap-2">
-              <MapPin className="w-4 h-4 text-slate-400 mt-1" />
-              <div>
-                <p className="text-sm text-slate-600">Business Address</p>
-                <p className="text-slate-900">
-                  {cafeteriaData.businessAddress}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <Phone className="w-4 h-4 text-slate-400 mt-1" />
-              <div>
-                <p className="text-sm text-slate-600">Contact Number</p>
-                <p className="text-slate-900">{cafeteriaData.contactNumber}</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <Mail className="w-4 h-4 text-slate-400 mt-1" />
-              <div>
-                <p className="text-sm text-slate-600">Email</p>
-                <p className="text-slate-900">{cafeteriaData.email}</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <Calendar className="w-4 h-4 text-slate-400 mt-1" />
-              <div>
-                <p className="text-sm text-slate-600">Registration Date</p>
-                <p className="text-slate-900">
-                  {new Date(
-                    cafeteriaData.registrationDate
-                  ).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Registration Information Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-purple-700" />
-              Registration Information
-            </CardTitle>
-            <CardDescription>Business registration details</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <div className="flex gap-2 items-start">
+            <Mail className="w-4 h-4 text-slate-400 mt-1" />
             <div>
-              <p className="text-sm text-slate-600">Account Approval Status</p>
-              <p className="text-slate-900 capitalize">
-                {cafeteriaData.approvalStatus === "pending"
-                  ? "Pending Review"
-                  : cafeteriaData.approvalStatus}
-              </p>
+              <p className="text-sm text-slate-600">Email</p>
+              <p className="text-slate-900">{cafeteriaData.email}</p>
             </div>
+          </div>
 
+          <div className="flex gap-2 items-start">
+            <Calendar className="w-4 h-4 text-slate-400 mt-1" />
             <div>
-              <p className="text-sm text-slate-600">SSM Registration Number</p>
-              <p className="text-slate-900">{cafeteriaData.ssmNumber}</p>
-            </div>
-
-            <div>
-              <p className="text-sm text-slate-600">Business License Number</p>
+              <p className="text-sm text-slate-600">Registration Date</p>
               <p className="text-slate-900">
-                {cafeteriaData.businessLicenseNumber}
+                {new Date(cafeteriaData.registrationDate).toLocaleDateString()}
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            <Button
-              onClick={handleUpdateDocuments}
-              variant="outline"
-              className="w-full mt-4"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Update Business Information
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Business Verification Documents */}
-      <Card className="mt-6">
+      {/* Verification Documents */}
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-purple-700" />
-            Business Verification Documents
+            Verification Documents
           </CardTitle>
-          <CardDescription>
-            View and manage your uploaded business documents
-          </CardDescription>
+          <CardDescription>Your uploaded business documents</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* SSM Certificate */}
-            <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-purple-700" />
-                </div>
-                <div>
-                  <p className="text-slate-900">SSM Certificate</p>
-                  <p className="text-sm text-slate-600">
-                    {cafeteriaData.documents.ssmCertificate.name}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Uploaded:{" "}
-                    {new Date(
-                      cafeteriaData.documents.ssmCertificate.uploadDate
-                    ).toLocaleDateString()}{" "}
-                    | Expires:{" "}
-                    {new Date(
-                      cafeteriaData.documents.ssmCertificate.expiryDate
-                    ).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ssmCertificate.expiryDate
-                ) === "valid" && (
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Valid
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ssmCertificate.expiryDate
-                ) === "expiring-soon" && (
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                    Expiring Soon
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ssmCertificate.expiryDate
-                ) === "expired" && (
-                  <Badge className="bg-red-100 text-red-800 border-red-300">
-                    Expired
-                  </Badge>
-                )}
-                <Button variant="ghost" size="sm">
-                  View
-                </Button>
-              </div>
-            </div>
 
-            {/* Business License */}
-            <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-purple-700" />
-                </div>
-                <div>
-                  <p className="text-slate-900">Business License</p>
-                  <p className="text-sm text-slate-600">
-                    {cafeteriaData.documents.businessLicense.name}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Uploaded:{" "}
-                    {new Date(
-                      cafeteriaData.documents.businessLicense.uploadDate
-                    ).toLocaleDateString()}{" "}
-                    | Expires:{" "}
-                    {new Date(
-                      cafeteriaData.documents.businessLicense.expiryDate
-                    ).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.businessLicense.expiryDate
-                ) === "valid" && (
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Valid
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.businessLicense.expiryDate
-                ) === "expiring-soon" && (
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                    Expiring Soon
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.businessLicense.expiryDate
-                ) === "expired" && (
-                  <Badge className="bg-red-100 text-red-800 border-red-300">
-                    Expired
-                  </Badge>
-                )}
-                <Button variant="ghost" size="sm">
-                  View
-                </Button>
-              </div>
-            </div>
+        <CardContent className="space-y-4">
+          {Object.entries(cafeteriaData.documents).map(([key, doc]) => {
+            const status = getDocumentStatus(doc.expiryDate);
 
-            {/* Owner Identification */}
-            <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-purple-700" />
-                </div>
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between p-4 border border-slate-200 rounded-lg"
+              >
                 <div>
-                  <p className="text-slate-900">Owner Identification</p>
-                  <p className="text-sm text-slate-600">
-                    {cafeteriaData.documents.ownerIdentification.name}
+                  <p className="text-slate-900 capitalize">
+                    {key.replace(/([A-Z])/g, " $1")}
                   </p>
+                  <p className="text-sm text-slate-600">{doc.name}</p>
                   <p className="text-xs text-slate-500">
-                    Uploaded:{" "}
-                    {new Date(
-                      cafeteriaData.documents.ownerIdentification.uploadDate
-                    ).toLocaleDateString()}{" "}
-                    | Expires:{" "}
-                    {new Date(
-                      cafeteriaData.documents.ownerIdentification.expiryDate
-                    ).toLocaleDateString()}
+                    Uploaded: {new Date(doc.uploadDate).toLocaleDateString()} | Expires:{" "}
+                    {new Date(doc.expiryDate).toLocaleDateString()}
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ownerIdentification.expiryDate
-                ) === "valid" && (
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Valid
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ownerIdentification.expiryDate
-                ) === "expiring-soon" && (
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                    Expiring Soon
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ownerIdentification.expiryDate
-                ) === "expired" && (
-                  <Badge className="bg-red-100 text-red-800 border-red-300">
-                    Expired
-                  </Badge>
-                )}
-                <Button variant="ghost" size="sm">
-                  View
-                </Button>
-              </div>
-            </div>
 
-            <Button
-              onClick={handleUpdateDocuments}
-              className="w-full bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Upload Updated Documents
-            </Button>
-          </div>
+                <Badge
+                  className={
+                    status === "valid"
+                      ? "bg-green-100 text-green-800 border-green-300"
+                      : status === "expiring"
+                      ? "bg-amber-100 text-amber-800 border-amber-300"
+                      : "bg-red-100 text-red-800 border-red-300"
+                  }
+                >
+                  {status === "expiring" ? "Expiring Soon" : status}
+                </Badge>
+              </div>
+            );
+          })}
+
+          <Button
+            onClick={handleUploadDocuments}
+            className="w-full bg-gradient-to-r from-purple-700 to-pink-700 text-white hover:opacity-90"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Upload Updated Documents
+          </Button>
         </CardContent>
       </Card>
     </div>
