@@ -21,6 +21,7 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
 
   useEffect(() => {
     let isMounted = true;
+    let createdProfile = false;
 
     const fetchProfile = async () => {
       setIsProfileLoading(true);
@@ -28,13 +29,40 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!isMounted) return;
 
       if (!error && data) {
         setProfile(data);
+        setIsProfileLoading(false);
+        return;
       }
+
+      // Auto-provision a profile with default cafeteria_id if none exists.
+      if (!data && !createdProfile) {
+        createdProfile = true;
+        const fallbackCafeteriaId = user.id; // use auth user id as cafeteria_id fallback
+        const { data: upserted, error: upsertError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: user.id,
+            cafeteria_id: fallbackCafeteriaId,
+            cafeteria_name: user.name || 'My Cafeteria',
+            role: 'staff',
+          })
+          .select()
+          .maybeSingle();
+
+        if (upsertError) {
+          setIsProfileLoading(false);
+          return;
+        }
+        setProfile(upserted || null);
+        setIsProfileLoading(false);
+        return;
+      }
+
       setIsProfileLoading(false);
     };
 
@@ -45,11 +73,12 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
     };
   }, [user.id]);
 
-  const cafeteriaId = profile?.cafeteria_id || null;
+  const cafeteriaId = profile?.cafeteria_id || user.id; // fallback to own auth id
+  const cafeteriaName = profile?.cafeteria_name || `${user.name || 'My'} Cafeteria`;
 
   if (currentPage === 'manage-menu') {
     if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
-    return <MenuManagement cafeteriaId={cafeteriaId} cafeteriaName={profile?.cafeteria_name || null} />;
+    return <MenuManagement cafeteriaId={cafeteriaId} cafeteriaName={cafeteriaName} />;
   }
 
   if (currentPage === 'manage-orders') {
@@ -83,7 +112,7 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
         <p className="text-slate-600">
           {profile?.cafeteria_name
             ? `Managing ${profile.cafeteria_name}`
-            : 'Manage your cafeteria menu and customer pre-orders efficiently.'}
+            : `Managing ${cafeteriaName}`}
         </p>
       </div>
 

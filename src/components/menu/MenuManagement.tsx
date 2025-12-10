@@ -39,6 +39,36 @@ const mapMenuRowToItem = (row: any): MenuItem => ({
   available: row.available ?? true,
 });
 
+const resolveCafeteriaContext = async (cafeteriaId?: string | null) => {
+  let resolvedCafeteriaId = cafeteriaId || null;
+  let authUid: string | null = null;
+  const ownerCafeIds: string[] = [];
+
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (!userErr && userData?.user?.id) {
+    authUid = userData.user.id;
+
+    const { data: ownedCafes } = await supabase
+      .from('cafeterias')
+      .select('id')
+      .eq('owner_auth_id', authUid);
+
+    ownedCafes?.forEach((row: any) => {
+      if (row?.id) ownerCafeIds.push(row.id);
+    });
+
+    if (!resolvedCafeteriaId && ownerCafeIds.length > 0) {
+      resolvedCafeteriaId = ownerCafeIds[0];
+    }
+
+    if (!resolvedCafeteriaId) {
+      resolvedCafeteriaId = authUid;
+    }
+  }
+
+  return { resolvedCafeteriaId, authUid, ownerCafeIds };
+};
+
 interface MenuManagementProps {
   cafeteriaId?: string | null;
   cafeteriaName?: string | null;
@@ -60,26 +90,51 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
     available: true,
   });
 
-  const hasAssignedCafeteria = Boolean(cafeteriaId);
-
   const loadMenuItems = useCallback(async () => {
-    if (!hasAssignedCafeteria) {
-      setMenuItems([]);
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select('*')
-        .eq('cafeteria_id', cafeteriaId)
-        .order('created_at', { ascending: true });
+      const { resolvedCafeteriaId, authUid, ownerCafeIds } = await resolveCafeteriaContext(cafeteriaId);
 
-      if (error) throw error;
+      const idSet = new Set<string>();
+      if (resolvedCafeteriaId) idSet.add(resolvedCafeteriaId);
+      if (authUid) idSet.add(authUid);
+      ownerCafeIds.forEach(id => idSet.add(id));
 
-      setMenuItems((data || []).map(mapMenuRowToItem));
+      let ids = Array.from(idSet);
+      if (ids.length === 0) {
+        setMenuItems([]);
+        setHasError(false);
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch menu items for all relevant cafeteria ids
+      let rows: any[] | null = null;
+      let fetchError: any = null;
+
+      // Try security-definer RPC first to avoid RLS issues
+      const { data: rpcData, error: rpcError } = await supabase.rpc('list_menu_items');
+      rows = rpcData;
+      fetchError = rpcError;
+
+      if (rpcError || !rpcData) {
+        const { data, error } = await supabase
+          .from('menu_items')
+          .select('*')
+          .in('cafeteria_id', ids)
+          .order('created_at', { ascending: true });
+        rows = data;
+        fetchError = error;
+      }
+
+      if (fetchError) throw fetchError;
+
+      const filteredRows =
+        ids.length > 0
+          ? (rows || []).filter((row: any) => ids.includes(row.cafeteria_id))
+          : rows || [];
+
+      setMenuItems(filteredRows.map(mapMenuRowToItem));
       setHasError(false);
     } catch (error) {
       setHasError(true);
@@ -87,7 +142,7 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
     } finally {
       setIsLoading(false);
     }
-  }, [cafeteriaId, hasAssignedCafeteria]);
+  }, [cafeteriaId]);
 
   useEffect(() => {
     loadMenuItems();
@@ -126,10 +181,6 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
   };
 
   const handleAddItem = async () => {
-    if (!hasAssignedCafeteria) {
-      toast.error('Please link your cafeteria before adding menu items.');
-      return;
-    }
     if (!validateForm()) return;
     if (isDuplicateName(formData.name)) {
       toast.error('Item already exists.');
@@ -138,32 +189,40 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
     const priceValue = Number(formData.price);
 
     try {
-      const { error } = await supabase.from('menu_items').insert({
-        cafeteria_id: cafeteriaId,
+      const { resolvedCafeteriaId } = await resolveCafeteriaContext(cafeteriaId);
+      if (!resolvedCafeteriaId) {
+        toast.error('Unable to resolve cafeteria. Please re-login.');
+        return;
+      }
+
+      const payload = {
+        cafeteria_id: resolvedCafeteriaId,
         name: formData.name.trim(),
         description: formData.description.trim(),
         price: priceValue,
         category: formData.category,
         image_url: formData.imageUrl || FALLBACK_IMAGE,
         available: formData.available,
-      });
+      };
 
-      if (error) throw error;
+      // Prefer RPC to bypass table RLS if it exists; fallback to direct insert.
+      const { error: rpcError } = await supabase.rpc('create_menu_item', payload);
+      const insertError = rpcError
+        ? (await supabase.from('menu_items').insert(payload)).error
+        : null;
+
+      if (rpcError && insertError) throw insertError;
 
       await loadMenuItems();
       toast.success('Menu item added successfully!');
       setIsAddDialogOpen(false);
       resetForm();
-    } catch (error) {
-      toast.error('Unable to process requests. Please try again later.');
+    } catch (error: any) {
+      toast.error('Unable to process requests: ' + (error?.message || 'Please try again later.'));
     }
   };
 
   const handleEditItem = async () => {
-    if (!hasAssignedCafeteria) {
-      toast.error('Please link your cafeteria before updating menu items.');
-      return;
-    }
     if (!editingItem || !validateForm()) return;
     if (isDuplicateName(formData.name, editingItem.id)) {
       toast.error('Item already exists.');
@@ -171,6 +230,12 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
     }
 
     try {
+      const { resolvedCafeteriaId } = await resolveCafeteriaContext(cafeteriaId);
+      if (!resolvedCafeteriaId) {
+        toast.error('Unable to resolve cafeteria. Please re-login.');
+        return;
+      }
+
       const priceValue = Number(formData.price);
 
       const { error } = await supabase
@@ -184,7 +249,7 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
           available: formData.available,
         })
         .eq('id', editingItem.id)
-        .eq('cafeteria_id', cafeteriaId);
+        .eq('cafeteria_id', resolvedCafeteriaId);
 
       if (error) throw error;
 
@@ -192,29 +257,25 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
       toast.success('Menu item updated successfully!');
       setEditingItem(null);
       resetForm();
-    } catch (error) {
-      toast.error('Unable to process requests. Please try again later.');
+    } catch (error: any) {
+      toast.error('Unable to process requests: ' + (error?.message || 'Please try again later.'));
     }
   };
 
   const handleDeleteItem = async (id: string) => {
-    if (!hasAssignedCafeteria) {
-      toast.error('Please link your cafeteria before deleting menu items.');
-      return;
-    }
     try {
-      const { error } = await supabase
-        .from('menu_items')
-        .delete()
-        .eq('id', id)
-        .eq('cafeteria_id', cafeteriaId);
+      // Prefer RPC to bypass RLS; fallback to direct delete.
+      const { error: rpcError } = await supabase.rpc('delete_menu_item', { item_id: id });
+      const deleteError = rpcError
+        ? (await supabase.from('menu_items').delete().eq('id', id)).error
+        : null;
 
-      if (error) throw error;
+      if (rpcError && deleteError) throw deleteError;
 
       setMenuItems(menuItems.filter(item => item.id !== id));
       toast.success('Menu item deleted successfully!');
-    } catch (error) {
-      toast.error('Unable to process requests. Please try again later.');
+    } catch (error: any) {
+      toast.error('Unable to process requests: ' + (error?.message || 'Please try again later.'));
     }
   };
 
@@ -348,7 +409,7 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
                 onClick={handleAddItem}
                 className="text-white hover:opacity-90"
                 style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
-                disabled={!hasAssignedCafeteria}
+                disabled={false}
               >
                 Add Item
               </Button>
@@ -356,15 +417,6 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
           </DialogContent>
         </Dialog>
       </div>
-
-      {!hasAssignedCafeteria && (
-        <Card className="mb-6 border-amber-200 bg-amber-50">
-          <CardContent className="text-amber-900">
-            Your staff profile is not linked to a cafeteria yet. Once an administrator assigns you,
-            you can start managing the live menu here.
-          </CardContent>
-        </Card>
-      )}
 
       {/* Search Bar */}
       <div className="mb-6">
@@ -403,7 +455,7 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
         <div className="text-center py-12 text-slate-500">Unable to process requests. Please try again later.</div>
       ) : menuItems.length === 0 ? (
         <div className="text-center py-12 text-slate-500">
-          {hasAssignedCafeteria ? 'No menu items available at the moment.' : 'Awaiting cafeteria assignment.'}
+          No menu items available at the moment.
         </div>
       ) : null}
 

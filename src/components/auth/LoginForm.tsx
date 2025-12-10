@@ -72,40 +72,50 @@ export default function LoginForm({
           (data.user.user_metadata?.status as string) ||
           "active";
 
-        // Fetch registration_request; any row => staff, use its status
-        const { data: regData, error: regError } = await supabase
-          .from("registration_request")
-          .select("status")
-          .or(
-            `user_id.eq.${data.user.id}${
-              data.user.email ? `,email.ilike.${data.user.email}` : ""
-            }`
-          )
-          .order("submitted_at", { ascending: false })
-          .limit(1)
+        // Fetch matching registration_request by linked app user id and/or email
+        const { data: appUser } = await supabase
+          .from("user")
+          .select("id")
+          .eq("auth_id", data.user.id)
           .maybeSingle();
+        const filters: string[] = [];
+        if (appUser?.id) filters.push(`user_id.eq.${appUser.id}`);
+        if (data.user.email) filters.push(`email.ilike.${data.user.email}`);
+        const orFilter = filters.join(",");
+
+        const { data: regData, error: regError } = orFilter
+          ? await supabase
+              .from("registration_request")
+              .select("status")
+              .or(orFilter)
+              .order("submitted_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : { data: null, error: null };
+
+        const regStatus = regData?.status
+          ? String(regData.status).trim().toLowerCase()
+          : null;
 
         if (regError) {
-          // If select blocked by RLS, do not block login
-          status = "active";
-        } else if (regData?.status) {
+          // If select blocked by RLS, fall back to metadata
+          status = status || "active";
+        } else if (regStatus) {
           role = isAdmin ? "admin" : "staff";
-          status = regData.status.toLowerCase();
-        } else if (role === "staff") {
-          // staff with no registration row -> treat as pending to block
-          status = "pending";
+          status = regStatus;
         }
 
         status = (status || "active").toLowerCase();
 
-        if (role === "staff" && status === "pending") {
+        // Only block when we have an explicit pending/rejected status.
+        if (role === "staff" && regStatus === "pending") {
           toast.info(
             "Your cafeteria owner application is pending approval. Please wait for admin review."
           );
           await supabase.auth.signOut();
           return;
         }
-        if (role === "staff" && status === "rejected") {
+        if (role === "staff" && regStatus === "rejected") {
           toast.error(
             "Your cafeteria owner application was rejected. Please contact support."
           );

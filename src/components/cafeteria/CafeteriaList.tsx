@@ -29,6 +29,20 @@ interface CafeteriaListProps {
   onSelectCafeteria: (cafeteria: Cafeteria) => void;
 }
 
+const DEFAULT_CAFETERIAS: Cafeteria[] = [
+  {
+    id: 'default-cafe-1',
+    name: 'UTM Cafeteria',
+    location: 'UTM',
+    description: 'Default cafeteria listing.',
+    image: '/UTMMunch-Logo.jpg',
+    rating: 4.5,
+    estimatedTime: '15-20 min',
+    isOpen: true,
+    category: 'Malaysian',
+  },
+];
+
 export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -45,12 +59,10 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
         .select('*')
         .order('name', { ascending: true });
 
-      if (error) {
-        setHasError(true);
-        setCafeterias([]);
-      } else {
-        setHasError(false);
-        setCafeterias((data || []).map(row => ({
+      setHasError(false);
+
+      const mapped =
+        (data || []).map(row => ({
           id: row.id,
           name: row.name,
           location: row.location ?? 'UTM',
@@ -60,7 +72,13 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
           estimatedTime: row.estimated_time ?? '15-20 min',
           isOpen: row.is_open ?? true,
           category: row.category ?? 'Malaysian',
-        })));
+        })) || [];
+
+      if (!error && mapped.length > 0) {
+        setCafeterias(mapped);
+      } else {
+        // If error OR no rows, show defaults so the page isn't empty
+        setCafeterias(DEFAULT_CAFETERIAS);
       }
       setIsLoading(false);
     };

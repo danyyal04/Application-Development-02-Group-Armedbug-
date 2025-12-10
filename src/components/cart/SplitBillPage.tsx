@@ -27,6 +27,7 @@ import {
 } from '../ui/dialog';
 import { Alert, AlertDescription } from '../ui/alert';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabaseClient';
 
 interface CartItem {
   id: string;
@@ -75,26 +76,7 @@ export default function SplitBillPage({
   onCancel,
   onCompleteSplitBill,
 }: SplitBillPageProps) {
-  const [participants, setParticipants] = useState<Participant[]>([
-    {
-      id: '1',
-      name: initiatorName,
-      email: currentUserEmail || 'initiator@utm.my',
-      amount: totalAmount / 2,
-      paid: false,
-      paymentStatus: 'pending',
-      invitationStatus: 'accepted',
-    },
-    {
-      id: '2',
-      name: 'Ahmad Bin Ali',
-      email: 'ahmad@graduate.utm.my',
-      amount: totalAmount / 2,
-      paid: false,
-      paymentStatus: 'pending',
-      invitationStatus: 'pending',
-    },
-  ]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
 
   const [selectedPaymentId, setSelectedPaymentId] = useState<string>('');
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -161,6 +143,51 @@ export default function SplitBillPage({
     if (status === 'rejected') return <Badge className="bg-red-100 text-red-700 border border-red-200">Rejected</Badge>;
     return <Badge className="bg-amber-100 text-amber-700 border border-amber-200">Pending Invite</Badge>;
   };
+
+  // Load real participants from the split_bill_participants table
+  useEffect(() => {
+    const loadParticipants = async () => {
+      const { data, error } = await supabase
+        .from('split_bill_participants')
+        .select('id, identifier, amount_due, status')
+        .eq('session_id', splitBillId);
+
+      if (error) {
+        toast.error('Failed to load participants');
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        // fallback to at least show the initiator
+        setParticipants([
+          {
+            id: 'initiator',
+            name: initiatorName,
+            email: currentUserEmail || 'you',
+            amount: totalAmount,
+            paid: false,
+            paymentStatus: 'pending',
+            invitationStatus: 'accepted',
+          },
+        ]);
+        return;
+      }
+
+      const mapped: Participant[] = data.map(row => ({
+        id: row.id,
+        name: row.identifier,
+        email: row.identifier,
+        amount: Number(row.amount_due) || totalAmount / data.length,
+        paid: row.status === 'paid',
+        paymentStatus: (row.status as Participant['paymentStatus']) || 'pending',
+        invitationStatus: (row.status as Participant['invitationStatus']) || 'pending',
+      }));
+
+      setParticipants(mapped);
+    };
+
+    loadParticipants();
+  }, [splitBillId, initiatorName, currentUserEmail, totalAmount]);
 
   const handlePayMyPortion = () => {
     if (!currentParticipant) {

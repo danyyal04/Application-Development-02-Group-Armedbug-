@@ -77,20 +77,34 @@ export default function MenuList({
     const loadMenu = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('menu_items')
-          .select('*')
-          .eq('cafeteria_id', cafeteria.id)
-          .eq('available', true)
-          .order('name', { ascending: true });
+        // Resolve cafeteria filter if provided
+        const cafeteriaId = cafeteria?.id;
 
-        if (error) throw error;
+        // Try RPC first (bypasses RLS if function is security definer)
+        const { data: rpcData, error: rpcError } = await supabase.rpc('list_menu_items');
+        let rows = rpcData;
+        let fetchError = rpcError;
 
-        setMenuItems((data || []).map(mapMenuRowToItem));
+        if (rpcError || !rpcData) {
+          const { data, error } = await supabase
+            .from('menu_items')
+            .select('*')
+            .order('name', { ascending: true });
+          rows = data;
+          fetchError = error;
+        }
+
+        if (fetchError) throw fetchError;
+
+        const filtered = (rows || []).filter(
+          (row: any) => row.available !== false && (!cafeteriaId || row.cafeteria_id === cafeteriaId)
+        );
+
+        setMenuItems(filtered.map(mapMenuRowToItem));
         setHasError(false);
-      } catch (error) {
+      } catch (error: any) {
         setHasError(true);
-        toast.error('Unable to load menu. Please check your connection.');
+        toast.error('Unable to load menu. Please try again later.');
       } finally {
         setIsLoading(false);
       }
@@ -132,18 +146,12 @@ export default function MenuList({
     [cartItems]
   );
 
-  const handleCheckout = () => {
+  const handleViewCart = () => {
     if (totalItems === 0) {
       toast.error('Your cart is empty');
       return;
     }
-
-    if (pickupTime === '') {
-      toast.error('Please select a pickup time');
-      return;
-    }
-
-    onCheckout(cartItems, pickupTime);
+    onCheckout(cartItems, pickupTime || 'asap');
   };
 
   const handleAddToCart = (item: MenuItem) => {
@@ -230,34 +238,24 @@ export default function MenuList({
         )}
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-12 text-slate-500">Loading menu items...</div>
-      ) : hasError ? (
-        <div className="text-center py-12 text-slate-500">Unable to load menu. Please check your connection.</div>
-      ) : menuItems.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">No menu items available at the moment.</div>
-      ) : null}
-
-      {/* Cart Summary with Pickup Time */}
+      {/* Cart Summary banner */}
       {totalItems > 0 && (
-        <Card className="mb-6 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
+        <Card className="mb-8 border-purple-200 bg-purple-50">
           <CardContent className="py-4 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between text-purple-900">
               <div className="flex items-center gap-3">
-                <ShoppingCart className="w-5 h-5 text-purple-700" />
+                <ShoppingCart className="w-5 h-5" />
                 <div>
-                  <p className="text-purple-900">{totalItems} items in cart</p>
+                  <p className="font-semibold">{totalItems} {totalItems === 1 ? 'item' : 'items'} in cart</p>
                   <p className="text-sm text-purple-700">Total: RM {totalPrice.toFixed(2)}</p>
                 </div>
               </div>
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="pickupTime" className="text-purple-900">
-                Pickup Time
-              </Label>
+              <Label htmlFor="pickupTimeBanner" className="text-purple-900">Pickup Time</Label>
               <Select value={pickupTime} onValueChange={onPickupTimeChange}>
-                <SelectTrigger id="pickupTime" className="bg-white">
+                <SelectTrigger id="pickupTimeBanner" className="bg-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,14 +270,22 @@ export default function MenuList({
 
             <Button
               className="w-full text-white hover:opacity-90"
-              style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
-              onClick={handleCheckout}
+              style={{ background: 'linear-gradient(90deg, #7e22ce, #ec4899)' }}
+              onClick={handleViewCart}
             >
-              Pre-Order Now
+              View Cart & Checkout
             </Button>
           </CardContent>
         </Card>
       )}
+
+      {isLoading ? (
+        <div className="text-center py-12 text-slate-500">Loading menu items...</div>
+      ) : hasError ? (
+        <div className="text-center py-12 text-slate-500">Unable to load menu. Please check your connection.</div>
+      ) : menuItems.length === 0 ? (
+        <div className="text-center py-12 text-slate-500">No menu items available at the moment.</div>
+      ) : null}
 
       {/* Menu Items */}
       {filteredItems.length === 0 ? (

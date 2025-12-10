@@ -21,7 +21,7 @@ import CafeteriaList from '../cafeteria/CafeteriaList';
 import CheckoutPage from '../checkout/CheckoutPage';
 import CartPage from '../cart/CartPage';
 import CartSideBar from '../cart/CartSideBar';
-import SplitBillInitiation from '../cart/SplitBill';
+import SplitBill from '../cart/SplitBill';
 import SplitBillPage from '../cart/SplitBillPage';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabaseClient';
@@ -37,13 +37,6 @@ type CartItem = {
   category: string;
 };
 
-type SplitBillItem = {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-};
-
 interface StudentDashboardProps {
   user: any;
   currentPage: string;
@@ -52,7 +45,7 @@ interface StudentDashboardProps {
 }
 
 const DEFAULT_CAFETERIA = {
-  id: 'utm-default',
+  id: null as string | null, // avoid non-uuid ids in orders
   name: 'UTMMunch Cafeterias',
   location: 'Universiti Teknologi Malaysia',
 };
@@ -65,8 +58,15 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartPickupTime, setCartPickupTime] = useState('asap');
   const [cartCafeteria, setCartCafeteria] = useState<any | null>(null);
-  const [splitBillItems, setSplitBillItems] = useState<SplitBillItem[]>([]);
   const [isCartSidebarOpen, setIsCartSidebarOpen] = useState(false);
+  const [showSplitDialog, setShowSplitDialog] = useState(false);
+  const [activeSplitBill, setActiveSplitBill] = useState<{
+    sessionId: string;
+    cartItems: { id: string; name: string; price: number; quantity: number }[];
+    cafeteria: { name: string; location: string };
+    pickupTime: string;
+  } | null>(null);
+  const cartStorageKey = user?.id ? `utm-cart-${user.id}` : null;
 
   useEffect(() => {
     const loadFeatured = async () => {
@@ -86,15 +86,41 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
     }
   }, [cartItems.length]);
 
+  // Hydrate cart from localStorage on load
   useEffect(() => {
-    if (
-      (currentPage === 'split-bill-initiation' || currentPage === 'split-bill-tracking') &&
-      splitBillItems.length === 0
-    ) {
-      toast.info('Start checkout from your cart to use split bill.');
-      onNavigate('dashboard');
+    if (!cartStorageKey) return;
+    try {
+      const raw = localStorage.getItem(cartStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.items)) {
+        setCartItems(parsed.items);
+      }
+      if (parsed.pickupTime) setCartPickupTime(parsed.pickupTime);
+      if (parsed.cafeteria) setCartCafeteria(parsed.cafeteria);
+    } catch {
+      // ignore malformed data
     }
-  }, [currentPage, splitBillItems.length, onNavigate]);
+  }, [cartStorageKey]);
+
+  // Persist cart to localStorage on changes
+  useEffect(() => {
+    if (!cartStorageKey) return;
+    if (cartItems.length === 0) {
+      localStorage.removeItem(cartStorageKey);
+      return;
+    }
+    const payload = {
+      items: cartItems,
+      pickupTime: cartPickupTime,
+      cafeteria: cartCafeteria,
+    };
+    try {
+      localStorage.setItem(cartStorageKey, JSON.stringify(payload));
+    } catch {
+      // best effort
+    }
+  }, [cartItems, cartPickupTime, cartCafeteria, cartStorageKey]);
 
   const totalCartItems = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
@@ -108,10 +134,6 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
   }, [totalCartItems, onCartCountChange]);
 
   const cartPageCafeteria = cartCafeteria ?? selectedCafeteria ?? DEFAULT_CAFETERIA;
-  const splitBillTotal = splitBillItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const splitBillServiceFee = 0.5;
-  const splitBillTotalWithFee = splitBillTotal + splitBillServiceFee;
-
   const addItemToCart = (item: Omit<CartItem, 'quantity'>, notify = false) => {
     let updated = false;
     setCartItems(prev => {
@@ -185,25 +207,11 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
       return;
     }
     setCartPickupTime(pickup);
-    setSplitBillItems(
-      items.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-      }))
-    );
-    setCheckoutData({
-      cafeteria: selectedCafeteria,
-      cartItems: items.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-      })),
-      pickupTime: pickup,
-      mode: 'normal',
-    });
+    if (selectedCafeteria) {
+      setCartCafeteria(selectedCafeteria);
+    }
+    // Go to cart page to review before checkout
+    onNavigate('cart-preview');
   };
 
   const handleProceedToSplitBill = () => {
@@ -212,14 +220,6 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
       return;
     }
     setCartPickupTime(cartPickupTime);
-    setSplitBillItems(
-      cartItems.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-      }))
-    );
     setCheckoutData({
       cafeteria: cartCafeteria ?? selectedCafeteria,
       cartItems: cartItems.map(item => ({
@@ -229,16 +229,8 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
         quantity: item.quantity,
       })),
       pickupTime: cartPickupTime,
-      mode: 'split',
     });
     onNavigate('menu');
-  };
-
-  const handleSplitBillCompletion = () => {
-    toast.success('Split bill fully settled!');
-    setCartItems([]);
-    setSplitBillItems([]);
-    onNavigate('orders');
   };
 
   const renderContent = () => {
@@ -255,46 +247,6 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
       );
     }
 
-    if (currentPage === 'split-bill-initiation') {
-      return (
-        <SplitBillInitiation
-          cartItems={splitBillItems}
-          totalAmount={splitBillTotalWithFee}
-          cafeteria={{ name: cartPageCafeteria.name, location: cartPageCafeteria.location }}
-          pickupTime={cartPickupTime}
-          autoOpenDialog
-          onInitiateSplitBill={data => {
-            toast.success(
-              `Split bill link shared with your group (${data.participants.length} participant${
-                data.participants.length === 1 ? '' : 's'
-              }).`
-            );
-            onNavigate('split-bill-tracking');
-          }}
-          onCancel={() => onNavigate('cart-preview')}
-        />
-      );
-    }
-
-    if (currentPage === 'split-bill-tracking') {
-      return (
-        <SplitBillPage
-          splitBillId="SB-LIVE-001"
-          cartItems={splitBillItems}
-          totalAmount={splitBillTotalWithFee}
-          cafeteria={{ name: cartPageCafeteria.name, location: cartPageCafeteria.location }}
-          pickupTime={cartPickupTime}
-          initiatorName={user.name || 'UTM Student'}
-          currentUserEmail={user.email || 'student@utm.my'}
-          onPaymentComplete={participantId => {
-            toast.success(`Payment recorded for ${participantId}.`);
-          }}
-          onCancel={() => onNavigate('dashboard')}
-          onCompleteSplitBill={handleSplitBillCompletion}
-        />
-      );
-    }
-
     if (currentPage === 'splitbill-invitations') {
       return (
         <SplitBillInvitations
@@ -306,6 +258,23 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
       );
     }
 
+    if (currentPage === 'split-bill-tracking' && activeSplitBill) {
+      return (
+        <SplitBillPage
+          splitBillId={activeSplitBill.sessionId}
+          cartItems={activeSplitBill.cartItems}
+          totalAmount={activeSplitBill.cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)}
+          cafeteria={activeSplitBill.cafeteria}
+          pickupTime={activeSplitBill.pickupTime}
+          initiatorName={user?.name || 'You'}
+          currentUserEmail={user?.email}
+          onPaymentComplete={() => toast.success('Payment recorded')}
+          onCancel={() => onNavigate('menu')}
+          onCompleteSplitBill={() => toast.success('Split bill completed')}
+        />
+      );
+    }
+
     if (currentPage === 'menu') {
       if (checkoutData) {
         return (
@@ -313,7 +282,7 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
             cafeteria={checkoutData.cafeteria || cartPageCafeteria}
             cartItems={checkoutData.cartItems}
             pickupTime={checkoutData.pickupTime}
-            initialMode={checkoutData.mode || 'normal'}
+            initialMode="normal"
             onBack={() => setCheckoutData(null)}
             onSuccess={() => {
               setCheckoutData(null);
@@ -322,13 +291,7 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
               toast.success('Order placed successfully!');
               onNavigate('orders');
             }}
-            onSplitBill={() => {
-              if (checkoutData.cartItems.length === 0) {
-                toast.error('Your cart is empty');
-                return;
-              }
-              onNavigate('split-bill-initiation');
-            }}
+            onSplitBill={() => setShowSplitDialog(true)}
           />
         );
       }
@@ -549,6 +512,37 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
       </div>
     );
   };
+
+  const splitCartItems = checkoutData?.cartItems ?? cartItems;
+  const splitCafeteria = checkoutData?.cafeteria || cartPageCafeteria;
+
+  if (showSplitDialog && checkoutData) {
+    return (
+      <SplitBill
+        cartItems={splitCartItems}
+        totalAmount={splitCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)}
+        cafeteria={{ name: splitCafeteria?.name, location: splitCafeteria?.location }}
+        pickupTime={checkoutData.pickupTime}
+        autoOpenDialog
+        onInitiateSplitBill={({ sessionId }) => {
+          setShowSplitDialog(false);
+          setActiveSplitBill({
+            sessionId: sessionId || 'new-session',
+            cartItems: splitCartItems,
+            cafeteria: { name: splitCafeteria?.name, location: splitCafeteria?.location },
+            pickupTime: checkoutData.pickupTime,
+          });
+          toast.success('Split bill initiated.');
+          onNavigate('split-bill-tracking');
+        }}
+        onCancel={() => {
+          setShowSplitDialog(false);
+          setCheckoutData(prev => (prev ? { ...prev, mode: 'normal' } : prev));
+          onNavigate('menu');
+        }}
+      />
+    );
+  }
 
   return (
     <>

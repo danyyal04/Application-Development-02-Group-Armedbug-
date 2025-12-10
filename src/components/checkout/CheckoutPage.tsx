@@ -73,6 +73,12 @@ export default function CheckoutPage({
   const [splitMethod, setSplitMethod] = useState<'even' | 'items'>('even');
   const [participantCount, setParticipantCount] = useState<number>(2);
 
+  const safeCafeteriaId = useMemo(() => {
+    const id = cafeteria?.id;
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return id && uuidPattern.test(id) ? id : null;
+  }, [cafeteria?.id]);
+
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const serviceFee = 0.5;
   const total = subtotal + serviceFee;
@@ -258,13 +264,8 @@ export default function CheckoutPage({
 
     setIsProcessing(true);
     try {
-      const { data: payment, error: paymentError } = await supabase
-        .from('payment')
-        .select('*')
-        .eq('id', selectedPaymentId)
-        .single();
-
-      if (paymentError || !payment) {
+      const payment = paymentMethods.find(pm => pm.id === selectedPaymentId);
+      if (!payment) {
         toast.error('Unable to connect to payment service. Please try again later.');
         return;
       }
@@ -286,7 +287,7 @@ export default function CheckoutPage({
 
       const { error: orderError } = await supabase.from('orders').insert([{
         user_id: user.id,
-        cafeteria_id: cafeteria?.id || null,
+        cafeteria_id: safeCafeteriaId,
         total_amount: total,
         payment_id: payment.id,
         payment_method: payment.type,
@@ -295,7 +296,7 @@ export default function CheckoutPage({
         items: JSON.stringify(cartItems),
       }]);
       if (orderError) {
-        toast.error('Unable to connect to payment service. Please try again later.');
+        toast.error(orderError.message || 'Unable to connect to payment service. Please try again later.');
         return;
       }
 
@@ -307,7 +308,7 @@ export default function CheckoutPage({
         })
         .eq('id', selectedPaymentId);
       if (updateError) {
-        toast.error('Payment failed or cancelled');
+        toast.error(updateError.message || 'Payment failed or cancelled');
         return;
       }
 
@@ -333,25 +334,6 @@ export default function CheckoutPage({
         <p className="text-slate-600 mb-3">
           {checkoutMode === 'normal' ? 'Review your order and complete payment' : 'Review your order and start split bill'}
         </p>
-        <div className="inline-flex rounded-full border border-slate-200 overflow-hidden text-sm bg-slate-100">
-          <Button
-            type="button"
-            variant="ghost"
-            className={`rounded-none px-4 ${checkoutMode === 'normal' ? 'bg-white text-slate-900 font-semibold shadow-sm' : 'text-slate-700'}`}
-            onClick={() => setCheckoutMode('normal')}
-          >
-            Normal Checkout
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className={`rounded-none px-4 ${checkoutMode === 'split' ? 'bg-white text-purple-700 font-semibold shadow-sm' : 'text-slate-700'}`}
-            onClick={() => setCheckoutMode('split')}
-            disabled={!onSplitBill}
-          >
-            Split Bill
-          </Button>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -365,6 +347,14 @@ export default function CheckoutPage({
               <div className="flex justify-between"><span className="text-slate-600">Location</span><span className="text-slate-900">{cafeteria.location}</span></div>
               <div className="flex justify-between items-center"><span className="text-slate-600">Pickup Time</span>
                 <Badge className="bg-purple-600"><Clock className="w-3 h-3 mr-1" />{getPickupTimeLabel(pickupTime)}</Badge>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <div className="flex items-center gap-2 text-blue-800">
+                  <Clock className="w-4 h-4" />
+                  <p className="text-sm font-medium">Estimated Preparation Time</p>
+                </div>
+                <p className="text-sm text-blue-800 mt-1">Ready in approximately 24 minutes</p>
+                <p className="text-xs text-blue-700">Based on current queue and order volume</p>
               </div>
             </CardContent>
           </Card>
@@ -381,6 +371,48 @@ export default function CheckoutPage({
                   <p className="text-slate-900">RM {(item.price * item.quantity).toFixed(2)}</p>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Checkout Options</CardTitle>
+              <CardDescription>Choose how you want to pay</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-slate-100 rounded-full p-1 flex items-center gap-1">
+                <button
+                  type="button"
+                  className={`flex-1 text-sm py-2 rounded-full transition ${
+                    checkoutMode === 'normal'
+                      ? 'bg-white shadow-sm font-semibold text-slate-900'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  onClick={() => setCheckoutMode('normal')}
+                >
+                  Normal Checkout
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 text-sm py-2 rounded-full transition ${
+                    checkoutMode === 'split'
+                      ? 'bg-white shadow-sm font-semibold text-purple-700'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  onClick={() => {
+                    setCheckoutMode('split');
+                    onSplitBill?.();
+                  }}
+                  disabled={!onSplitBill}
+                >
+                  Split Bill
+                </button>
+              </div>
+              <p className="text-sm text-slate-600">
+                {checkoutMode === 'normal'
+                  ? 'Pay the full amount by yourself.'
+                  : 'Split the cost with your dining companions. Each person pays their portion.'}
+              </p>
             </CardContent>
           </Card>
 
@@ -479,27 +511,19 @@ export default function CheckoutPage({
               </div>
               <Separator />
               <div className="flex justify-between text-slate-900"><span>Total</span><span>RM {total.toFixed(2)}</span></div>
-              {checkoutMode === 'split' && onSplitBill && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-purple-600 text-purple-700 hover:bg-purple-50 flex items-center justify-center gap-2"
-                  onClick={onSplitBill}
-                >
-                  <Users className="w-4 h-4" />
-                  Create Split Bill
-                </Button>
-              )}
-              {checkoutMode === 'normal' && (
-                <Button
-                  className="w-full text-white hover:opacity-90"
-                  style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
-                  onClick={handlePlaceOrderClick}
-                  disabled={!selectedPaymentId || isProcessing}
-                >
-                  {placeOrderLabel}
-                </Button>
-              )}
+              <Button
+                className="w-full text-white hover:opacity-90"
+                style={{ backgroundColor: checkoutMode === 'normal' ? 'oklch(44% 0.25 355)' : 'oklch(40.8% 0.153 2.432)' }}
+                onClick={checkoutMode === 'normal' ? handlePlaceOrderClick : () => { setCheckoutMode('split'); onSplitBill?.(); }}
+                disabled={checkoutMode === 'normal' ? (!selectedPaymentId || isProcessing) : isProcessing}
+              >
+                {checkoutMode === 'normal' ? placeOrderLabel : (
+                  <span className="flex items-center gap-2 justify-center">
+                    <Users className="w-4 h-4" />
+                    Create Split Bill
+                  </span>
+                )}
+              </Button>
               {checkoutMode === 'normal' && selectedPayment?.type === 'card' && (
                 <div className="flex items-start gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                   <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5" />

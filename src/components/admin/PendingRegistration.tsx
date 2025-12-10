@@ -97,14 +97,25 @@ export default function PendingRegistrations({
   const handleApprove = async () => {
     if (!selectedRegistration) return;
     setProcessing(true);
-    const { error } = await supabase
+    // 1) Mark as approved
+    const { error: approveError } = await supabase
       .from("registration_request")
       .update({ status: "approved", reviewed_at: new Date().toISOString() })
       .eq("id", selectedRegistration.id)
       .select()
       .maybeSingle();
-    if (error) {
-      toast.error("Failed to approve: " + error.message);
+    if (approveError) {
+      toast.error("Failed to approve: " + approveError.message);
+      setProcessing(false);
+      return;
+    }
+
+    // 2) Create cafeteria listing via RPC (security definer)
+    const { error: cafeError } = await supabase.rpc("create_cafeteria_for_owner", {
+      registration_id: selectedRegistration.id,
+    });
+    if (cafeError) {
+      toast.error("Approved, but failed to create cafeteria listing: " + cafeError.message);
       setProcessing(false);
       return;
     }

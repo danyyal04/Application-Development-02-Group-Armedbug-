@@ -70,6 +70,10 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
         toast.error('Owner identification document is required.');
         return false;
       }
+      if (!formData.businessLogoFile) {
+        toast.error('Business logo is required for cafeteria listing.');
+        return false;
+      }
     }
     return true;
   };
@@ -103,18 +107,17 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
       const user = data.user;
       if (user && formData.role === 'staff') {
-        const { error: reqErr } = await supabase.from('registration_request').insert({
-          // Assumes registration_request.user_id now references auth.users(id)
-          user_id: user.id,
-          business_name: formData.businessName,
-          business_address: formData.businessAddress,
-          contact_number: formData.contactNumber,
-          email: formData.email,
-          documents: {
+        // Use a security-definer RPC to bypass RLS for owner registration
+        const { error: reqErr } = await supabase.rpc('create_owner_registration', {
+          _auth_id: user.id,
+          _email: formData.email,
+          _business_name: formData.businessName,
+          _business_address: formData.businessAddress,
+          _contact_number: formData.contactNumber,
+          _documents: {
             owner_identification: formData.ownerIdFile,
             business_logo: formData.businessLogoFile || null,
           },
-          status: 'pending',
         });
         if (reqErr) {
           toast.error('Failed to submit application: ' + reqErr.message);
@@ -263,10 +266,10 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                         </label>
                       </div>
                       <div className="space-y-2">
-                        <Label>Business Logo (optional)</Label>
+                        <Label>Business Logo *</Label>
                         <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
                           <Upload className="w-4 h-4 text-slate-500" />
-                          <span>{formData.businessLogoFile || 'Choose file'}</span>
+                          <span>{formData.businessLogoFile || 'Choose file (logo shown to customers)'}</span>
                           <input
                             type="file"
                             className="hidden"

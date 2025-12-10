@@ -1,15 +1,14 @@
 // scripts/seed-admins.mjs
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = "https://cleiujovigtjaroqkggd.supabase.co"; // replace
-const SERVICE_ROLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWl1am92aWd0amFyb3FrZ2dkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzIzNTUxMiwiZXhwIjoyMDc4ODExNTEyfQ.o96LvNuUvkRbnRgEw-IX5OVytUUXlOstorfq9kYsnTI"; // replace, keep secret
+const SUPABASE_URL = "https://wbgjwatjhqukvkygcuun.supabase.co"; // replace
+const SERVICE_ROLE_KEY = "sb_secret_Gwi_OmL8jyQ7CvC1Q4DS8A_9z87ZFHM"; // replace, keep secret
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 const admins = [
   "danialdev@gmail.com",
-  "amandev@gmail.com",
+  "fathurahmandev@gmail.com",
   "thayaallandev@gmail.com",
   "mustaqimdev@gmail.com",
 ];

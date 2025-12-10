@@ -68,21 +68,30 @@ export default function App() {
       (user.user_metadata?.status as string) ||
       'active';
 
-    // Pull latest registration_request to avoid stale metadata (e.g., after admin approves)
-    const { data: regRow } = await supabase
-      .from('registration_request')
-      .select('status')
-      .eq('user_id', user.id)
-      .order('submitted_at', { ascending: false })
-      .limit(1)
+    // Map auth user -> app user id
+    const { data: appUser } = await supabase
+      .from('user')
+      .select('id')
+      .eq('auth_id', user.id)
       .maybeSingle();
+
+    // Pull latest registration_request to avoid stale metadata (e.g., after admin approves)
+    const { data: regRow, error: regErr } = appUser?.id
+      ? await supabase
+          .from('registration_request')
+          .select('status')
+          .eq('user_id', appUser.id)
+          .order('submitted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : { data: null, error: null };
 
     if (regRow?.status) {
       role = role === 'admin' ? 'admin' : 'staff';
       status = regRow.status;
     }
 
-    if (role === 'staff' && status === 'pending') {
+    if (role === 'staff' && status === 'pending' && !regErr) {
       await supabase.auth.signOut();
       return null;
     }

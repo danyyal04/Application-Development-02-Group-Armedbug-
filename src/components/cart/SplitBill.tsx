@@ -20,6 +20,7 @@ import { Separator } from '../ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Alert, AlertDescription } from '../ui/alert';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabaseClient';
 
 interface CartItem {
   id: string;
@@ -45,6 +46,7 @@ interface SplitBillInitiationProps {
   onInitiateSplitBill: (data: {
     splitMethod: 'equal' | 'items';
     participants: Participant[];
+    sessionId?: string;
   }) => void;
   onCancel: () => void;
   autoOpenDialog?: boolean;
@@ -78,11 +80,12 @@ export default function SplitBillInitiation({
   onCancel,
   autoOpenDialog = false,
 }: SplitBillInitiationProps) {
-  const [splitMethod, setSplitMethod] = useState<'equal' | 'items'>('equal');
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [newParticipant, setNewParticipant] = useState('');
   const [participantType, setParticipantType] = useState<'username' | 'email'>('username');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const splitMethod: 'equal' = 'equal';
 
   const subtotal = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0) || totalAmount,
@@ -127,17 +130,67 @@ export default function SplitBillInitiation({
     toast.success('Participant removed');
   };
 
-  const handleInitiate = () => {
+  const handleInitiate = async () => {
     if (participants.length === 0) {
-      toast.error('Please add at least one participant to continue');
+      toast.error('Please add at least one participant.');
       return;
     }
 
-    onInitiateSplitBill({
-      splitMethod,
-      participants,
-    });
-    setIsDialogOpen(false);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error('You must be logged in to create a split bill.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Create split bill session
+      const { data: session, error: sessionError } = await supabase
+        .from('split_bill_sessions')
+        .insert({
+          initiator_user_id: user.id,
+          total_amount: totalToSplit,
+          split_method: 'even',
+          pickup_time: pickupTime,
+        })
+        .select('id')
+        .single();
+
+      if (sessionError || !session?.id) {
+        throw new Error(sessionError?.message || 'Failed to create split bill session');
+      }
+
+      const perPerson = participants.length > 0 ? totalToSplit / participants.length : totalToSplit;
+
+      // Insert participants
+      const participantRows = participants.map(p => ({
+        session_id: session.id,
+        identifier: p.identifier,
+        identifier_type: p.type,
+        amount_due: perPerson,
+        status: 'pending',
+      }));
+
+      const { error: participantsError } = await supabase
+        .from('split_bill_participants')
+        .insert(participantRows);
+
+      if (participantsError) {
+        throw new Error(participantsError.message);
+      }
+
+      toast.success('Split bill created and participants added.');
+      onInitiateSplitBill({
+        splitMethod: 'equal',
+        participants,
+        sessionId: session.id,
+      });
+      setIsDialogOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create split bill');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -300,49 +353,6 @@ export default function SplitBillInitiation({
 
             <Card>
               <CardHeader>
-                <CardTitle>Select Split Method</CardTitle>
-                <CardDescription>Choose how to divide the payment</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[
-                    { key: 'equal', title: 'Split Evenly', description: 'Divide the total amount equally among all participants' },
-                    { key: 'items', title: 'Split by Items', description: 'Each participant pays for specific items they ordered' },
-                  ].map(option => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setSplitMethod(option.key as typeof splitMethod)}
-                      className={`text-left rounded-lg border p-4 transition-all ${
-                        splitMethod === option.key
-                          ? 'border-purple-600 bg-purple-50 shadow-sm'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <p className="text-slate-900 font-medium">{option.title}</p>
-                      <p className="text-sm text-slate-600">{option.description}</p>
-                      {splitMethod === option.key && (
-                        <Badge variant="secondary" className="mt-2 text-xs border-purple-200 text-purple-800">
-                          <Check className="w-3 h-3 mr-1" />
-                          Selected
-                        </Badge>
-                      )}
-                      {option.key === 'items' && (
-                        <Badge variant="secondary" className="mt-2 text-xs">Coming Soon</Badge>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-sm text-purple-700 mt-3">
-                  {splitMethod === 'equal'
-                    ? 'Divide the total amount equally among all participants.'
-                    : 'Assign items per participant (coming soon). For now amounts will default to even split.'}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
                 <CardTitle>Add Participants</CardTitle>
                 <CardDescription>Add people to split the bill with</CardDescription>
               </CardHeader>
@@ -449,11 +459,11 @@ export default function SplitBillInitiation({
             </Button>
             <Button
               onClick={handleInitiate}
-              disabled={participants.length === 0}
               className="flex-1 bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"
+              disabled={isSubmitting}
             >
               <CreditCard className="w-4 h-4 mr-2" />
-              Add Participants
+              {isSubmitting ? 'Creating...' : 'Initiate Split Bill'}
             </Button>
           </div>
         </DialogContent>
