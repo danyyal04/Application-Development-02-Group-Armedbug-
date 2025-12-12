@@ -2,9 +2,9 @@ import { useState } from "react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -26,10 +26,6 @@ import {
 
 import { toast } from "sonner";
 
-// ================================
-// Types
-// ================================
-
 interface CafeteriaUser {
   id: string;
   name: string;
@@ -49,12 +45,7 @@ interface CafeteriaInformationProps {
   user: CafeteriaUser;
 }
 
-// ================================
-// Component
-// ================================
-
 export default function CafeteriaInformation({ user }: CafeteriaInformationProps) {
-  // In real implementation: fetch from DB
   const [cafeteriaData] = useState({
     businessName: user.businessName || "Your Cafeteria",
     ownerName: user.name,
@@ -82,10 +73,6 @@ export default function CafeteriaInformation({ user }: CafeteriaInformationProps
       },
     } as Record<string, CafeteriaDocument>,
   });
-
-  // ================================
-  // Helpers
-  // ================================
 
   const getDocumentStatus = (expiry: string) => {
     const today = new Date();
@@ -137,22 +124,17 @@ export default function CafeteriaInformation({ user }: CafeteriaInformationProps
     (doc) => getDocumentStatus(doc.expiryDate) === "expiring"
   );
 
-  // ================================
-  // UI
-  // ================================
-
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl text-slate-900 mb-1">Cafeteria Information</h1>
-          <p className="text-slate-600">Business profile and verification details</p>
+          <p className="text-slate-600">Cafeteria details and verification</p>
         </div>
         {renderStatusBadge(cafeteriaData.approvalStatus)}
       </div>
 
-      {/* Alerts */}
       {expiredDocs && (
         <Alert className="border-red-200 bg-red-50">
           <AlertCircle className="w-4 h-4 text-red-600" />
@@ -186,24 +168,24 @@ export default function CafeteriaInformation({ user }: CafeteriaInformationProps
         </Alert>
       )}
 
-      {/* Business Information */}
+      {/* CAFETERIA DETAILS */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="w-5 h-5 text-purple-700" />
-            Business Details
+            Cafeteria Details
           </CardTitle>
           <CardDescription>Cafeteria information on record</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <p><strong>Business Name:</strong> {cafeteriaData.businessName}</p>
+          <p><strong>Cafeteria Name:</strong> {cafeteriaData.businessName}</p>
           <p><strong>Owner:</strong> {cafeteriaData.ownerName}</p>
 
           <div className="flex gap-2 items-start">
             <MapPin className="w-4 h-4 text-slate-400 mt-1" />
             <div>
-              <p className="text-sm text-slate-600">Business Address</p>
+              <p className="text-sm text-slate-600">Cafeteria Address</p>
               <p className="text-slate-900">{cafeteriaData.businessAddress}</p>
             </div>
           </div>
@@ -233,17 +215,18 @@ export default function CafeteriaInformation({ user }: CafeteriaInformationProps
               </p>
             </div>
           </div>
+
         </CardContent>
       </Card>
 
-      {/* Verification Documents */}
+      {/* DOCUMENT SECTION */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-purple-700" />
             Verification Documents
           </CardTitle>
-          <CardDescription>Your uploaded business documents</CardDescription>
+          <CardDescription>Your uploaded cafeteria documents</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
