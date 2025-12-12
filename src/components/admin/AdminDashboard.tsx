@@ -1,194 +1,168 @@
-import { useCallback, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import {
-  Users,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Shield,
-  LogOut,
-} from "lucide-react";
-import PendingRegistration from "./PendingRegistration";
-import UserManagement from "./UserManagement";
+import { AlarmClock, Users, CheckCircle, XCircle } from "lucide-react";
+import { supabase } from "../../lib/supabaseClient";
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  accountStatus?: string;
-  businessName?: string;
-}
+export default function AdminDashboard() {
+  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingList, setPendingList] = useState<any[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [activeUsers, setActiveUsers] = useState(0);
+  const [suspendedUsers, setSuspendedUsers] = useState(0);
 
-interface AdminDashboardProps {
-  user: User;
-  onLogout: () => void;
-}
+  useEffect(() => {
+    loadDashboard();
+  }, []);
 
-export default function AdminDashboard({
-  user,
-  onLogout,
-}: AdminDashboardProps) {
-  const [stats, setStats] = useState({
-    pendingRegistrations: 0,
-    totalUsers: 0,
-    activeUsers: 0,
-    suspendedUsers: 0,
-  });
-  const [refreshUsersKey, setRefreshUsersKey] = useState<number>(0);
+  const loadDashboard = async () => {
+    // Load pending list
+    const { data: pendingRows, error: pendingErr } = await supabase
+      .from("registration_request")
+      .select("*")
+      .eq("status", "pending");
 
-  const updateStats = useCallback(
-    (newStats: Partial<typeof stats>) => {
-      setStats((prev) => ({ ...prev, ...newStats }));
-    },
-    []
-  );
+    setPendingList(pendingRows || []);
+    setPendingCount(pendingRows?.length || 0);
+
+    // Load total users
+    const { data: usersData } = await supabase.from("profiles").select("id");
+    setTotalUsers(usersData?.length || 0);
+
+    // Active users
+    const { data: activeData } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("status", "active");
+    setActiveUsers(activeData?.length || 0);
+
+    // Suspended users
+    const { data: suspendedData } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("status", "suspended");
+    setSuspendedUsers(suspendedData?.length || 0);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <Shield className="w-8 h-8 text-purple-700" />
-                <h1 className="text-slate-900">Admin Dashboard</h1>
-              </div>
-              <p className="text-slate-600">
-                Manage cafeteria owner registrations and user accounts
-              </p>
-            </div>
-            <Button variant="outline" onClick={onLogout} className="gap-2">
-              <LogOut className="w-4 h-4" />
-              Logout
-            </Button>
-          </div>
-        </div>
+    <div className="p-8">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <span className="text-purple-600">🛡️</span> Admin Dashboard
+        </h1>
+        <p className="text-slate-600">
+          Manage cafeteria owner registrations and user accounts
+        </p>
+      </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardDescription>Pending Approvals</CardDescription>
-                <Clock className="w-4 h-4 text-orange-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-baseline gap-2">
-                <span className="text-slate-900">
-                  {stats.pendingRegistrations}
-                </span>
-                <Badge
-                  variant="outline"
-                  className="text-orange-600 border-orange-200"
-                >
-                  Needs Review
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardDescription>Total Users</CardDescription>
-                <Users className="w-4 h-4 text-blue-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-baseline gap-2">
-                <span className="text-slate-900">{stats.totalUsers}</span>
-                <span className="text-xs text-slate-500">registered</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardDescription>Active Users</CardDescription>
-                <CheckCircle className="w-4 h-4 text-green-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-baseline gap-2">
-                <span className="text-slate-900">{stats.activeUsers}</span>
-                <span className="text-xs text-slate-500">verified</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardDescription>Suspended</CardDescription>
-                <XCircle className="w-4 h-4 text-red-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-baseline gap-2">
-                <span className="text-slate-900">{stats.suspendedUsers}</span>
-                <span className="text-xs text-slate-500">accounts</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <Card className="shadow-xl">
+      {/* Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+        {/* Pending Approvals */}
+        <Card>
           <CardHeader>
-            <CardTitle>Account Management</CardTitle>
-            <CardDescription>
-              Review pending registrations and manage user accounts
-            </CardDescription>
+            <CardTitle className="text-sm flex items-center justify-between">
+              Pending Approvals <AlarmClock className="w-4 h-4 text-orange-500" />
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="pending" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="pending" className="relative">
-                  Pending Registrations
-                  {stats.pendingRegistrations > 0 && (
-                    <Badge
-                      variant="destructive"
-                      className="ml-2 h-5 min-w-5 rounded-full px-1 text-xs"
-                    >
-                      {stats.pendingRegistrations}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="users">User Management</TabsTrigger>
-              </TabsList>
+            <p className="text-3xl font-bold">{pendingCount}</p>
+            <Badge variant="outline" className="mt-2 text-orange-600 border-orange-400">
+              Needs Review
+            </Badge>
+          </CardContent>
+        </Card>
 
-              <TabsContent value="pending" className="mt-6">
-                <PendingRegistration
-                  onStatsUpdate={updateStats}
-                  onApprovedOrRejected={() =>
-                    setRefreshUsersKey((k) => k + 1)
-                  }
-                />
-              </TabsContent>
+        {/* Total Users */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center justify-between">
+              Total Users <Users className="w-4 h-4 text-blue-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{totalUsers}</p>
+            <p className="text-xs text-slate-500">registered</p>
+          </CardContent>
+        </Card>
 
-              <TabsContent value="users" className="mt-6">
-                <UserManagement
-                  onStatsUpdate={updateStats}
-                  refreshKey={refreshUsersKey}
-                />
-              </TabsContent>
-            </Tabs>
+        {/* Active Users */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center justify-between">
+              Active Users <CheckCircle className="w-4 h-4 text-green-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{activeUsers}</p>
+            <p className="text-xs text-slate-500">verified</p>
+          </CardContent>
+        </Card>
+
+        {/* Suspended */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center justify-between">
+              Suspended <XCircle className="w-4 h-4 text-red-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{suspendedUsers}</p>
+            <p className="text-xs text-slate-500">accounts</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Account Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Account Management</CardTitle>
+          <p className="text-slate-600 text-sm">
+            Review pending registrations and manage user accounts
+          </p>
+        </CardHeader>
+
+        <CardContent>
+          <Tabs defaultValue="pending">
+            <TabsList className="grid grid-cols-2 mb-4">
+              <TabsTrigger value="pending">Pending Registrations</TabsTrigger>
+              <TabsTrigger value="users">User Management</TabsTrigger>
+            </TabsList>
+
+            {/* Pending List */}
+            <TabsContent value="pending">
+              {pendingList.length === 0 ? (
+                <div className="text-center text-slate-500 p-6">
+                  No pending registrations yet.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingList.map((owner: any) => (
+                    <div
+                      key={owner.id}
+                      className="border p-4 rounded-md shadow-sm bg-white"
+                    >
+                      <div className="font-semibold text-lg">{owner.business_name}</div>
+                      <div className="text-sm text-slate-600">
+                        Address: {owner.business_address}
+                      </div>
+                      <div className="text-sm">Email: {owner.email}</div>
+                      <div className="text-sm">Contact: {owner.contact_number}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="users">
+              <div className="p-4 text-center text-sm text-slate-500">
+                User management page is coming soon.
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }
