@@ -40,31 +40,28 @@ export default function RegisterForm({
     businessAddress: "",
     contactNumber: "",
     ownerIdFile: "",
-    businessLogoFile: "",
     ssmCertificateFile: "",
     businessLicenseFile: "",
+    businessLogoFile: "",
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // EMAIL VALIDATION RULES
+  // Email validation
   const utmEmailRegex = useMemo(
     () => /@(utm\.my|graduate\.utm\.my)$/i,
     []
   );
 
   const ownerEmailRegex = useMemo(
-    () => /^[a-zA-Z0-9._%+-]*Owner@gmail\.com$/,
+    () => /^[a-zA-Z0-9._%+-]*owner@gmail\.com$/,
     []
   );
 
   const generalEmailRegex = useMemo(() => /\S+@\S+\.\S+/, []);
 
-  // ============================
-  // VALIDATION
-  // ============================
-
+  // Validation
   const validateInputs = () => {
     if (!formData.name.trim())
       return toast.error("Full name is required."), false;
@@ -76,9 +73,7 @@ export default function RegisterForm({
       return toast.error("Customers MUST use a UTM email address."), false;
 
     if (formData.role === "staff" && !ownerEmailRegex.test(formData.email))
-      return toast.error(
-        "Cafeteria Owner MUST use an email like xxOwner@gmail.com"
-      ), false;
+      return toast.error("Cafeteria Owner email must end with xxowner@gmail.com"), false;
 
     if (formData.password.length < 8)
       return toast.error("Password must be at least 8 characters."), false;
@@ -89,29 +84,20 @@ export default function RegisterForm({
     if (formData.role === "staff") {
       if (!formData.businessName)
         return toast.error("Cafeteria name required."), false;
-
       if (!formData.businessAddress)
         return toast.error("Cafeteria address required."), false;
-
       if (!formData.contactNumber)
         return toast.error("Contact number required."), false;
-
       if (!formData.ownerIdFile)
         return toast.error("Owner ID is required."), false;
-
       if (!formData.ssmCertificateFile)
         return toast.error("SSM Certificate is required."), false;
-
       if (!formData.businessLicenseFile)
         return toast.error("Business License is required."), false;
     }
 
     return true;
   };
-
-  // ============================
-  // SUBMIT
-  // ============================
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,6 +106,7 @@ export default function RegisterForm({
     setLoading(true);
 
     try {
+      // Create User Auth
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -129,7 +116,6 @@ export default function RegisterForm({
             role: formData.role,
             status: formData.role === "staff" ? "pending" : "active",
           },
-          emailRedirectTo: window.location.origin + "/login",
         },
       });
 
@@ -141,56 +127,52 @@ export default function RegisterForm({
 
       const user = data.user;
 
+      // Insert into registration_request table
       if (user && formData.role === "staff") {
-        const { error: reqErr } = await supabase.from("registration_request").insert({
-          user_id: user.id,
-          business_name: formData.businessName,
-          business_address: formData.businessAddress,
-          contact_number: formData.contactNumber,
-          email: formData.email,
-          documents: {
-            owner_identification: formData.ownerIdFile,
-            ssm_certificate: formData.ssmCertificateFile,
-            business_license: formData.businessLicenseFile,
-            business_logo: formData.businessLogoFile || null,
-          },
-          status: "pending",
-        });
+        const { error: regErr } = await supabase
+          .from("registration_request")
+          .insert({
+            user_id: user.id,
+            business_name: formData.businessName,
+            business_address: formData.businessAddress,
+            contact_number: formData.contactNumber,
+            email: formData.email,
+            status: "pending",
+            submitted_at: new Date().toISOString(),
+            documents: {
+              owner_identification: formData.ownerIdFile,
+              ssm_certificate: formData.ssmCertificateFile,
+              business_license: formData.businessLicenseFile,
+              business_logo: formData.businessLogoFile || null,
+            },
+          });
 
-        if (reqErr) {
-          toast.error("Failed to submit application: " + reqErr.message);
-          setLoading(false);
-          return;
+        if (regErr) {
+          toast.error("Submission failed: " + regErr.message);
+        } else {
+          toast.success("Application submitted. Waiting for admin approval.");
         }
       }
 
-      if (user) {
-        await supabase.auth.signOut();
-        toast.success(
-          formData.role === "staff"
-            ? "Application submitted. Please wait for admin approval."
-            : "Registration successful! Check your UTM email."
-        );
-        onRegister();
+      if (formData.role !== "staff") {
+        toast.success("Registration successful!");
       }
+
+      onRegister();
+
     } catch (err: any) {
-    toast.error("Unexpected error: " + err.message);
-    } finally {
-      setLoading(false);
+      toast.error("Unexpected error: " + err.message);
     }
+
+    setLoading(false);
   };
 
-  // FILE FIELDS
   const documentFields = [
-    { label: "Owner Identification (IC/Passport) *", key: "ownerIdFile" as keyof typeof formData },
-    { label: "SSM Certificate *", key: "ssmCertificateFile" as keyof typeof formData },
-    { label: "Business License *", key: "businessLicenseFile" as keyof typeof formData },
-    { label: "Business Logo (Optional)", key: "businessLogoFile" as keyof typeof formData },
-  ] as const;
-
-  // ============================
-  // UI
-  // ============================
+    { label: "Owner Identification (IC/Passport) *", key: "ownerIdFile" },
+    { label: "SSM Certificate *", key: "ssmCertificateFile" },
+    { label: "Business License *", key: "businessLicenseFile" },
+    { label: "Cafeteria Logo (Optional)", key: "businessLogoFile" },
+  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -210,12 +192,12 @@ export default function RegisterForm({
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
 
-              {/* ROLE SELECT */}
+              {/* ROLE (UPDATED LABEL) */}
               <div className="space-y-2">
-                <Label>Register As</Label>
+                <Label>Role</Label>
                 <Select
                   value={formData.role}
-                  onValueChange={(value: string) =>
+                  onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, role: value }))
                   }
                 >
@@ -227,10 +209,11 @@ export default function RegisterForm({
                 </Select>
               </div>
 
-              {/* NAME */}
+              {/* FULL NAME */}
               <div className="space-y-2">
                 <Label>Full Name</Label>
                 <Input
+                  placeholder="Enter your full name"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
@@ -242,40 +225,33 @@ export default function RegisterForm({
               <div className="space-y-2">
                 <Label>Email</Label>
                 <Input
+                  placeholder="Enter your email"
                   value={formData.email}
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
                   }
                 />
 
-                {/* CUSTOMER EMAIL CHECK */}
-                {formData.role === "student" &&
-                  formData.email !== "" &&
-                  !utmEmailRegex.test(formData.email) && (
-                    <p className="text-xs text-red-600">
-                      Must use UTM email (example: yourname@utm.my)
-                    </p>
-                  )}
+                {formData.role === "student" && (
+                  <p className="text-xs text-slate-500">Must use UTM email format.</p>
+                )}
 
-                {/* CAFETERIA OWNER EMAIL CHECK */}
-                {formData.role === "staff" &&
-                  formData.email !== "" &&
-                  !ownerEmailRegex.test(formData.email) && (
-                    <p className="text-xs text-red-600">
-                      Must use owner email: <strong>xxOwner@gmail.com</strong>
-                    </p>
-                  )}
+                {formData.role === "staff" && (
+                  <p className="text-xs text-slate-500">
+                    Must use owner email format: <strong>xxowner@gmail.com</strong>
+                  </p>
+                )}
               </div>
 
-              {/* STAFF FIELDS */}
+              {/* STAFF FORM */}
               {formData.role === "staff" && (
                 <>
                   <Separator />
 
-                  {/* CAFETERIA NAME */}
                   <div className="space-y-2">
                     <Label>Cafeteria Name</Label>
                     <Input
+                      placeholder="Enter cafeteria name"
                       value={formData.businessName}
                       onChange={(e) =>
                         setFormData({ ...formData, businessName: e.target.value })
@@ -283,10 +259,10 @@ export default function RegisterForm({
                     />
                   </div>
 
-                  {/* CAFETERIA ADDRESS */}
                   <div className="space-y-2">
                     <Label>Cafeteria Address</Label>
                     <Input
+                      placeholder="Enter cafeteria address"
                       value={formData.businessAddress}
                       onChange={(e) =>
                         setFormData({ ...formData, businessAddress: e.target.value })
@@ -294,10 +270,10 @@ export default function RegisterForm({
                     />
                   </div>
 
-                  {/* CONTACT NUMBER (NOT CHANGED) */}
                   <div className="space-y-2">
                     <Label>Contact Number</Label>
                     <Input
+                      placeholder="Enter contact number"
                       value={formData.contactNumber}
                       onChange={(e) =>
                         setFormData({ ...formData, contactNumber: e.target.value })
@@ -307,13 +283,12 @@ export default function RegisterForm({
 
                   <Separator />
 
-                  {/* DOCUMENT UPLOAD FIELDS */}
                   {documentFields.map((field) => (
                     <div key={field.key} className="space-y-2">
                       <Label>{field.label}</Label>
                       <label className="flex items-center justify-between rounded-md border border-slate-300 px-4 py-2 cursor-pointer hover:bg-slate-50">
                         <span className="text-slate-700">
-                          {formData[field.key] || "Choose file"}
+                          {(formData as any)[field.key] || "Choose file"}
                         </span>
                         <Upload className="w-4 h-4 text-slate-500" />
                         <input
@@ -337,6 +312,7 @@ export default function RegisterForm({
                 <Label>Password</Label>
                 <div className="relative">
                   <Input
+                    placeholder="Enter your password"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={(e) =>
@@ -358,6 +334,7 @@ export default function RegisterForm({
                 <Label>Confirm Password</Label>
                 <div className="relative">
                   <Input
+                    placeholder="Re-enter your password"
                     type={showPassword ? "text" : "password"}
                     value={formData.confirmPassword}
                     onChange={(e) =>
@@ -390,7 +367,6 @@ export default function RegisterForm({
                   : "Register"}
               </Button>
 
-              {/* SWITCH TO LOGIN */}
               <p className="text-sm text-center text-slate-600">
                 Already have an account?{" "}
                 <button
@@ -401,6 +377,7 @@ export default function RegisterForm({
                   Login here
                 </button>
               </p>
+
             </form>
           </CardContent>
         </Card>
