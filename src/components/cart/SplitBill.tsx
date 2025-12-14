@@ -328,7 +328,13 @@ export default function SplitBillInitiation({
         </div>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) onCancel();
+        }}
+      >
         <DialogContent className="sm:max-w-xl lg:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-purple-900">
@@ -454,7 +460,14 @@ export default function SplitBillInitiation({
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDialogOpen(false);
+                onCancel();
+              }}
+              className="flex-1"
+            >
               Cancel
             </Button>
             <Button

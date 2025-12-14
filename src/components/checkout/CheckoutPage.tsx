@@ -401,7 +401,6 @@ export default function CheckoutPage({
                   }`}
                   onClick={() => {
                     setCheckoutMode('split');
-                    onSplitBill?.();
                   }}
                   disabled={!onSplitBill}
                 >
@@ -514,7 +513,7 @@ export default function CheckoutPage({
               <Button
                 className="w-full text-white hover:opacity-90"
                 style={{ backgroundColor: checkoutMode === 'normal' ? 'oklch(44% 0.25 355)' : 'oklch(40.8% 0.153 2.432)' }}
-                onClick={checkoutMode === 'normal' ? handlePlaceOrderClick : () => { setCheckoutMode('split'); onSplitBill?.(); }}
+                onClick={checkoutMode === 'normal' ? handlePlaceOrderClick : () => onSplitBill?.()}
                 disabled={checkoutMode === 'normal' ? (!selectedPaymentId || isProcessing) : isProcessing}
               >
                 {checkoutMode === 'normal' ? placeOrderLabel : (

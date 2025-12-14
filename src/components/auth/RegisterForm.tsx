@@ -16,6 +16,7 @@ interface RegisterFormProps {
 
 export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps) {
   const [formData, setFormData] = useState({
+    username: '',
     name: '',
     email: '',
     password: '',
@@ -31,8 +32,13 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
   const [loading, setLoading] = useState(false);
   const emailRegex = useMemo(() => /\S+@\S+\.\S+/, []);
   const utmEmailRegex = useMemo(() => /@(?:utm\.my|graduate\.utm\.my)$/i, []);
+  const usernameRegex = useMemo(() => /^[a-z0-9_.-]{3,20}$/i, []);
 
   const validateInputs = () => {
+    if (!usernameRegex.test(formData.username.trim())) {
+      toast.error('Username must be 3-20 characters (letters, numbers, . _ -).');
+      return false;
+    }
     if (!formData.name.trim()) {
       toast.error('Full name is required.');
       return false;
@@ -85,12 +91,34 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
     setLoading(true);
 
     try {
+      const normalizedUsername = formData.username.trim().toLowerCase();
+
+      // Check username availability against app users table
+      const { data: existingUsername, error: usernameError } = await supabase
+        .from('user')
+        .select('id')
+        .eq('username', normalizedUsername)
+        .maybeSingle();
+
+      if (usernameError) {
+        toast.error('Unable to verify username availability. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      if (existingUsername) {
+        toast.error('Username is already taken. Please choose another.');
+        setLoading(false);
+        return;
+      }
+
       // 1. Register user in Supabase Auth without auto-login
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
+            username: normalizedUsername,
             name: formData.name,
             role: formData.role,
             status: formData.role === 'staff' ? 'pending' : 'active',
@@ -189,6 +217,19 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="e.g., irfandanial"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-slate-500">Used for split-bill invites; must be unique.</p>
               </div>
 
               <div className="space-y-2">
