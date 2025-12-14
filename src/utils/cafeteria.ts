@@ -56,26 +56,6 @@ export async function ensureCafeteriaContext(user: EnsureUser) {
     cafeteriaId = ownerCafe?.id || user.id;
   }
 
-  if (!profileRow || profileRow.cafeteria_id !== cafeteriaId) {
-    const upsertPayload = {
-      id: user.id,
-      cafeteria_id: cafeteriaId,
-      cafeteria_name: cafeteriaName,
-      role: 'staff',
-    };
-    const { data: upserted, error: upsertError } = await supabase
-      .from('profiles')
-      .upsert(upsertPayload)
-      .select(profileSelection)
-      .maybeSingle();
-
-    if (upsertError) {
-      throw upsertError;
-    }
-
-    profileRow = upserted;
-  }
-
   let cafeteriaRow = ownerCafe;
 
   if (!cafeteriaRow) {
@@ -93,7 +73,8 @@ export async function ensureCafeteriaContext(user: EnsureUser) {
   }
 
   if (!cafeteriaRow) {
-    const insertPayload = {
+    // Do not create cafeteria client-side (RLS blocks anon key). Return minimal shape.
+    cafeteriaRow = {
       id: cafeteriaId,
       owner_auth_id: user.id,
       name: cafeteriaName,
@@ -105,49 +86,19 @@ export async function ensureCafeteriaContext(user: EnsureUser) {
       rating: 4.5,
       estimated_time: DEFAULT_ESTIMATED_TIME,
       is_open: true,
-    };
-
-    let inserted = null;
-    let insertError = null;
-    try {
-      const { data, error } = await supabase
-        .from('cafeterias')
-        .upsert(insertPayload, { onConflict: 'id' })
-        .select(cafeteriaSelection)
-        .maybeSingle();
-      inserted = data;
-      insertError = error;
-    } catch (err: any) {
-      insertError = err;
-    }
-
-    if (insertError) {
-      // If the failure is due to owner unique constraint, fetch the existing row
-      const duplicateOwner =
-        typeof insertError.message === 'string' &&
-        insertError.message.includes('cafeterias_owner_auth_unique');
-      if (duplicateOwner) {
-        const { data: existingOwner } = await supabase
-          .from('cafeterias')
-          .select(cafeteriaSelection)
-          .eq('owner_auth_id', user.id)
-          .maybeSingle();
-        cafeteriaRow = existingOwner || null;
-      } else {
-        throw insertError;
-      }
-    } else {
-      cafeteriaRow = inserted;
-    }
-  } else if (!cafeteriaRow.owner_auth_id) {
-    await supabase
-      .from('cafeterias')
-      .update({ owner_auth_id: user.id })
-      .eq('id', cafeteriaRow.id);
+      created_at: null,
+      updated_at: null,
+    } as any;
   }
 
   return {
-    profile: profileRow,
+    profile:
+      profileRow || {
+        id: user.id,
+        cafeteria_id: cafeteriaId,
+        cafeteria_name: cafeteriaName,
+        role: 'staff',
+      },
     cafeteria: cafeteriaRow,
     cafeteriaId: cafeteriaRow?.id || cafeteriaId,
     cafeteriaName: cafeteriaRow?.name || cafeteriaName,

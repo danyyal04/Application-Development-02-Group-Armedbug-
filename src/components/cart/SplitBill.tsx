@@ -31,8 +31,7 @@ interface CartItem {
 
 interface Participant {
   id: string;
-  identifier: string; // username or email
-  type: 'username' | 'email';
+  identifier: string; // email only
 }
 
 interface SplitBillInitiationProps {
@@ -82,7 +81,6 @@ export default function SplitBillInitiation({
 }: SplitBillInitiationProps) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [newParticipant, setNewParticipant] = useState('');
-  const [participantType, setParticipantType] = useState<'username' | 'email'>('username');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const splitMethod: 'equal' = 'equal';
@@ -117,7 +115,6 @@ export default function SplitBillInitiation({
     const participant: Participant = {
       id: `participant-${Date.now()}`,
       identifier: newParticipant.trim(),
-      type: participantType,
     };
 
     setParticipants([...participants, participant]);
@@ -166,7 +163,7 @@ export default function SplitBillInitiation({
       const participantRows = participants.map(p => ({
         session_id: session.id,
         identifier: p.identifier,
-        identifier_type: p.type,
+        identifier_type: 'email',
         amount_due: perPerson,
         status: 'pending',
       }));
@@ -363,31 +360,9 @@ export default function SplitBillInitiation({
                 <CardDescription>Add people to split the bill with</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div>
-                  <Label className="mb-2 block">Participant Identifier Type</Label>
-                  <div className="flex gap-2 flex-wrap">
-                    {(['username', 'email'] as const).map(type => (
-                      <Button
-                        key={type}
-                        type="button"
-                        variant={participantType === type ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setParticipantType(type)}
-                        className={participantType === type ? 'bg-purple-700' : ''}
-                      >
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="flex gap-2">
                   <Input
-                    placeholder={
-                      participantType === 'username'
-                        ? 'Enter username (e.g., john_doe)'
-                        : 'Enter email (e.g., student@utm.my)'
-                    }
+                    placeholder="Enter email (e.g., student@utm.my)"
                     value={newParticipant}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => setNewParticipant(e.target.value)}
                     onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
@@ -429,9 +404,7 @@ export default function SplitBillInitiation({
                             <UserPlus className="w-4 h-4 text-slate-600" />
                             <div className="flex-1">
                               <p className="text-slate-900">{participant.identifier}</p>
-                              <p className="text-xs text-slate-500">
-                                {participant.type === 'username' ? 'Username' : 'Email'}
-                              </p>
+                              <p className="text-xs text-slate-500">Email</p>
                             </div>
                             <p className="text-slate-900">RM {amountPerPerson.toFixed(2)}</p>
                           </div>
@@ -454,7 +427,7 @@ export default function SplitBillInitiation({
             <Alert className="border-blue-200 bg-blue-50">
               <AlertCircle className="w-4 h-4 text-blue-600" />
               <AlertDescription className="text-blue-800 text-sm">
-                Participants will be notified by username or email. No invite links required.
+                Participants will be notified by email. No invite links required.
               </AlertDescription>
             </Alert>
           </div>
