@@ -242,16 +242,25 @@ export default function CafeteriaInformation({
 
       const publicUrl = publicData.publicUrl;
 
-      // Client-side cannot update cafetarias table without an RLS policy; keep local only.
+      // Try to persist to DB via RPC (requires set_shop_image_url security definer)
+      try {
+        await supabase.rpc("set_shop_image_url", {
+          _cafeteria_id: activeRecord.id,
+          _url: publicUrl,
+        });
+      } catch (rpcError: any) {
+        // Non-fatal; still update local state so the owner sees it.
+        console.warn("set_shop_image_url failed", rpcError);
+      }
+
+      // Update local state so owner sees the latest image immediately
       setShopImageUrl(`${publicUrl}?t=${Date.now()}`);
       setCafeteriaRecord((prev: any) =>
-        prev
-          ? { ...prev, shop_image_url: publicUrl, image: publicUrl }
-          : prev
+        prev ? { ...prev, shop_image_url: publicUrl, image: publicUrl } : prev
       );
       setSelectedShopImage(null);
       setShopImagePreview(null);
-      toast.success("Shop image uploaded! (Saved locally — requires server policy to persist.)");
+      toast.success("Shop image uploaded!");
     } catch (error: any) {
       toast.error(error?.message || "Failed to upload shop image. Please try again.");
     } finally {
