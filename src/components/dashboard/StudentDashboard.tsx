@@ -75,7 +75,12 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
         .select('*')
         .order('rating', { ascending: false })
         .limit(3);
-      setFeaturedCafeterias(data || []);
+      const safeData =
+        (data || []).map((row: any) => ({
+          ...row,
+          image: row.shop_image_url || row.image || '/UTMMunch-Logo.jpg',
+        })) || [];
+      setFeaturedCafeterias(safeData);
     };
     loadFeatured();
   }, []);
