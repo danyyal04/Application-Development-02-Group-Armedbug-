@@ -19,6 +19,7 @@ interface Cafeteria {
   location: string;
   description: string;
   image: string;
+  shopImageUrl?: string | null;
   rating: number;
   estimatedTime: string;
   isOpen: boolean;
@@ -36,6 +37,7 @@ const DEFAULT_CAFETERIAS: Cafeteria[] = [
     location: 'UTM',
     description: 'Default cafeteria listing.',
     image: '/UTMMunch-Logo.jpg',
+    shopImageUrl: '/UTMMunch-Logo.jpg',
     rating: 4.5,
     estimatedTime: '15-20 min',
     isOpen: true,
@@ -67,7 +69,8 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
           name: row.name,
           location: row.location ?? 'UTM',
           description: row.description ?? '',
-          image: row.image ?? '/UTMMunch-Logo.jpg',
+          shopImageUrl: row.shop_image_url || row.image || null,
+          image: row.shop_image_url || row.image || '/UTMMunch-Logo.jpg',
           rating: row.rating ?? 4.5,
           estimatedTime: row.estimated_time ?? '15-20 min',
           isOpen: row.is_open ?? true,

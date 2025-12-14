@@ -5,9 +5,9 @@ import MenuManagement from '../menu/MenuManagement.js';
 import OrderManagement from '../orders/OrderManagement.js';
 import ProfileSettings from '../profile/ProfileSettings.js';
 import PaymentManagement from '../payment/PaymentManagement.js';
-import { supabase } from '../../lib/supabaseClient.js';
 import LiveQueueDashboard from '../queue/LiveQueueDashboard.js';
 import CafeteriaInformation from '../profile/CafeteriaInformation.js';
+import { ensureCafeteriaContext } from '../../utils/cafeteria.js';
 
 interface StaffDashboardProps {
   user: any;
@@ -17,53 +17,28 @@ interface StaffDashboardProps {
 
 export default function StaffDashboard({ user, currentPage, onNavigate }: StaffDashboardProps) {
   const [profile, setProfile] = useState<any>(null);
+  const [ownerCafeteria, setOwnerCafeteria] = useState<any>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    let createdProfile = false;
 
     const fetchProfile = async () => {
       setIsProfileLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!isMounted) return;
-
-      if (!error && data) {
-        setProfile(data);
-        setIsProfileLoading(false);
-        return;
-      }
-
-      // Auto-provision a profile with default cafeteria_id if none exists.
-      if (!data && !createdProfile) {
-        createdProfile = true;
-        const fallbackCafeteriaId = user.id; // use auth user id as cafeteria_id fallback
-        const { data: upserted, error: upsertError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: user.id,
-            cafeteria_id: fallbackCafeteriaId,
-            cafeteria_name: user.name || 'My Cafeteria',
-            role: 'staff',
-          })
-          .select()
-          .maybeSingle();
-
-        if (upsertError) {
-          setIsProfileLoading(false);
-          return;
+      try {
+        const context = await ensureCafeteriaContext(user);
+        if (!isMounted) return;
+        setProfile(context.profile);
+        setOwnerCafeteria(context.cafeteria);
+      } catch (error) {
+        if (isMounted) {
+          setProfile(null);
         }
-        setProfile(upserted || null);
-        setIsProfileLoading(false);
-        return;
+      } finally {
+        if (isMounted) {
+          setIsProfileLoading(false);
+        }
       }
-
-      setIsProfileLoading(false);
     };
 
     fetchProfile();
@@ -71,10 +46,11 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
     return () => {
       isMounted = false;
     };
-  }, [user.id]);
+  }, [user.id, user.name, user.email]);
 
-  const cafeteriaId = profile?.cafeteria_id || user.id; // fallback to own auth id
-  const cafeteriaName = profile?.cafeteria_name || `${user.name || 'My'} Cafeteria`;
+  const cafeteriaId = ownerCafeteria?.id || profile?.cafeteria_id || user.id; // fallback to own auth id
+  const cafeteriaName =
+    ownerCafeteria?.name || profile?.cafeteria_name || `${user.name || 'My'} Cafeteria`;
 
   if (currentPage === 'manage-menu') {
     if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
@@ -93,7 +69,11 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
 
   if (currentPage === 'cafeteria-info') {
     if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
-    return <CafeteriaInformation user={{ ...user, businessName: profile?.cafeteria_name }} />;
+    return (
+      <CafeteriaInformation
+        user={{ ...user, businessName: ownerCafeteria?.name || profile?.cafeteria_name }}
+      />
+    );
   }
 
   if (currentPage === 'manage-payments') {
@@ -109,11 +89,7 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-slate-900 mb-2">{user.name} - Dashboard ⭐</h1>
-        <p className="text-slate-600">
-          {profile?.cafeteria_name
-            ? `Managing ${profile.cafeteria_name}`
-            : `Managing ${cafeteriaName}`}
-        </p>
+        <p className="text-slate-600">Managing {ownerCafeteria?.name || profile?.cafeteria_name || cafeteriaName}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

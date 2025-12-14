@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -21,10 +21,15 @@ import {
   AlertCircle,
   Upload,
   Calendar,
+  ImagePlus,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { toast } from "sonner";
+import { supabase } from "../../lib/supabaseClient.js";
+import { ensureCafeteriaContext } from "../../utils/cafeteria.js";
+
+const SHOP_IMAGE_BUCKET = "cafeteria-media";
 
 interface CafeteriaInformationProps {
   user: {
@@ -41,7 +46,7 @@ export default function CafeteriaInformation({
   user,
 }: CafeteriaInformationProps) {
   // Mock data - would come from database in real application
-  const [cafeteriaData] = useState({
+  const [cafeteriaData, setCafeteriaData] = useState({
     businessName: user.businessName || "Cafe Angkasa",
     ownerName: user.name,
     email: user.email,
@@ -74,6 +79,57 @@ export default function CafeteriaInformation({
   });
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [cafeteriaRecord, setCafeteriaRecord] = useState<any>(null);
+  const [isLoadingCafeteria, setIsLoadingCafeteria] = useState(true);
+  const [cafeteriaError, setCafeteriaError] = useState<string | null>(null);
+  const [shopImageUrl, setShopImageUrl] = useState<string | null>(null);
+  const [selectedShopImage, setSelectedShopImage] = useState<File | null>(null);
+  const [shopImagePreview, setShopImagePreview] = useState<string | null>(null);
+  const [isUploadingShopImage, setIsUploadingShopImage] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadCafeteria = async () => {
+      setIsLoadingCafeteria(true);
+      setCafeteriaError(null);
+      try {
+        const context = await ensureCafeteriaContext(user);
+        if (!isMounted) return;
+        const cafeteriaRow = context.cafeteria;
+        setCafeteriaRecord(cafeteriaRow);
+        setShopImageUrl(cafeteriaRow?.shop_image_url || cafeteriaRow?.image || null);
+        setCafeteriaData((prev) => ({
+          ...prev,
+          businessName: cafeteriaRow?.name || context.cafeteriaName || prev.businessName,
+          ownerName: user.name,
+          businessAddress: cafeteriaRow?.location || prev.businessAddress,
+          email: user.email,
+          registrationDate: cafeteriaRow?.created_at || prev.registrationDate,
+        }));
+      } catch (error: any) {
+        if (isMounted) {
+          setCafeteriaError(error?.message || "Unable to load cafeteria details.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingCafeteria(false);
+        }
+      }
+    };
+
+    loadCafeteria();
+    return () => {
+      isMounted = false;
+    };
+  }, [user.id, user.name, user.email]);
+
+  useEffect(() => {
+    return () => {
+      if (shopImagePreview) {
+        URL.revokeObjectURL(shopImagePreview);
+      }
+    };
+  }, [shopImagePreview]);
 
   // UC015 - Get approval status details
   const getApprovalStatusBadge = (status: string) => {
@@ -124,6 +180,89 @@ export default function CafeteriaInformation({
     toast.info("Document upload feature will be available soon");
   };
 
+  const handleShopImageSelection = (file: File | null) => {
+    if (shopImagePreview) {
+      URL.revokeObjectURL(shopImagePreview);
+    }
+    if (!file) {
+      setSelectedShopImage(null);
+      setShopImagePreview(null);
+      return;
+    }
+    setSelectedShopImage(file);
+    setShopImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleShopImageUpload = async () => {
+    if (!selectedShopImage) {
+      toast.error("Please select an image to upload.");
+      return;
+    }
+    setIsUploadingShopImage(true);
+    try {
+      let activeRecord = cafeteriaRecord;
+      if (!activeRecord?.id) {
+        try {
+          const context = await ensureCafeteriaContext(user);
+          activeRecord = context.cafeteria;
+          setCafeteriaRecord(context.cafeteria);
+          setShopImageUrl(context.cafeteria?.shop_image_url || context.cafeteria?.image || null);
+        } catch (contextError: any) {
+          throw new Error(
+            contextError?.message ||
+              "Unable to determine your cafeteria record. Please try again later."
+          );
+        }
+      }
+
+      if (!activeRecord?.id) {
+        throw new Error("Unable to determine your cafeteria record. Please try again later.");
+      }
+
+      const fileExt = selectedShopImage.name.split(".").pop();
+      const fileName = `${activeRecord.id}-${Date.now()}.${fileExt}`;
+      const filePath = `shop-images/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(SHOP_IMAGE_BUCKET)
+        .upload(filePath, selectedShopImage, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicData } = supabase.storage
+        .from(SHOP_IMAGE_BUCKET)
+        .getPublicUrl(filePath);
+
+      if (!publicData?.publicUrl) {
+        throw new Error("Unable to create a public URL for the uploaded image.");
+      }
+
+      const publicUrl = publicData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("cafeterias")
+        .update({
+          shop_image_url: publicUrl,
+          image: publicUrl,
+        })
+        .eq("id", activeRecord.id);
+
+      if (updateError) throw updateError;
+
+      setShopImageUrl(`${publicUrl}?t=${Date.now()}`);
+      setSelectedShopImage(null);
+      setShopImagePreview(null);
+      toast.success("Shop image updated! Customers will now see the new photo.");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to upload shop image. Please try again.");
+    } finally {
+      setIsUploadingShopImage(false);
+    }
+  };
+
   // UC015 - AF1: Missing or Expired Business Documents
   const hasExpiredDocuments = Object.values(cafeteriaData.documents).some(
     (doc) => checkDocumentExpiry(doc.expiryDate) === "expired"
@@ -132,6 +271,17 @@ export default function CafeteriaInformation({
   const hasExpiringSoonDocuments = Object.values(cafeteriaData.documents).some(
     (doc) => checkDocumentExpiry(doc.expiryDate) === "expiring-soon"
   );
+
+  if (isLoadingCafeteria) {
+    return (
+      <div className="px-6 py-10 text-center text-slate-500">
+        Loading cafeteria information...
+      </div>
+    );
+  }
+
+  const currentShopImage =
+    shopImagePreview || shopImageUrl || "/UTMMunch-Logo.jpg";
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -147,6 +297,15 @@ export default function CafeteriaInformation({
           {getApprovalStatusBadge(cafeteriaData.approvalStatus)}
         </div>
       </div>
+
+      {cafeteriaError && (
+        <Alert className="mb-6 border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            {cafeteriaError}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* UC015 - AF1: Alert for Expired Documents */}
       {hasExpiredDocuments && (
@@ -205,6 +364,60 @@ export default function CafeteriaInformation({
           </AlertDescription>
         </Alert>
       )}
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ImagePlus className="w-5 h-5 text-purple-700" />
+            Shop Image
+          </CardTitle>
+          <CardDescription>
+            Upload a storefront photo that customers see in the cafeteria list
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-6 items-center">
+            <div className="w-full md:w-64 h-40 border border-dashed border-slate-300 rounded-lg overflow-hidden bg-slate-50">
+              <img
+                src={currentShopImage}
+                alt="Cafeteria shop"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex-1 space-y-3 w-full">
+              <Label className="text-sm text-slate-600">
+                Upload an image (JPG, PNG up to 5MB)
+              </Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleShopImageSelection(e.target.files?.[0] || null)}
+              />
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={handleShopImageUpload}
+                  disabled={!selectedShopImage || isUploadingShopImage || isLoadingCafeteria}
+                  className="bg-gradient-to-r from-purple-700 to-pink-700 text-white hover:opacity-90"
+                >
+                  {isUploadingShopImage ? "Uploading..." : "Save Shop Image"}
+                </Button>
+                {selectedShopImage && !isUploadingShopImage && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleShopImageSelection(null)}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">
+                Tip: Use a bright, welcoming image. It will appear anywhere your cafeteria is listed to customers.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Business Information Card */}
