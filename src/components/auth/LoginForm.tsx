@@ -270,9 +270,6 @@ export default function LoginForm({
                 </div>
 
                 <p className="text-center text-sm text-slate-600">
-                  Admin access is limited to approved emails.
-                </p>
-                <p className="text-center text-sm text-slate-600">
                   Don’t have an account?{" "}
                   <button
                     type="button"
