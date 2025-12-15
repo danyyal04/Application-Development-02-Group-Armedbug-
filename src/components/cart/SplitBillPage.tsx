@@ -1,4 +1,4 @@
-import { useState, useEffect, type ChangeEvent } from 'react';
+import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
 import {
   Users,
   CreditCard,
@@ -48,6 +48,14 @@ interface Participant {
   invitationStatus: 'pending' | 'accepted' | 'rejected';
 }
 
+interface PaymentMethod {
+  id: string;
+  type: 'fpx' | 'ewallet' | 'card';
+  name: string;
+  details: string;
+  is_default?: boolean;
+}
+
 interface SplitBillPageProps {
   splitBillId: string;
   cartItems: CartItem[];
@@ -78,6 +86,7 @@ export default function SplitBillPage({
 }: SplitBillPageProps) {
   const [participants, setParticipants] = useState<Participant[]>([]);
 
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string>('');
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
@@ -85,19 +94,16 @@ export default function SplitBillPage({
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
 
-  const currentParticipant = participants.find(p => p.email === currentUserEmail);
+  const normalizedEmail = (currentUserEmail || '').toLowerCase();
+  const currentParticipant = participants.find(
+    p => (p.email || '').toLowerCase() === normalizedEmail
+  );
   const paidCount = participants.filter(p => p.paid).length;
   const totalPaid = participants.filter(p => p.paid).reduce((sum, p) => sum + p.amount, 0);
   const unpaidAmount = totalAmount - totalPaid;
   const progressPercentage = (totalPaid / totalAmount) * 100;
   const allPaid = participants.every(p => p.paid);
   const isInitiator = currentUserEmail === participants[0]?.email;
-
-  const mockPaymentMethods = [
-    { id: '1', type: 'fpx', name: 'Maybank', details: '****1234' },
-    { id: '2', type: 'ewallet', name: "Touch 'n Go eWallet", details: '012-345-6789' },
-    { id: '3', type: 'card', name: 'Visa', details: '****5678' },
-  ];
 
   const getPickupTimeLabel = (value: string) => {
     switch (value) {
@@ -144,50 +150,83 @@ export default function SplitBillPage({
     return <Badge className="bg-amber-100 text-amber-700 border border-amber-200">Pending Invite</Badge>;
   };
 
-  // Load real participants from the split_bill_participants table
+  // Load participants from DB
+  const refreshParticipants = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('split_bill_participants')
+      .select('id, identifier, amount_due, status')
+      .eq('session_id', splitBillId);
+
+    if (error) {
+      toast.error('Failed to load participants');
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      // fallback to at least show the initiator
+      setParticipants([
+        {
+          id: 'initiator',
+          name: initiatorName,
+          email: currentUserEmail || 'you',
+          amount: totalAmount,
+          paid: false,
+          paymentStatus: 'pending',
+          invitationStatus: 'accepted',
+        },
+      ]);
+      return;
+    }
+
+    const mapped: Participant[] = data.map(row => ({
+      id: row.id,
+      name: row.identifier,
+      email: row.identifier,
+      amount: Number(row.amount_due) || totalAmount / data.length,
+      paid: row.status === 'paid',
+      paymentStatus: (row.status as Participant['paymentStatus']) || 'pending',
+      invitationStatus: (row.status as Participant['invitationStatus']) || 'pending',
+    }));
+
+    setParticipants(mapped);
+  }, [splitBillId, initiatorName, currentUserEmail, totalAmount]);
+
   useEffect(() => {
-    const loadParticipants = async () => {
+    refreshParticipants();
+  }, [refreshParticipants]);
+
+  // Load saved payment methods for current user
+  useEffect(() => {
+    const loadPaymentMethods = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data, error } = await supabase
-        .from('split_bill_participants')
-        .select('id, identifier, amount_due, status')
-        .eq('session_id', splitBillId);
+        .from('payment')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .order('created_at', { ascending: true });
 
       if (error) {
-        toast.error('Failed to load participants');
+        toast.error('Failed to load payment methods');
         return;
       }
 
-      if (!data || data.length === 0) {
-        // fallback to at least show the initiator
-        setParticipants([
-          {
-            id: 'initiator',
-            name: initiatorName,
-            email: currentUserEmail || 'you',
-            amount: totalAmount,
-            paid: false,
-            paymentStatus: 'pending',
-            invitationStatus: 'accepted',
-          },
-        ]);
-        return;
-      }
-
-      const mapped: Participant[] = data.map(row => ({
-        id: row.id,
-        name: row.identifier,
-        email: row.identifier,
-        amount: Number(row.amount_due) || totalAmount / data.length,
-        paid: row.status === 'paid',
-        paymentStatus: (row.status as Participant['paymentStatus']) || 'pending',
-        invitationStatus: (row.status as Participant['invitationStatus']) || 'pending',
-      }));
-
-      setParticipants(mapped);
+      const methods = (data || []) as PaymentMethod[];
+      setPaymentMethods(methods);
     };
 
-    loadParticipants();
-  }, [splitBillId, initiatorName, currentUserEmail, totalAmount]);
+    loadPaymentMethods();
+  }, []);
+
+  // Pick default payment selection whenever methods load/change
+  useEffect(() => {
+    const defaultMethod = paymentMethods.find(m => m.is_default);
+    if (!selectedPaymentId && (defaultMethod || paymentMethods[0])) {
+      setSelectedPaymentId((defaultMethod || paymentMethods[0]).id);
+    }
+  }, [paymentMethods, selectedPaymentId]);
 
   const handlePayMyPortion = () => {
     if (!currentParticipant) {
@@ -205,6 +244,11 @@ export default function SplitBillPage({
       return;
     }
 
+    if (paymentMethods.length === 0) {
+      toast.error('Please add a payment method first (Payments page).');
+      return;
+    }
+
     setShowPaymentDialog(true);
   };
 
@@ -219,15 +263,19 @@ export default function SplitBillPage({
       return;
     }
 
+    const selectedMethod = paymentMethods.find(m => m.id === selectedPaymentId);
+    if (!selectedMethod) {
+      toast.error('Invalid payment method. Please choose another.');
+      return;
+    }
+
     setIsProcessing(true);
 
     // Simulate payment processing
-    setTimeout(() => {
+    setTimeout(async () => {
       const isSuccess = Math.random() > 0.1; // 90% success rate
 
       if (isSuccess) {
-        const selectedMethod = mockPaymentMethods.find(m => m.id === selectedPaymentId);
-        
         // Update participant payment status
         setParticipants(prev =>
           prev.map(p =>
@@ -242,6 +290,23 @@ export default function SplitBillPage({
               : p
           )
         );
+
+        // Persist to DB so reloads stay paid
+        if (currentParticipant?.id) {
+          const { error } = await supabase
+            .from('split_bill_participants')
+            .update({ status: 'paid' })
+            .eq('id', currentParticipant.id);
+
+          if (error) {
+            console.error('split_bill_participants update error', error);
+            toast.error(error.message || 'Unable to record payment. Please try again.');
+            setIsProcessing(false);
+            return;
+          }
+
+          await refreshParticipants();
+        }
 
         toast.success('Payment successful! Thank you for your contribution.');
         setShowPaymentDialog(false);
@@ -279,7 +344,7 @@ export default function SplitBillPage({
     setIsProcessing(true);
 
     // Simulate payment processing for remaining amount
-    setTimeout(() => {
+    setTimeout(async () => {
       const isSuccess = Math.random() > 0.1;
 
       if (isSuccess) {
@@ -295,7 +360,20 @@ export default function SplitBillPage({
           }))
         );
 
-        toast.success('Split bill payment completed successfully! 🎉');
+        // Persist paid status for pending participants
+        const { error } = await supabase
+          .from('split_bill_participants')
+          .update({ status: 'paid' })
+          .eq('session_id', splitBillId)
+          .eq('status', 'pending');
+
+        if (error) {
+          console.warn('Failed to persist complete payment', error);
+        } else {
+          await refreshParticipants();
+        }
+
+        toast.success('Split bill payment completed successfully! ??');
         setShowCompleteDialog(false);
 
         if (onCompleteSplitBill) {
@@ -313,14 +391,14 @@ export default function SplitBillPage({
 
   useEffect(() => {
     // Check if all participants have paid
-    if (allPaid) {
+    if (allPaid && participants.length > 0) {
       setTimeout(() => {
         toast.success('All payments completed. Order is confirmed! 🎉', {
           duration: 5000,
         });
       }, 500);
     }
-  }, [allPaid]);
+  }, [allPaid, participants.length]);
 
   // Simulate session expiry after 30 minutes (for demo, using shorter time)
   useEffect(() => {
@@ -597,7 +675,7 @@ export default function SplitBillPage({
                 )}
 
                 {/* UC021: Complete Split Bill Payment */}
-                {isInitiator && !allPaid && unpaidAmount > 0 && (
+                {!allPaid && unpaidAmount > 0 && (
                   <Button
                     onClick={handleCoverRemainingAmount}
                     variant="outline"
@@ -608,11 +686,14 @@ export default function SplitBillPage({
                   </Button>
                 )}
 
-                {allPaid && (
-                  <Button variant="outline" onClick={onCancel} className="w-full">
-                    Close
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  onClick={onCancel}
+                  className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                  disabled={isProcessing}
+                >
+                  Cancel
+                </Button>
               </div>
 
               {/* Info */}
@@ -659,36 +740,45 @@ export default function SplitBillPage({
             {/* Payment Method Selection */}
             <div className="space-y-2">
               <Label>Select Payment Method</Label>
-              <RadioGroup value={selectedPaymentId} onValueChange={setSelectedPaymentId}>
-                <div className="space-y-2">
-                  {mockPaymentMethods.map(method => (
-                    <div
-                      key={method.id}
-                      className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedPaymentId === method.id
-                          ? 'border-purple-600 bg-purple-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                      onClick={() => setSelectedPaymentId(method.id)}
-                    >
-                      <RadioGroupItem value={method.id} id={method.id} />
-                      <Label htmlFor={method.id} className="flex-1 cursor-pointer">
-                        <p className="text-slate-900">{method.name}</p>
-                        <p className="text-sm text-slate-600">{method.details}</p>
-                      </Label>
-                      <CreditCard className="w-4 h-4 text-slate-400" />
-                    </div>
-                  ))}
-                </div>
-              </RadioGroup>
+              {paymentMethods.length === 0 ? (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <AlertDescription className="text-xs text-amber-800">
+                    No payment methods found. Please add one on the Payments page before paying.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <RadioGroup value={selectedPaymentId} onValueChange={setSelectedPaymentId}>
+                  <div className="space-y-2">
+                    {paymentMethods.map(method => (
+                      <div
+                        key={method.id}
+                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedPaymentId === method.id
+                            ? 'border-purple-600 bg-purple-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                        onClick={() => setSelectedPaymentId(method.id)}
+                      >
+                        <RadioGroupItem value={method.id} id={method.id} />
+                        <Label htmlFor={method.id} className="flex-1 cursor-pointer">
+                          <p className="text-slate-900">{method.name}</p>
+                          <p className="text-sm text-slate-600">{method.details}</p>
+                        </Label>
+                        <CreditCard className="w-4 h-4 text-slate-400" />
+                      </div>
+                    ))}
+                  </div>
+                </RadioGroup>
+              )}
             </div>
 
             {/* Payment Credentials */}
             <div className="space-y-2">
               <Label htmlFor="credentials">
-                {mockPaymentMethods.find(m => m.id === selectedPaymentId)?.type === 'fpx'
+                {paymentMethods.find(m => m.id === selectedPaymentId)?.type === 'fpx'
                   ? 'Banking Username/PIN'
-                  : mockPaymentMethods.find(m => m.id === selectedPaymentId)?.type === 'ewallet'
+                  : paymentMethods.find(m => m.id === selectedPaymentId)?.type === 'ewallet'
                   ? 'E-Wallet PIN'
                   : 'Card CVV'}
               </Label>
@@ -773,28 +863,37 @@ export default function SplitBillPage({
             {/* Payment Method Selection */}
             <div className="space-y-2">
               <Label>Select Payment Method</Label>
-              <RadioGroup value={selectedPaymentId} onValueChange={setSelectedPaymentId}>
-                <div className="space-y-2">
-                  {mockPaymentMethods.map(method => (
-                    <div
-                      key={method.id}
-                      className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedPaymentId === method.id
-                          ? 'border-purple-600 bg-purple-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                      onClick={() => setSelectedPaymentId(method.id)}
-                    >
-                      <RadioGroupItem value={method.id} id={method.id} />
-                      <Label htmlFor={method.id} className="flex-1 cursor-pointer">
-                        <p className="text-slate-900">{method.name}</p>
-                        <p className="text-sm text-slate-600">{method.details}</p>
-                      </Label>
-                      <CreditCard className="w-4 h-4 text-slate-400" />
-                    </div>
-                  ))}
-                </div>
-              </RadioGroup>
+              {paymentMethods.length === 0 ? (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <AlertDescription className="text-xs text-amber-800">
+                    No payment methods found. Please add one on the Payments page before paying.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <RadioGroup value={selectedPaymentId} onValueChange={setSelectedPaymentId}>
+                  <div className="space-y-2">
+                    {paymentMethods.map(method => (
+                      <div
+                        key={method.id}
+                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedPaymentId === method.id
+                            ? 'border-purple-600 bg-purple-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                        onClick={() => setSelectedPaymentId(method.id)}
+                      >
+                        <RadioGroupItem value={method.id} id={method.id} />
+                        <Label htmlFor={method.id} className="flex-1 cursor-pointer">
+                          <p className="text-slate-900">{method.name}</p>
+                          <p className="text-sm text-slate-600">{method.details}</p>
+                        </Label>
+                        <CreditCard className="w-4 h-4 text-slate-400" />
+                      </div>
+                    ))}
+                  </div>
+                </RadioGroup>
+              )}
             </div>
 
             <Alert className="border-blue-200 bg-blue-50">
@@ -827,3 +926,13 @@ export default function SplitBillPage({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+

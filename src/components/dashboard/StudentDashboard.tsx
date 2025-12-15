@@ -60,13 +60,26 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
   const [cartCafeteria, setCartCafeteria] = useState<any | null>(null);
   const [isCartSidebarOpen, setIsCartSidebarOpen] = useState(false);
   const [showSplitDialog, setShowSplitDialog] = useState(false);
-  const [activeSplitBill, setActiveSplitBill] = useState<{
+  const [activeSplitBill, setActiveSplitBillState] = useState<{
     sessionId: string;
     cartItems: { id: string; name: string; price: number; quantity: number }[];
     cafeteria: { name: string; location: string };
     pickupTime: string;
+    totalAmount?: number;
   } | null>(null);
   const cartStorageKey = user?.id ? `utm-cart-${user.id}` : null;
+  const splitStorageKey = user?.id ? `utm-active-split-${user.id}` : null;
+
+  const persistActiveSplit = (value: typeof activeSplitBill) => {
+    setActiveSplitBillState(value);
+    if (!splitStorageKey) return;
+    if (value) {
+      localStorage.setItem(splitStorageKey, JSON.stringify(value));
+    } else {
+      localStorage.removeItem(splitStorageKey);
+    }
+    window.dispatchEvent(new Event('utm-active-split-changed'));
+  };
 
   useEffect(() => {
     const loadFeatured = async () => {
@@ -106,7 +119,20 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
     } catch {
       // ignore malformed data
     }
-  }, [cartStorageKey]);
+    try {
+      if (splitStorageKey) {
+        const rawSplit = localStorage.getItem(splitStorageKey);
+        if (rawSplit) {
+          const parsedSplit = JSON.parse(rawSplit);
+          if (parsedSplit?.sessionId) {
+            setActiveSplitBillState(parsedSplit);
+          }
+        }
+      }
+    } catch {
+      // ignore malformed data
+    }
+  }, [cartStorageKey, splitStorageKey]);
 
   // Persist cart to localStorage on changes
   useEffect(() => {
@@ -255,30 +281,45 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
     if (currentPage === 'splitbill-invitations') {
       return (
         <SplitBillInvitations
-          onNavigateToPayment={(splitBillId: string) => {
-            // Hook up to split bill payment flow when available
-            toast.info(`Open payment for split bill ${splitBillId}`);
+          onNavigateToPayment={({ splitBillId, totalAmount, myShare, cafeteria }) => {
+            persistActiveSplit({
+              sessionId: splitBillId,
+              cartItems: [],
+              cafeteria: { name: cafeteria || 'Cafeteria', location: 'UTM' },
+              pickupTime: 'asap',
+              totalAmount: totalAmount || myShare || 0,
+            });
+            onNavigate('split-bill-tracking');
           }}
         />
       );
     }
 
-    if (currentPage === 'split-bill-tracking' && activeSplitBill) {
-      return (
-        <SplitBillPage
-          splitBillId={activeSplitBill.sessionId}
-          cartItems={activeSplitBill.cartItems}
-          totalAmount={activeSplitBill.cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)}
+  if (currentPage === 'split-bill-tracking' && activeSplitBill) {
+    return (
+      <SplitBillPage
+        splitBillId={activeSplitBill.sessionId}
+        cartItems={activeSplitBill.cartItems}
+          totalAmount={
+            activeSplitBill.totalAmount ??
+            activeSplitBill.cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+          }
           cafeteria={activeSplitBill.cafeteria}
-          pickupTime={activeSplitBill.pickupTime}
-          initiatorName={user?.name || 'You'}
-          currentUserEmail={user?.email}
-          onPaymentComplete={() => toast.success('Payment recorded')}
-          onCancel={() => onNavigate('menu')}
-          onCompleteSplitBill={() => toast.success('Split bill completed')}
-        />
-      );
-    }
+        pickupTime={activeSplitBill.pickupTime}
+        initiatorName={user?.name || 'You'}
+        currentUserEmail={user?.email}
+        onPaymentComplete={() => toast.success('Payment recorded')}
+        onCancel={() => {
+          persistActiveSplit(null);
+          onNavigate('menu');
+        }}
+        onCompleteSplitBill={() => {
+          persistActiveSplit(null);
+          toast.success('Split bill completed');
+        }}
+      />
+    );
+  }
 
     if (currentPage === 'menu') {
       if (checkoutData) {
@@ -531,7 +572,7 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
         autoOpenDialog
         onInitiateSplitBill={({ sessionId }) => {
           setShowSplitDialog(false);
-          setActiveSplitBill({
+          persistActiveSplit({
             sessionId: sessionId || 'new-session',
             cartItems: splitCartItems,
             cafeteria: { name: splitCafeteria?.name, location: splitCafeteria?.location },

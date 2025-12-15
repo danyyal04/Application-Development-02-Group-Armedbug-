@@ -27,9 +27,13 @@ interface SplitBillInvitation {
 }
 
 interface SplitBillInvitationsProps {
-  onNavigateToPayment?: (splitBillId: string) => void;
+  onNavigateToPayment?: (invitation: {
+    splitBillId: string;
+    totalAmount: number;
+    myShare: number;
+    cafeteria?: string;
+  }) => void;
 }
-
 
 const getSplitMethodLabel = (method: string) => {
   switch (method) {
@@ -55,9 +59,9 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       const possibleIdentifiers = [
-        user?.email,
-        user?.user_metadata?.email,
-        user?.user_metadata?.username,
+        user?.email?.toLowerCase(),
+        user?.user_metadata?.email?.toLowerCase(),
+        user?.user_metadata?.username?.toLowerCase(),
       ].filter(Boolean) as string[];
 
       if (!possibleIdentifiers.length) {
@@ -105,6 +109,7 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
   const pendingInvitations = invitations.filter(inv => inv.status === 'pending' && inv.sessionStatus === 'active');
   const acceptedInvitations = invitations.filter(inv => inv.status === 'accepted');
   const declinedInvitations = invitations.filter(inv => inv.status === 'declined');
+  const ongoingInvitations = invitations.filter(inv => inv.status !== 'declined');
 
   const handleViewDetails = (invitation: SplitBillInvitation) => {
     setSelectedInvitation(invitation);
@@ -154,12 +159,13 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
     }
   };
 
-  const handlePayMyShare = (splitBillId: string) => {
+  const handleTrackPayment = (invitation: SplitBillInvitation) => {
     if (onNavigateToPayment) {
-      onNavigateToPayment(splitBillId);
-    } else {
-      toast.info('Redirecting to payment...', {
-        description: 'You will be able to pay your share.',
+      onNavigateToPayment({
+        splitBillId: invitation.splitBillId,
+        totalAmount: invitation.totalAmount,
+        myShare: invitation.myShare,
+        cafeteria: invitation.cafeteria,
       });
     }
   };
@@ -257,10 +263,10 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
                           </Badge>
                         </div>
                         <p className="text-sm text-slate-600 mb-1">
-                          From: <span className="text-slate-900">{invitation.initiatorName}</span> • {invitation.cafeteria}
+                          From: <span className="text-slate-900">{invitation.initiatorName}</span>  {invitation.cafeteria}
                         </p>
                         <p className="text-sm text-slate-500">
-                          {getSplitMethodLabel(invitation.splitMethod)} • Total: RM {invitation.totalAmount.toFixed(2)}
+                          {getSplitMethodLabel(invitation.splitMethod)}  Total: RM {invitation.totalAmount.toFixed(2)}
                         </p>
                         <div className="flex items-center gap-4 mt-2">
                           <p className="text-purple-700">Your Share: RM {invitation.myShare.toFixed(2)}</p>
@@ -315,36 +321,33 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
         </Card>
       )}
 
-      {/* Accepted Invitations */}
-      {acceptedInvitations.length > 0 && (
+      {/* Ongoing Payments (includes accepted/pending in sessions) */}
+      {ongoingInvitations.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Accepted Invitations</CardTitle>
-            <CardDescription>Split bills you have joined</CardDescription>
+            <CardTitle>Ongoing Payments</CardTitle>
+            <CardDescription>Split bills you’re part of</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {acceptedInvitations.map((invitation) => (
+              {ongoingInvitations.map((invitation) => (
                 <Card key={invitation.id} className="border-green-200 bg-green-50/30">
                   <CardContent className="pt-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <p className="text-sm text-slate-900">{invitation.orderId}</p>
                           {getStatusBadge(invitation.status)}
                         </div>
                         <p className="text-sm text-slate-600">
-                          {invitation.cafeteria} • Your Share: RM {invitation.myShare.toFixed(2)}
+                          {invitation.cafeteria}  Your Share: RM {invitation.myShare.toFixed(2)}
                         </p>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handlePayMyShare(invitation.splitBillId)}
-                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                      >
-                        Pay My Share
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleTrackPayment(invitation)}>
+                          Track Payment
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -366,7 +369,7 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
               {declinedInvitations.map((invitation) => (
                 <div key={invitation.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg opacity-75">
                   <div>
-                    <p className="text-sm text-slate-900">{invitation.orderId} • {invitation.cafeteria}</p>
+                    <p className="text-sm text-slate-900">{invitation.orderId}  {invitation.cafeteria}</p>
                     <p className="text-xs text-slate-500">From: {invitation.initiatorName}</p>
                   </div>
                   {getStatusBadge(invitation.status)}
@@ -379,4 +382,3 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
     </div>
   );
 }
-

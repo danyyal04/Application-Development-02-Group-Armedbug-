@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Menu,
   User,
@@ -12,6 +12,7 @@ import {
   Mail,
   BarChart3,
   Building2,
+  Users,
 } from "lucide-react";
 import { Button } from "../ui/button.js";
 import { Badge } from "../ui/badge";
@@ -48,6 +49,7 @@ export default function Navbar({
   onCartClick,
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
+  const [hasActiveSplit, setHasActiveSplit] = useState(false);
 
   const initials = user.name
     .split(" ")
@@ -57,6 +59,32 @@ export default function Navbar({
 
   const isStaff = user.role === "staff";
   const isAdmin = user.role === "admin";
+
+  // Track active split-bill session from localStorage
+  const splitStorageKey = `utm-active-split-${user.id}`;
+  const invitationCount = 0; // TODO: replace with real invitations count when backend available
+  useEffect(() => {
+    const readActive = () => {
+      try {
+        const raw = localStorage.getItem(splitStorageKey);
+        setHasActiveSplit(!!raw);
+      } catch {
+        setHasActiveSplit(false);
+      }
+    };
+    readActive();
+    const handler = (e: any) => {
+      if (!e || !("key" in e) || e.key === splitStorageKey) {
+        readActive();
+      }
+    };
+    window.addEventListener("storage", handler);
+    window.addEventListener("utm-active-split-changed", handler as any);
+    return () => {
+      window.removeEventListener("storage", handler);
+      window.removeEventListener("utm-active-split-changed", handler as any);
+    };
+  }, [splitStorageKey]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 shadow-sm">
@@ -354,9 +382,11 @@ export default function Navbar({
                 onClick={() => onNavigate("splitbill-invitations")}
               >
                 <Mail className="w-5 h-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-orange-600 hover:bg-orange-600">
-                  2
-                </Badge>
+                {invitationCount + (hasActiveSplit ? 1 : 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[11px] flex items-center justify-center">
+                    {invitationCount + (hasActiveSplit ? 1 : 0)}
+                  </span>
+                )}
               </Button>
             )}
             {!isAdmin && (

@@ -157,9 +157,19 @@ export default function SplitBillInitiation({
         throw new Error(sessionError?.message || 'Failed to create split bill session');
       }
 
-      const perPerson = participants.length > 0 ? totalToSplit / participants.length : totalToSplit;
+      // Include the initiator in the split calculation
+      const participantCount = participants.length + 1; // +1 for initiator
+      const perPerson = participantCount > 0 ? totalToSplit / participantCount : totalToSplit;
 
-      // Insert participants
+      // Insert initiator and added participants
+      const initiatorParticipant = {
+        session_id: session.id,
+        identifier: user.email ?? user.id,
+        identifier_type: 'email',
+        amount_due: perPerson,
+        status: 'accepted',
+      };
+
       const participantRows = participants.map(p => ({
         session_id: session.id,
         identifier: p.identifier,
@@ -168,9 +178,11 @@ export default function SplitBillInitiation({
         status: 'pending',
       }));
 
+      const allParticipants = [initiatorParticipant, ...participantRows];
+
       const { error: participantsError } = await supabase
         .from('split_bill_participants')
-        .insert(participantRows);
+        .insert(allParticipants);
 
       if (participantsError) {
         throw new Error(participantsError.message);
