@@ -776,11 +776,7 @@ export default function SplitBillPage({
             {/* Payment Credentials */}
             <div className="space-y-2">
               <Label htmlFor="credentials">
-                {paymentMethods.find(m => m.id === selectedPaymentId)?.type === 'fpx'
-                  ? 'Banking Username/PIN'
-                  : paymentMethods.find(m => m.id === selectedPaymentId)?.type === 'ewallet'
-                  ? 'E-Wallet PIN'
-                  : 'Card CVV'}
+                {paymentMethods.find(m => m.id === selectedPaymentId)?.type === 'card' ? 'Card CVV' : 'PIN'}
               </Label>
               <Input
                 id="credentials"
