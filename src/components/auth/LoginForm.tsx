@@ -15,7 +15,7 @@ import { supabase } from "../../lib/supabaseClient"; // correct path
 
 const ALLOWED_ADMIN_EMAILS = [
   "danialdev@gmail.com",
-  "amandev@gmail.com",
+  "fathurahmandev@gmail.com",
   "thayaallandev@gmail.com",
   "mustaqimdev@gmail.com",
 ];
