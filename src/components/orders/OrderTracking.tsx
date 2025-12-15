@@ -31,6 +31,7 @@ type OrderStatus = "Pending" | "Cooking" | "Ready for Pickup" | "Completed";
 
 interface Order {
   id: string;
+  orderNumber: number;
   cafeteria: string;
   items: OrderItem[];
   total: number;
@@ -57,6 +58,7 @@ const parseItems = (raw: any): OrderItem[] => {
 
 const mapRowToOrder = (row: any): Order => ({
   id: row.id,
+  orderNumber: row.order_number,
   cafeteria: row.cafeteria_name || "Cafeteria",
   items: parseItems(row.items),
   total: Number(row.total_amount) || 0,
@@ -79,25 +81,33 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
-  const loadOrders = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+const loadOrders = async () => {
+  setIsLoading(true);
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
 
-      if (error) throw error;
-      setOrders((data || []).map(mapRowToOrder));
-      setHasError(false);
-    } catch {
-      setHasError(true);
-      toast.error("Unable to retrieve orders. Please check your connection.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    if (error) throw error;
+    
+    // Calculate order numbers based on user's sequence
+    const mappedOrders = (data || []).map(mapRowToOrder);
+    const ordersWithNumbers = mappedOrders.map((order, index) => ({
+      ...order,
+      orderNumber: index + 1
+    }));
+    
+    setOrders(ordersWithNumbers);
+    setHasError(false);
+  } catch {
+    setHasError(true);
+    toast.error("Unable to retrieve orders. Please check your connection.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   useEffect(() => {
     loadOrders();
@@ -237,7 +247,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle className="flex items-center gap-2">
-                          {order.id}
+                          ORD-{order.orderNumber.toString().padStart(3, '0')}
                           <Badge className={getStatusColor(order.status)}>
                             {getStatusIcon(order.status)}
                             <span className="ml-1">{order.status}</span>
@@ -361,7 +371,9 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                     <CardContent className="py-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-slate-900">{order.id}</p>
+                          <p className="text-slate-900">
+                            ORD-{order.orderNumber.toString().padStart(3, '0')}
+                          </p>
                           <p className="text-sm text-slate-600">
                             {order.cafeteria} • {order.items.length} items
                           </p>
