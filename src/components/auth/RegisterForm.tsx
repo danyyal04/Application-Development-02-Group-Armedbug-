@@ -31,6 +31,11 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
   const [loading, setLoading] = useState(false);
   const emailRegex = useMemo(() => /\S+@\S+\.\S+/, []);
   const utmEmailRegex = useMemo(() => /@(?:utm\.my|graduate\.utm\.my)$/i, []);
+  const ownerEmailRegex = useMemo(
+  () => /^[a-zA-Z0-9._%+-]*owner@gmail\.com$/,
+  []
+);
+
 
   const validateInputs = () => {
     if (!formData.name.trim()) {
@@ -45,6 +50,11 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
       toast.error('Customer accounts must use a valid UTM email address.');
       return false;
     }
+    if (formData.role === 'staff' && !ownerEmailRegex.test(formData.email)) {
+    toast.error('Cafeteria Owner email must follow format: xxowner@gmail.com');
+    return false;
+    }
+
     if (formData.password.length < 8) {
       toast.error('Password must be at least 8 characters long.');
       return false;
