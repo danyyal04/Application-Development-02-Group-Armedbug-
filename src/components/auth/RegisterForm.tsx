@@ -227,7 +227,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                   <Separator />
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="businessName">Cafeteria/Business Name</Label>
+                      <Label htmlFor="businessName">Cafeteria Name</Label>
                       <Input
                         id="businessName"
                         placeholder="e.g., Cafe Angkasa"
@@ -237,7 +237,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="businessAddress">Business Address</Label>
+                      <Label htmlFor="businessAddress">Cafeteria Address</Label>
                       <Input
                         id="businessAddress"
                         placeholder="e.g., Faculty of Computing, UTM"
@@ -259,8 +259,8 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
                     <Separator />
                     <div className="space-y-3">
-                      <Label className="text-sm font-medium">Business Verification Documents</Label>
-                      <p className="text-xs text-slate-500">Owner ID is required. Business logo is optional for display.</p>
+                      <Label className="text-sm font-medium">Cafeteria Verification Documents</Label>
+                      <p className="text-xs text-slate-500">Owner ID and Cafeteria logo are required.</p>
                       <div className="space-y-2">
                         <Label>Owner Identification (IC/Passport) *</Label>
                         <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
