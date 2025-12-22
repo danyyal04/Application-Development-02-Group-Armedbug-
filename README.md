@@ -14,7 +14,7 @@ Developer: Thayaallan
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
 | Sprint 1 | Dynamic Menu Display            |  [Cafeteria](src/components/cafeteria/CafeteriaList.tsx)</br> [Menu List](src/components/menu/MenuList.tsx)</br> [Menu Management](src/components/menu/MenuManagement.tsx)</br>  | [Supabase Connection](src/lib/supabaseClient.ts)        |         |         |
-| Sprint 2 |             |          |         |
+| Sprint 2 | Cart and Split Bill Option            | [Cart Page](src/components/cart/CartPage.tsx)</br> [Cart Side Bar](src/components/cart/CartSideBar.tsx)</br> [Split Bill](src/components/cart/SplitBill.tsx)</br> [Split Bill Page](src/components/cart/SplitBillPage.tsx) | [Supabase Connection](src/lib/supabaseClient.ts)         |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
 
