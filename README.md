@@ -24,7 +24,7 @@ Developer: Irfan Danial
 | Sprint   | Module Name | Frontend | Backend |
 |----------|-------------|----------|---------|
 | Sprint 1 | Multiple Payment Options            |  [Payment Management](src/components/payment/PaymentManagement.tsx)</br> [Payment Method](src/components/payment/PaymentMethods.tsx)</br> [Checkout Page](src/components/checkout/CheckoutPage.tsx)</br>| [Supabase Connection](src/lib/supabaseClient.ts)         |         |         |
-| Sprint 2 |             |          |         |
+| Sprint 2 | Split Bill Feature            | [Split Bill Invite] (src/components/splitbill/SplitBillInvitations.tsx)</br> [Split Bill Detail] (src/components/splitbill/InvitationDetailView.tsx) </br> [Split Bill Payment] (src/components/cart/SplitBill.tsx)        |         |
 | Sprint 3 |             |          |         |
 | Sprint 4 |             |          |         |
 
