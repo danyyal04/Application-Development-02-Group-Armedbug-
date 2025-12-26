@@ -111,6 +111,19 @@ const loadOrders = async () => {
 
   useEffect(() => {
     loadOrders();
+
+    const channel = supabase
+      .channel("orders-tracking")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => loadOrders()
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, [userId]);
 
   const activeOrders = useMemo(
