@@ -38,6 +38,7 @@ interface SplitBillInitiationProps {
   cartItems: CartItem[];
   totalAmount: number;
   cafeteria?: {
+    id?: string;
     name?: string;
     location?: string;
   };
@@ -147,6 +148,9 @@ export default function SplitBillInitiation({
         .insert({
           initiator_user_id: user.id,
           total_amount: totalToSplit,
+          // Save items and cafeteria_id to DB (assuming schema update applied)
+          items: JSON.stringify(cartItems),
+          cafeteria_id: (cafeteria as any)?.id,
           split_method: 'even',
           pickup_time: pickupTime,
         })

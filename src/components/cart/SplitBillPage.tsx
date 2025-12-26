@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, type ChangeEvent } from 'react';
 import {
   Users,
   CreditCard,
@@ -61,6 +61,7 @@ interface SplitBillPageProps {
   cartItems: CartItem[];
   totalAmount: number;
   cafeteria: {
+    id?: string;
     name: string;
     location: string;
   };
@@ -389,16 +390,97 @@ export default function SplitBillPage({
     }, 2000);
   };
 
+  // Order Creation Ref to prevent duplicates
+  const orderCreatedRef = useRef(false);
+
   useEffect(() => {
     // Check if all participants have paid
-    if (allPaid && participants.length > 0) {
-      setTimeout(() => {
-        toast.success('All payments completed. Order is confirmed! 🎉', {
-          duration: 5000,
-        });
-      }, 500);
+    if (allPaid && participants.length > 0 && !orderCreatedRef.current) {
+      const createOrder = async () => {
+        try {
+          // Get current user and session details
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          // Check if I am the initiator (to prevent race conditions/duplicates from multiple users)
+          // We fetch the session to get the initiator_user_id
+          const { data: session } = await supabase
+            .from('split_bill_sessions')
+            .select('initiator_user_id')
+            .eq('id', splitBillId)
+            .single();
+
+          if (!session || session.initiator_user_id !== user.id) {
+             // Not the initiator, do not create the order
+             return;
+          }
+
+          // Prevent double creation
+          orderCreatedRef.current = true;
+
+          // Check if order already exists for this split bill
+          const paymentMethodString = `Split Bill ${splitBillId}`;
+          const { data: existingOrder } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('payment_method', paymentMethodString)
+            .maybeSingle();
+
+          if (existingOrder) {
+            console.log('Order already exists for this split bill');
+            return;
+          }
+
+          // Resolve cafeteria ID
+          let cafeId = (cafeteria as any).id || null;
+          console.log(`[Order Creation] Initial Cafe ID from props: ${cafeId}`, cafeteria);
+
+          if (!cafeId) {
+            console.log(`[Order Creation] ID missing, attempting lookup by name: ${cafeteria.name}`);
+            const { data: cafeData } = await supabase
+              .from('cafeterias')
+              .select('id')
+              .eq('name', cafeteria.name)
+              .maybeSingle();
+            cafeId = cafeData?.id || null;
+            console.log(`[Order Creation] Lookup result: ${cafeId}`);
+          }
+          
+          if (!cafeId) {
+              console.error('[Order Creation] CRITICAL: Could not resolve Cafeteria ID. Order will not be visible to manager.');
+              toast.error('Warning: Cafeteria ID not found. Order may not appear in management view.');
+          }
+
+          // Create the order
+          const { error: orderError } = await supabase.from('orders').insert([
+            {
+              user_id: user.id,
+              cafeteria_id: cafeId,
+              total_amount: totalAmount,
+              status: 'Pending',
+              paid_at: new Date().toISOString(),
+              items: JSON.stringify(cartItems),
+              payment_method: paymentMethodString,
+            },
+          ]);
+
+          if (orderError) {
+             console.error('Failed to create order from split bill', orderError);
+             toast.error('Payment complete, but failed to create order record.');
+          } else {
+             toast.success('All payments completed. Order is confirmed! 🎉', {
+               duration: 5000,
+             });
+          }
+
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      createOrder();
     }
-  }, [allPaid, participants.length]);
+  }, [allPaid, participants.length, cafeteria, cartItems, totalAmount, splitBillId]);
 
   // Simulate session expiry after 30 minutes (for demo, using shorter time)
   useEffect(() => {

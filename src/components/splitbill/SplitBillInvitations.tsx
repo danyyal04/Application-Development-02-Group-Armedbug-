@@ -72,7 +72,14 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
 
       const { data, error } = await supabase
         .from('split_bill_participants')
-        .select('id, session_id, identifier, identifier_type, status, amount_due, created_at, session:split_bill_sessions(id, total_amount, split_method, initiator_user_id, created_at)')
+        .select(`
+          id, session_id, identifier, identifier_type, status, amount_due, created_at,
+          session:split_bill_sessions (
+            id, total_amount, split_method, initiator_user_id, created_at, 
+            items, cafeteria_id,
+            cafeteria:cafeterias (id, name, location)
+          )
+        `)
         .in('identifier', possibleIdentifiers);
 
       if (error) {
@@ -81,23 +88,41 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
         return;
       }
 
-      const mapped: SplitBillInvitation[] = (data || []).map((row: any) => ({
+      const mapped: SplitBillInvitation[] = (data || []).map((row: any) => {
+        const session = row.session;
+        const cafe = session?.cafeteria; 
+        
+        // Parse items from session
+        let parsedItems = [];
+        try {
+            if (session?.items && typeof session.items === 'string') {
+                parsedItems = JSON.parse(session.items);
+            } else if (Array.isArray(session?.items)) {
+                parsedItems = session.items;
+            }
+        } catch (e) {
+            console.error("Failed to parse split bill items", e);
+        }
+
+        return {
         id: row.id,
         splitBillId: row.session_id,
         orderId: row.session_id,
-        cafeteria: 'Cafeteria',
-        initiatorName: row.session?.initiator_user_id || 'Initiator',
-        initiatorEmail: '',
-        totalAmount: Number(row.session?.total_amount) || 0,
+        cafeteria: cafe?.name || 'Cafeteria',
+        // Store full cafeteria object including ID
+        _cafeteriaObj: cafe ? { id: cafe.id, name: cafe.name, location: cafe.location } : { name: 'Cafeteria', location: 'Unknown' },
+        initiatorName: session?.initiator_user_id || 'Initiator',
+        initiatorEmail: session?.initiator_user_id, 
+        totalAmount: Number(session?.total_amount) || 0,
         myShare: Number(row.amount_due) || 0,
         splitMethod: 'evenly',
         participants: 0,
-        items: [],
+        items: parsedItems, // Pass parsed items
         status: row.status || 'pending',
         sessionStatus: 'active',
         invitedAt: row.created_at || '',
         expiresAt: 'N/A',
-      }));
+      }});
 
       setInvitations(mapped);
       setLoading(false);
@@ -105,6 +130,12 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
 
     loadInvitations();
   }, []);
+
+  const handlePayMyShare = () => {
+    if (selectedInvitation) {
+      handleTrackPayment(selectedInvitation);
+    }
+  };
 
   const pendingInvitations = invitations.filter(inv => inv.status === 'pending' && inv.sessionStatus === 'active');
   const acceptedInvitations = invitations.filter(inv => inv.status === 'accepted');
@@ -166,6 +197,10 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
         totalAmount: invitation.totalAmount,
         myShare: invitation.myShare,
         cafeteria: invitation.cafeteria,
+        // @ts-ignore
+        _cafeteriaObj: (invitation as any)._cafeteriaObj,
+        // @ts-ignore
+        items: invitation.items,
       });
     }
   };

@@ -63,21 +63,34 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
   const [activeSplitBill, setActiveSplitBillState] = useState<{
     sessionId: string;
     cartItems: { id: string; name: string; price: number; quantity: number }[];
-    cafeteria: { name: string; location: string };
+    cafeteria: { id?: string; name: string; location: string };
     pickupTime: string;
     totalAmount?: number;
   } | null>(null);
   const cartStorageKey = user?.id ? `utm-cart-${user.id}` : null;
   const splitStorageKey = user?.id ? `utm-active-split-${user.id}` : null;
 
-  const persistActiveSplit = (value: typeof activeSplitBill) => {
-    setActiveSplitBillState(value);
-    if (!splitStorageKey) return;
-    if (value) {
-      localStorage.setItem(splitStorageKey, JSON.stringify(value));
-    } else {
-      localStorage.removeItem(splitStorageKey);
+  // Persist active split bill across refreshes
+  useEffect(() => {
+    const saved = localStorage.getItem('activeSplitBill');
+    if (saved) {
+      try {
+        setActiveSplitBillState(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse saved split bill', e);
+      }
     }
+  }, []);
+
+  const persistActiveSplit = (data: typeof activeSplitBill) => {
+    setActiveSplitBillState(data);
+    localStorage.setItem('activeSplitBill', JSON.stringify(data));
+    window.dispatchEvent(new Event('utm-active-split-changed'));
+  };
+  
+  const clearActiveSplit = () => {
+    setActiveSplitBillState(null);
+    localStorage.removeItem('activeSplitBill');
     window.dispatchEvent(new Event('utm-active-split-changed'));
   };
 
@@ -281,11 +294,16 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
     if (currentPage === 'splitbill-invitations') {
       return (
         <SplitBillInvitations
-          onNavigateToPayment={({ splitBillId, totalAmount, myShare, cafeteria }) => {
+          onNavigateToPayment={({ splitBillId, totalAmount, myShare, cafeteria, _cafeteriaObj, items }: any) => {
+            // Use the rich object if available (contains ID)
+            const safeCafeteria = _cafeteriaObj || (typeof cafeteria === 'object' ? cafeteria : { name: cafeteria || 'Cafeteria', location: 'UTM' });
+            
+            console.log("Navigating to split bill with items:", { splitBillId, safeCafeteria, itemCount: items?.length });
+
             persistActiveSplit({
               sessionId: splitBillId,
-              cartItems: [],
-              cafeteria: { name: cafeteria || 'Cafeteria', location: 'UTM' },
+              cartItems: items || [], // Pass the items!
+              cafeteria: safeCafeteria,
               pickupTime: 'asap',
               totalAmount: totalAmount || myShare || 0,
             });
@@ -567,7 +585,7 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
       <SplitBill
         cartItems={splitCartItems}
         totalAmount={splitCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)}
-        cafeteria={{ name: splitCafeteria?.name, location: splitCafeteria?.location }}
+        cafeteria={{ name: splitCafeteria?.name, location: splitCafeteria?.location, id: splitCafeteria?.id }}
         pickupTime={checkoutData.pickupTime}
         autoOpenDialog
         onInitiateSplitBill={({ sessionId }) => {
@@ -575,7 +593,7 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
           persistActiveSplit({
             sessionId: sessionId || 'new-session',
             cartItems: splitCartItems,
-            cafeteria: { name: splitCafeteria?.name, location: splitCafeteria?.location },
+            cafeteria: { name: splitCafeteria?.name, location: splitCafeteria?.location, id: splitCafeteria?.id },
             pickupTime: checkoutData.pickupTime,
           });
           toast.success('Split bill initiated.');
