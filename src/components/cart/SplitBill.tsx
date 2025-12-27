@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+} from "react";
 import {
   Users,
   Plus,
@@ -10,17 +16,29 @@ import {
   Clock,
   Sparkles,
   CreditCard,
-} from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Label } from '../ui/label';
-import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
-import { Separator } from '../ui/separator';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Alert, AlertDescription } from '../ui/alert';
-import { toast } from 'sonner';
-import { supabase } from '../../lib/supabaseClient';
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Button } from "../ui/button";
+import { Label } from "../ui/label";
+import { Input } from "../ui/input";
+import { Badge } from "../ui/badge";
+import { Separator } from "../ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import { Alert, AlertDescription } from "../ui/alert";
+import { toast } from "sonner";
+import { supabase } from "../../lib/supabaseClient";
 
 interface CartItem {
   id: string;
@@ -44,7 +62,7 @@ interface SplitBillInitiationProps {
   };
   pickupTime?: string;
   onInitiateSplitBill: (data: {
-    splitMethod: 'equal' | 'items';
+    splitMethod: "equal" | "items";
     participants: Participant[];
     sessionId?: string;
   }) => void;
@@ -56,18 +74,18 @@ const SERVICE_FEE = 0.5;
 
 const getPickupTimeLabel = (value?: string) => {
   switch (value) {
-    case 'asap':
-      return 'ASAP';
-    case '30min':
-      return 'In 30 minutes';
-    case '1hour':
-      return 'In 1 hour';
-    case '1.5hour':
-      return 'In 1.5 hours';
-    case '2hour':
-      return 'In 2 hours';
+    case "asap":
+      return "ASAP";
+    case "30min":
+      return "In 30 minutes";
+    case "1hour":
+      return "In 1 hour";
+    case "1.5hour":
+      return "In 1.5 hours";
+    case "2hour":
+      return "In 2 hours";
     default:
-      return value || 'ASAP';
+      return value || "ASAP";
   }
 };
 
@@ -81,13 +99,15 @@ export default function SplitBillInitiation({
   autoOpenDialog = false,
 }: SplitBillInitiationProps) {
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [newParticipant, setNewParticipant] = useState('');
+  const [newParticipant, setNewParticipant] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const splitMethod: 'equal' = 'equal';
+  const splitMethod: "equal" = "equal";
 
   const subtotal = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0) || totalAmount,
+    () =>
+      cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0) ||
+      totalAmount,
     [cartItems, totalAmount]
   );
   const totalToSplit = useMemo(() => subtotal + SERVICE_FEE, [subtotal]);
@@ -105,53 +125,59 @@ export default function SplitBillInitiation({
   const handleAddParticipant = async () => {
     const trimmedParticipant = newParticipant.trim();
     if (!trimmedParticipant) {
-      toast.error('Please enter a valid identifier');
+      toast.error("Please enter a valid identifier");
       return;
     }
 
     const normalizedParticipant = trimmedParticipant.toLowerCase();
-    if (participants.some(p => p.identifier.toLowerCase() === normalizedParticipant)) {
-      toast.error('This participant has already been added');
+    if (
+      participants.some(
+        (p) => p.identifier.toLowerCase() === normalizedParticipant
+      )
+    ) {
+      toast.error("This participant has already been added");
       return;
     }
 
     const { data: isRegistered, error: registrationError } = await supabase.rpc(
-      'is_registered_email',
+      "is_registered_email",
       { check_email: trimmedParticipant }
     );
     if (registrationError) {
-      toast.error('Unable to verify participant email. Please try again.');
+      toast.error("Unable to verify participant email. Please try again.");
       return;
     }
     if (!isRegistered) {
-      toast.error('This email is not registered in UTMmunch.');
+      toast.error("This email is not registered in UTMmunch.");
       return;
     }
 
     const participant: Participant = {
       id: `participant-${Date.now()}`,
-      identifier: trimmedParticipant,
+      identifier: normalizedParticipant,
     };
 
     setParticipants([...participants, participant]);
-    setNewParticipant('');
-    toast.success('Participant added successfully');
+    setNewParticipant("");
+    toast.success("Participant added successfully");
   };
 
   const handleRemoveParticipant = (participantId: string) => {
-    setParticipants(participants.filter(p => p.id !== participantId));
-    toast.success('Participant removed');
+    setParticipants(participants.filter((p) => p.id !== participantId));
+    toast.success("Participant removed");
   };
 
   const handleInitiate = async () => {
     if (participants.length === 0) {
-      toast.error('Please add at least one participant.');
+      toast.error("Please add at least one participant.");
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
-      toast.error('You must be logged in to create a split bill.');
+      toast.error("You must be logged in to create a split bill.");
       return;
     }
 
@@ -159,63 +185,66 @@ export default function SplitBillInitiation({
     try {
       // Create split bill session
       const { data: session, error: sessionError } = await supabase
-        .from('split_bill_sessions')
+        .from("split_bill_sessions")
         .insert({
           initiator_user_id: user.id,
           total_amount: totalToSplit,
           // Save items and cafeteria_id to DB (assuming schema update applied)
           items: JSON.stringify(cartItems),
           cafeteria_id: (cafeteria as any)?.id,
-          split_method: 'even',
+          split_method: "even",
           pickup_time: pickupTime,
         })
-        .select('id')
+        .select("id")
         .single();
 
       if (sessionError || !session?.id) {
-        throw new Error(sessionError?.message || 'Failed to create split bill session');
+        throw new Error(
+          sessionError?.message || "Failed to create split bill session"
+        );
       }
 
       // Include the initiator in the split calculation
       const participantCount = participants.length + 1; // +1 for initiator
-      const perPerson = participantCount > 0 ? totalToSplit / participantCount : totalToSplit;
+      const perPerson =
+        participantCount > 0 ? totalToSplit / participantCount : totalToSplit;
 
       // Insert initiator and added participants
       const initiatorParticipant = {
         session_id: session.id,
-        identifier: user.email ?? user.id,
-        identifier_type: 'email',
+        identifier: (user.email ?? user.id).toLowerCase(),
+        identifier_type: "email",
         amount_due: perPerson,
-        status: 'accepted',
+        status: "accepted",
       };
 
-      const participantRows = participants.map(p => ({
+      const participantRows = participants.map((p) => ({
         session_id: session.id,
         identifier: p.identifier,
-        identifier_type: 'email',
+        identifier_type: "email",
         amount_due: perPerson,
-        status: 'pending',
+        status: "pending",
       }));
 
       const allParticipants = [initiatorParticipant, ...participantRows];
 
       const { error: participantsError } = await supabase
-        .from('split_bill_participants')
+        .from("split_bill_participants")
         .insert(allParticipants);
 
       if (participantsError) {
         throw new Error(participantsError.message);
       }
 
-      toast.success('Split bill created and participants added.');
+      toast.success("Split bill created and participants added.");
       onInitiateSplitBill({
-        splitMethod: 'equal',
+        splitMethod: "equal",
         participants,
         sessionId: session.id,
       });
       setIsDialogOpen(false);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to create split bill');
+      toast.error(err?.message || "Failed to create split bill");
     } finally {
       setIsSubmitting(false);
     }
@@ -244,11 +273,15 @@ export default function SplitBillInitiation({
             <CardContent className="space-y-3">
               <div className="flex justify-between text-slate-600">
                 <span>Cafeteria</span>
-                <span className="text-slate-900">{cafeteria?.name || 'Cafe Siswa'}</span>
+                <span className="text-slate-900">
+                  {cafeteria?.name || "Cafe Siswa"}
+                </span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Location</span>
-                <span className="text-slate-900 text-right">{cafeteria?.location || 'Kolej Tun Dr. Ismail'}</span>
+                <span className="text-slate-900 text-right">
+                  {cafeteria?.location || "Kolej Tun Dr. Ismail"}
+                </span>
               </div>
               <div className="flex justify-between text-slate-600 items-center">
                 <span>Pickup Time</span>
@@ -260,10 +293,16 @@ export default function SplitBillInitiation({
               <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
                 <div className="flex items-center gap-2 text-blue-800">
                   <Clock className="w-4 h-4" />
-                  <p className="text-sm font-medium">Estimated Preparation Time</p>
+                  <p className="text-sm font-medium">
+                    Estimated Preparation Time
+                  </p>
                 </div>
-                <p className="text-sm text-blue-800 mt-1">Ready in approximately 24 minutes</p>
-                <p className="text-xs text-blue-700">Based on current queue and order volume</p>
+                <p className="text-sm text-blue-800 mt-1">
+                  Ready in approximately 24 minutes
+                </p>
+                <p className="text-xs text-blue-700">
+                  Based on current queue and order volume
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -274,13 +313,17 @@ export default function SplitBillInitiation({
               <CardDescription>{cartItems.length} items</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {cartItems.map(item => (
+              {cartItems.map((item) => (
                 <div key={item.id} className="flex justify-between py-2">
                   <div>
                     <p className="text-slate-900">{item.name}</p>
-                    <p className="text-sm text-slate-500">Qty: {item.quantity}</p>
+                    <p className="text-sm text-slate-500">
+                      Qty: {item.quantity}
+                    </p>
                   </div>
-                  <p className="text-slate-900">RM {(item.price * item.quantity).toFixed(2)}</p>
+                  <p className="text-slate-900">
+                    RM {(item.price * item.quantity).toFixed(2)}
+                  </p>
                 </div>
               ))}
             </CardContent>
@@ -293,7 +336,9 @@ export default function SplitBillInitiation({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 rounded-full bg-slate-100 p-1 text-sm">
-                <div className="px-3 py-2 text-center text-slate-500">Normal Checkout</div>
+                <div className="px-3 py-2 text-center text-slate-500">
+                  Normal Checkout
+                </div>
                 <div className="px-3 py-2 text-center rounded-full bg-white shadow text-purple-700 font-medium flex items-center justify-center gap-2">
                   <Users className="w-4 h-4" />
                   Split Bill
@@ -301,16 +346,20 @@ export default function SplitBillInitiation({
               </div>
 
               <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
-                <p className="text-purple-900 font-medium">Split the bill with friends!</p>
+                <p className="text-purple-900 font-medium">
+                  Split the bill with friends!
+                </p>
                 <p className="text-sm text-purple-800">
-                  Share the cost with your dining companions. Each person pays their portion.
+                  Share the cost with your dining companions. Each person pays
+                  their portion.
                 </p>
               </div>
 
               <div className="space-y-2">
                 <Label>Split Method</Label>
                 <div className="p-3 rounded-lg border border-slate-200 text-sm text-slate-700">
-                  Split Evenly or Split by Items (select during participant setup)
+                  Split Evenly or Split by Items (select during participant
+                  setup)
                 </div>
               </div>
             </CardContent>
@@ -348,7 +397,8 @@ export default function SplitBillInitiation({
               <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-blue-800">
-                  Your payment will be processed securely. Please collect your order at the specified pickup time.
+                  Your payment will be processed securely. Please collect your
+                  order at the specified pickup time.
                 </p>
               </div>
             </CardContent>
@@ -369,7 +419,9 @@ export default function SplitBillInitiation({
               <UserPlus className="w-5 h-5" />
               Add Participants
             </DialogTitle>
-            <DialogDescription>Choose split method and add participants</DialogDescription>
+            <DialogDescription>
+              Choose split method and add participants
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -378,9 +430,13 @@ export default function SplitBillInitiation({
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-purple-700">Order Summary</p>
-                    <p className="text-2xl text-purple-900">RM {totalToSplit.toFixed(2)}</p>
+                    <p className="text-2xl text-purple-900">
+                      RM {totalToSplit.toFixed(2)}
+                    </p>
                   </div>
-                  <Badge className="bg-purple-600">{cartItems.length} items</Badge>
+                  <Badge className="bg-purple-600">
+                    {cartItems.length} items
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
@@ -388,16 +444,20 @@ export default function SplitBillInitiation({
             <Card>
               <CardHeader>
                 <CardTitle>Add Participants</CardTitle>
-                <CardDescription>Add people to split the bill with</CardDescription>
+                <CardDescription>
+                  Add people to split the bill with
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex gap-2">
                   <Input
                     placeholder="Enter email (e.g., student@utm.my)"
                     value={newParticipant}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => setNewParticipant(e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setNewParticipant(e.target.value)
+                    }
                     onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         e.preventDefault();
                         handleAddParticipant();
                       }
@@ -426,7 +486,7 @@ export default function SplitBillInitiation({
                     <Separator />
                     <Label>Participants ({participants.length})</Label>
                     <div className="space-y-2">
-                      {participants.map(participant => (
+                      {participants.map((participant) => (
                         <div
                           key={participant.id}
                           className="flex items-center justify-between p-3 border rounded-lg bg-slate-50"
@@ -434,15 +494,21 @@ export default function SplitBillInitiation({
                           <div className="flex items-center gap-3 flex-1">
                             <UserPlus className="w-4 h-4 text-slate-600" />
                             <div className="flex-1">
-                              <p className="text-slate-900">{participant.identifier}</p>
+                              <p className="text-slate-900">
+                                {participant.identifier}
+                              </p>
                               <p className="text-xs text-slate-500">Email</p>
                             </div>
-                            <p className="text-slate-900">RM {amountPerPerson.toFixed(2)}</p>
+                            <p className="text-slate-900">
+                              RM {amountPerPerson.toFixed(2)}
+                            </p>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleRemoveParticipant(participant.id)}
+                            onClick={() =>
+                              handleRemoveParticipant(participant.id)
+                            }
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
                             <X className="w-4 h-4" />
@@ -454,7 +520,6 @@ export default function SplitBillInitiation({
                 )}
               </CardContent>
             </Card>
-
           </div>
 
           <div className="flex gap-2">
@@ -474,7 +539,7 @@ export default function SplitBillInitiation({
               disabled={isSubmitting}
             >
               <CreditCard className="w-4 h-4 mr-2" />
-              {isSubmitting ? 'Creating...' : 'Initiate Split Bill'}
+              {isSubmitting ? "Creating..." : "Initiate Split Bill"}
             </Button>
           </div>
         </DialogContent>
