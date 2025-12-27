@@ -102,20 +102,35 @@ export default function SplitBillInitiation({
     }
   }, [autoOpenDialog]);
 
-  const handleAddParticipant = () => {
-    if (!newParticipant.trim()) {
+  const handleAddParticipant = async () => {
+    const trimmedParticipant = newParticipant.trim();
+    if (!trimmedParticipant) {
       toast.error('Please enter a valid identifier');
       return;
     }
 
-    if (participants.some(p => p.identifier === newParticipant.trim())) {
+    const normalizedParticipant = trimmedParticipant.toLowerCase();
+    if (participants.some(p => p.identifier.toLowerCase() === normalizedParticipant)) {
       toast.error('This participant has already been added');
+      return;
+    }
+
+    const { data: isRegistered, error: registrationError } = await supabase.rpc(
+      'is_registered_email',
+      { check_email: trimmedParticipant }
+    );
+    if (registrationError) {
+      toast.error('Unable to verify participant email. Please try again.');
+      return;
+    }
+    if (!isRegistered) {
+      toast.error('This email is not registered in UTMmunch.');
       return;
     }
 
     const participant: Participant = {
       id: `participant-${Date.now()}`,
-      identifier: newParticipant.trim(),
+      identifier: trimmedParticipant,
     };
 
     setParticipants([...participants, participant]);
@@ -398,7 +413,7 @@ export default function SplitBillInitiation({
                 </div>
 
                 {participants.length === 0 && (
-                  <Alert className="border-amber-200 bg-amber-50">
+                  <Alert className="border-amber-200 bg-amber-50 pl-11">
                     <AlertCircle className="w-4 h-4 text-amber-600" />
                     <AlertDescription className="text-amber-800 text-sm">
                       Please add at least one participant to continue.
@@ -440,12 +455,6 @@ export default function SplitBillInitiation({
               </CardContent>
             </Card>
 
-            <Alert className="border-blue-200 bg-blue-50">
-              <AlertCircle className="w-4 h-4 text-blue-600" />
-              <AlertDescription className="text-blue-800 text-sm">
-                Participants will be notified by email. No invite links required.
-              </AlertDescription>
-            </Alert>
           </div>
 
           <div className="flex gap-2">

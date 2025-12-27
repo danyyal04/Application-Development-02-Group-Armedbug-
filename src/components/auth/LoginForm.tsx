@@ -34,6 +34,11 @@ export default function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const normalizeRole = (role?: string | null) => {
+    if (role === "admin") return "admin";
+    if (role === "owner" || role === "staff") return "owner";
+    return "customer";
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,11 +67,12 @@ export default function LoginForm({
           data.user.user_metadata?.role === "admin";
 
         // Default role/status
-        let role = isAdmin
+        const rawRole = isAdmin
           ? "admin"
           : data.user.app_metadata?.role ||
             data.user.user_metadata?.role ||
-            "student";
+            "customer";
+        let role = normalizeRole(rawRole);
         let status =
           (data.user.app_metadata?.status as string) ||
           (data.user.user_metadata?.status as string) ||
@@ -101,21 +107,21 @@ export default function LoginForm({
           // If select blocked by RLS, fall back to metadata
           status = status || "active";
         } else if (regStatus) {
-          role = isAdmin ? "admin" : "staff";
+          role = isAdmin ? "admin" : "owner";
           status = regStatus;
         }
 
         status = (status || "active").toLowerCase();
 
         // Only block when we have an explicit pending/rejected status.
-        if (role === "staff" && regStatus === "pending") {
+        if (role === "owner" && regStatus === "pending") {
           toast.info(
             "Your cafeteria owner application is pending approval. Please wait for admin review."
           );
           await supabase.auth.signOut();
           return;
         }
-        if (role === "staff" && regStatus === "rejected") {
+        if (role === "owner" && regStatus === "rejected") {
           toast.error(
             "Your cafeteria owner application was rejected. Please contact support."
           );

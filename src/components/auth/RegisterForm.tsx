@@ -20,7 +20,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'student', // student = customer, staff = cafeteria owner
+    role: 'customer', // customer = customer, owner = cafeteria owner
     businessName: '',
     businessAddress: '',
     contactNumber: '',
@@ -46,11 +46,11 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
       toast.error('Please provide a valid email address.');
       return false;
     }
-    if (formData.role === 'student' && !utmEmailRegex.test(formData.email)) {
+    if (formData.role === 'customer' && !utmEmailRegex.test(formData.email)) {
       toast.error('Customer accounts must use a valid UTM email address.');
       return false;
     }
-    if (formData.role === 'staff' && !ownerEmailRegex.test(formData.email)) {
+    if (formData.role === 'owner' && !ownerEmailRegex.test(formData.email)) {
     toast.error('Cafeteria Owner email must follow format: xxowner@gmail.com');
     return false;
     }
@@ -63,7 +63,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
       toast.error('Passwords do not match!');
       return false;
     }
-    if (formData.role === 'staff') {
+    if (formData.role === 'owner') {
       if (!formData.businessName.trim()) {
         toast.error('Business name is required.');
         return false;
@@ -103,7 +103,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
           data: {
             name: formData.name,
             role: formData.role,
-            status: formData.role === 'staff' ? 'pending' : 'active',
+            status: formData.role === 'owner' ? 'pending' : 'active',
           },
           emailRedirectTo: window.location.origin + '/login', // stay on login page
         },
@@ -116,7 +116,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
       }
 
       const user = data.user;
-      if (user && formData.role === 'staff') {
+      if (user && formData.role === 'owner') {
         // Use a security-definer RPC to bypass RLS for owner registration
         const { error: reqErr } = await supabase.rpc('create_owner_registration', {
           _auth_id: user.id,
@@ -139,7 +139,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
       if (user) {
         await supabase.auth.signOut(); // ensure no auto-login
         toast.success(
-          formData.role === 'staff'
+          formData.role === 'owner'
             ? 'Application submitted. Please wait for admin approval.'
             : 'Registration successful! Please verify your email, then login.'
         );
@@ -183,8 +183,8 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                     <SelectValue placeholder="Choose role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="student">Customer (UTM Student/Staff)</SelectItem>
-                    <SelectItem value="staff">Cafeteria Owner</SelectItem>
+                    <SelectItem value="customer">Customer (UTM Student/Staff)</SelectItem>
+                    <SelectItem value="owner">Cafeteria Owner</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -206,15 +206,15 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                 <Input
                   id="email"
                   type="email"
-                  placeholder={formData.role === 'student' ? 'your.email@utm.my' : 'owner@email.com'}
+                  placeholder={formData.role === 'customer' ? 'your.email@utm.my' : 'owner@email.com'}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
                 />
-                {formData.role === 'student' && (
+                {formData.role === 'customer' && (
                   <p className="text-xs text-slate-500">Must be a valid UTM email address</p>
                 )}
-                {formData.role === 'staff' && (
+                {formData.role === 'owner' && (
                   <div className="flex gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
                     <Info className="w-4 h-4 mt-0.5" />
                     <span>Additional business information and verification documents are required for cafeteria owner registration.</span>
@@ -222,7 +222,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                 )}
               </div>
 
-              {formData.role === 'staff' && (
+              {formData.role === 'owner' && (
                 <>
                   <Separator />
                   <div className="space-y-4">
@@ -335,7 +335,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
               >
                 {loading
                   ? 'Creating account...'
-                  : formData.role === 'staff'
+                  : formData.role === 'owner'
                   ? 'Submit for Approval'
                   : 'Register'}
               </Button>

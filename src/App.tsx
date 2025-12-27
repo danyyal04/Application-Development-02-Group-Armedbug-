@@ -9,7 +9,7 @@ import AdminDashboard from './components/admin/AdminDashboard.js';
 import Navbar from './components/layout/Navbar.js';
 import { supabase } from './lib/supabaseClient';
 
-type UserRole = 'student' | 'staff' | 'admin';
+type UserRole = 'customer' | 'owner' | 'admin';
 
 interface User {
   id: string;
@@ -49,6 +49,12 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('login');
   const [cartCount, setCartCount] = useState(0);
 
+  const normalizeRole = (role?: string | null): UserRole => {
+    if (role === 'admin') return 'admin';
+    if (role === 'owner' || role === 'staff') return 'owner';
+    return 'customer';
+  };
+
   // Normalize user with latest registration_request status
   const buildUserFromSession = async (session: Session | null) => {
     if (!session?.user) return null;
@@ -56,12 +62,13 @@ export default function App() {
     const emailLower = (user.email || '').toLowerCase();
 
     // Default role/status from auth metadata
-    let role: UserRole =
+    const rawRole =
       ALLOWED_ADMIN_EMAILS.includes(emailLower)
         ? 'admin'
-        : (user.app_metadata?.role as UserRole) ||
-          (user.user_metadata?.role as UserRole) ||
-          'student';
+        : (user.app_metadata?.role as string) ||
+          (user.user_metadata?.role as string) ||
+          'customer';
+    let role: UserRole = normalizeRole(rawRole);
     let status =
       (user.app_metadata?.status as string) ||
       (user.user_metadata?.status as string) ||
@@ -86,11 +93,11 @@ export default function App() {
       : { data: null, error: null };
 
     if (regRow?.status) {
-      role = role === 'admin' ? 'admin' : 'staff';
+      role = role === 'admin' ? 'admin' : 'owner';
       status = regRow.status;
     }
 
-    if (role === 'staff' && status === 'pending' && !regErr) {
+    if (role === 'owner' && status === 'pending' && !regErr) {
       await supabase.auth.signOut();
       return null;
     }
@@ -181,7 +188,7 @@ export default function App() {
           )
         ) : currentUser.role === 'admin' ? (
           <AdminDashboard user={currentUser} onLogout={handleLogout} />
-        ) : currentUser.role === 'staff' ? (
+        ) : currentUser.role === 'owner' ? (
           <StaffDashboard user={currentUser} currentPage={currentPage} onNavigate={setCurrentPage} />
         ) : (
           <StudentDashboard

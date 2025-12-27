@@ -97,7 +97,7 @@ export async function ensureCafeteriaContext(user: EnsureUser) {
         id: user.id,
         cafeteria_id: cafeteriaId,
         cafeteria_name: cafeteriaName,
-        role: 'staff',
+        role: 'owner',
       },
     cafeteria: cafeteriaRow,
     cafeteriaId: cafeteriaRow?.id || cafeteriaId,

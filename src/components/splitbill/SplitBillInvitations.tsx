@@ -234,7 +234,7 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-slate-900 mb-2">Split Bill Invitations 📬</h1>
+        <h1 className="text-slate-900 mb-2">Split Bill Invitations</h1>
         <p className="text-slate-600">Manage your split bill invitations and join group orders</p>
       </div>
 
@@ -298,10 +298,10 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
                           </Badge>
                         </div>
                         <p className="text-sm text-slate-600 mb-1">
-                          From: <span className="text-slate-900">{invitation.initiatorName}</span>  {invitation.cafeteria}
+                          From: <span className="text-slate-900">{invitation.initiatorName}</span> | {invitation.cafeteria}
                         </p>
                         <p className="text-sm text-slate-500">
-                          {getSplitMethodLabel(invitation.splitMethod)}  Total: RM {invitation.totalAmount.toFixed(2)}
+                          {getSplitMethodLabel(invitation.splitMethod)} | Total: RM {invitation.totalAmount.toFixed(2)}
                         </p>
                         <div className="flex items-center gap-4 mt-2">
                           <p className="text-purple-700">Your Share: RM {invitation.myShare.toFixed(2)}</p>
@@ -375,7 +375,7 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
                           {getStatusBadge(invitation.status)}
                         </div>
                         <p className="text-sm text-slate-600">
-                          {invitation.cafeteria}  Your Share: RM {invitation.myShare.toFixed(2)}
+                          {invitation.cafeteria} | Your Share: RM {invitation.myShare.toFixed(2)}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -404,7 +404,7 @@ export default function SplitBillInvitations({ onNavigateToPayment }: SplitBillI
               {declinedInvitations.map((invitation) => (
                 <div key={invitation.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg opacity-75">
                   <div>
-                    <p className="text-sm text-slate-900">{invitation.orderId}  {invitation.cafeteria}</p>
+                    <p className="text-sm text-slate-900">{invitation.orderId} | {invitation.cafeteria}</p>
                     <p className="text-xs text-slate-500">From: {invitation.initiatorName}</p>
                   </div>
                   {getStatusBadge(invitation.status)}

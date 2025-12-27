@@ -31,7 +31,7 @@ interface NavbarProps {
     id: string;
     name: string;
     email: string;
-    role: "student" | "staff" | "admin";
+    role: "customer" | "owner" | "admin";
   };
   onLogout: () => void;
   currentPage: string;
@@ -57,7 +57,7 @@ export default function Navbar({
     .join("")
     .toUpperCase();
 
-  const isStaff = user.role === "staff";
+  const isOwner = user.role === "owner";
   const isAdmin = user.role === "admin";
 
   // Track active split-bill session from localStorage
@@ -124,7 +124,7 @@ export default function Navbar({
                     Dashboard
                   </Button>
 
-                  {isStaff ? (
+                  {isOwner ? (
                     <>
                       <Button
                         variant={
@@ -270,7 +270,7 @@ export default function Navbar({
               Dashboard
             </Button>
 
-            {isStaff ? (
+            {isOwner ? (
               <>
                 <Button
                   variant={currentPage === "manage-menu" ? "default" : "ghost"}
@@ -375,7 +375,7 @@ export default function Navbar({
 
           {/* User Menu - Desktop */}
           <div className="flex items-center gap-1">
-            {!isStaff && !isAdmin && (
+            {!isOwner && !isAdmin && (
               <Button
                 variant="ghost"
                 className="relative"
@@ -425,17 +425,17 @@ export default function Navbar({
                     <p className="font-medium">{user.name}</p>
                     <p className="text-sm text-slate-500">{user.email}</p>
                     <p className="text-xs text-slate-400 mt-1">
-                    {user.role === "staff" ? "Cafeteria Owner" : user.role === "admin" ? "Admin" : "Customer"}
+                    {user.role === "owner" ? "Cafeteria Owner" : user.role === "admin" ? "Admin" : "Customer"}
                   </p>
                   </div>
                   <DropdownMenuSeparator />
-                  {isStaff && (
+                  {isOwner && (
                     <DropdownMenuItem onClick={() => onNavigate("cafeteria-info")}>
                       <Building2 className="w-4 h-4 mr-2" />
                       Cafeteria Information
                     </DropdownMenuItem>
                   )}
-                  {isStaff && <DropdownMenuSeparator />}
+                  {isOwner && <DropdownMenuSeparator />}
                   <DropdownMenuItem onClick={() => onNavigate("profile")}>
                     <Settings className="w-4 h-4 mr-2" />
                     Profile Settings

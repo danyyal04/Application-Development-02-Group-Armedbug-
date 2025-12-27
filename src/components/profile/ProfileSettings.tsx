@@ -14,7 +14,7 @@ interface ProfileSettingsProps {
     id: string;
     name: string;
     email: string;
-    role: 'student' | 'staff' | 'admin';
+    role: 'customer' | 'owner' | 'admin';
   };
 }
 
