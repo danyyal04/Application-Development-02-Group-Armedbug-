@@ -352,7 +352,7 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
                             <SelectItem value="Ready for Pickup">
                               Ready for Pickup
                             </SelectItem>
-                            <SelectItem value="Completed">Completed</SelectItem>
+
                           </SelectContent>
                         </Select>
                         <span className="text-xs text-slate-400 whitespace-nowrap">

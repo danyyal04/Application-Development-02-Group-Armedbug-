@@ -64,7 +64,7 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
 
   if (currentPage === 'queue-dashboard') {
     if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
-    return <LiveQueueDashboard />;
+    return <LiveQueueDashboard cafeteriaId={cafeteriaId} />;
   }
 
   if (currentPage === 'cafeteria-info') {

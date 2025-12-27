@@ -5,6 +5,8 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 import { Alert, AlertDescription } from '../ui/alert';
+import { supabase } from '../../lib/supabaseClient';
+import { toast } from 'sonner';
 import {
   calculateEstimatedPickupTime,
   formatEstimatedPickupTime,
@@ -26,87 +28,124 @@ interface Order {
   estimatedPrepTime?: number;
 }
 
-// Mock orders data with timestamps
-const generateMockOrders = (): Order[] => {
-  const now = new Date();
-  return [
-    {
-      id: 'ORD-045',
-      customer: 'Ahmad bin Ali',
-      items: [{ name: 'Nasi Lemak', quantity: 1 }, { name: 'Teh Tarik', quantity: 1 }],
-      total: 11.00,
-      status: 'Pending',
-      time: '2 min ago',
-      queueNumber: 'A15',
-      createdAt: new Date(now.getTime() - 2 * 60 * 1000),
-      estimatedPrepTime: 15,
-    },
-    {
-      id: 'ORD-044',
-      customer: 'Siti Nurhaliza',
-      items: [{ name: 'Chicken Rice', quantity: 1 }],
-      total: 10.00,
-      status: 'Cooking',
-      time: '5 min ago',
-      queueNumber: 'A14',
-      createdAt: new Date(now.getTime() - 5 * 60 * 1000),
-      estimatedPrepTime: 12,
-    },
-    {
-      id: 'ORD-043',
-      customer: 'Lee Wei Ming',
-      items: [{ name: 'Mee Goreng', quantity: 2 }, { name: 'Ice Lemon Tea', quantity: 1 }],
-      total: 18.00,
-      status: 'Ready for Pickup',
-      time: '8 min ago',
-      queueNumber: 'A13',
-      createdAt: new Date(now.getTime() - 8 * 60 * 1000),
-      estimatedPrepTime: 20,
-    },
-    {
-      id: 'ORD-042',
-      customer: 'Nurul Ain',
-      items: [{ name: 'Nasi Goreng', quantity: 3 }],
-      total: 21.00,
-      status: 'Cooking',
-      time: '10 min ago',
-      queueNumber: 'A12',
-      createdAt: new Date(now.getTime() - 10 * 60 * 1000),
-      estimatedPrepTime: 18,
-    },
-    {
-      id: 'ORD-041',
-      customer: 'Raj Kumar',
-      items: [{ name: 'Roti Canai', quantity: 6 }, { name: 'Teh Tarik', quantity: 2 }],
-      total: 32.00,
-      status: 'Pending',
-      time: '12 min ago',
-      queueNumber: 'A11',
-      createdAt: new Date(now.getTime() - 12 * 60 * 1000),
-      estimatedPrepTime: 35,
-    },
-  ];
+// Helper functions
+const parseItems = (raw: any): Order["items"] => {
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item) => ({
+      name: item.name ?? "Item",
+      quantity: Number(item.quantity) || 1,
+    }));
+  } catch {
+    return [];
+  }
 };
 
-export default function LiveQueueDashboard() {
-  const [orders, setOrders] = useState<Order[]>(generateMockOrders());
+const normalizeStatus = (value: string | null | undefined): Order["status"] => {
+  const allowed: Order["status"][] = [
+    "Pending",
+    "Cooking",
+    "Ready for Pickup",
+    "Completed",
+  ];
+  if (value && allowed.includes(value as Order["status"])) {
+    return value as Order["status"];
+  }
+  return "Pending";
+};
+
+interface LiveQueueDashboardProps {
+  cafeteriaId?: string;
+}
+
+export default function LiveQueueDashboard({ cafeteriaId }: LiveQueueDashboardProps) {
+  const [orders, setOrders] = useState<Order[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [syncError, setSyncError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchOrders = async () => {
+    if (!cafeteriaId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('cafeteria_id', cafeteriaId)
+        .neq('status', 'Completed')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const mappedOrders: Order[] = (data || []).map((order: any) => {
+        const items = parseItems(order.items);
+        return {
+          id: order.id,
+          customer: order.customer_name || order.user_id?.slice(0, 8) || "Customer",
+          items,
+          total: Number(order.total_amount) || 0,
+          status: normalizeStatus(order.status),
+          time: new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          queueNumber: order.queue_number || "—",
+          createdAt: new Date(order.created_at),
+          estimatedPrepTime: 0
+        };
+      });
+
+      setOrders(mappedOrders);
+      setLastUpdated(new Date());
+      setSyncError(false);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      // setSyncError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!cafeteriaId) {
+        setIsLoading(false);
+        return;
+    }
+
+    fetchOrders();
+
+    const channel = supabase
+      .channel('queue-dashboard')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `cafeteria_id=eq.${cafeteriaId}`
+        },
+        () => {
+          fetchOrders();
+          toast.info('Queue updated');
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [cafeteriaId]);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || !cafeteriaId) return;
 
     const interval = setInterval(() => {
-      // Simulate data refresh
-      setLastUpdated(new Date());
-      // In a real app, this would fetch from API
-      // For demo, we'll just update the timestamp
+      fetchOrders();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [autoRefresh]);
+  }, [autoRefresh, cafeteriaId]);
 
   const activeOrders = orders.filter(order => order.status !== 'Completed');
   const queueLength = getQueueLength(orders);
@@ -114,15 +153,7 @@ export default function LiveQueueDashboard() {
   const statusBreakdown = getOrderStatusBreakdown(orders);
 
   const handleManualRefresh = () => {
-    setLastUpdated(new Date());
-    // Simulate sync error occasionally for demo
-    const shouldError = Math.random() < 0.1;
-    setSyncError(shouldError);
-    
-    if (!shouldError) {
-      // In real app, refresh data from API
-      setOrders(generateMockOrders());
-    }
+    fetchOrders();
   };
 
   const getStatusColor = (status: string) => {
