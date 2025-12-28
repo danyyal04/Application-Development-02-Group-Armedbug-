@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Clock, ChefHat, Package, Users, TrendingUp, RefreshCw } from 'lucide-react';
+import { Clock, ChefHat, Package, Users, TrendingUp, RefreshCw, AlertTriangle, Play, Pause } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 import { Alert, AlertDescription } from '../ui/alert';
+import { Switch } from '../ui/switch';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
 import {
@@ -66,6 +67,8 @@ export default function LiveQueueDashboard({ cafeteriaId }: LiveQueueDashboardPr
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [syncError, setSyncError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isQueueActive, setIsQueueActive] = useState(true);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const fetchOrders = async () => {
     if (!cafeteriaId) return;
@@ -106,6 +109,56 @@ export default function LiveQueueDashboard({ cafeteriaId }: LiveQueueDashboardPr
     }
   };
 
+  const fetchQueueStatus = async () => {
+    if (!cafeteriaId) return;
+    try {
+      const { data, error } = await supabase
+        .from('cafeterias')
+        .select('is_open')
+        .eq('id', cafeteriaId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching queue status:', error);
+        return;
+      }
+      
+      if (data) {
+        setIsQueueActive(data.is_open ?? true);
+      }
+    } catch (err) {
+      console.error('Error in fetchQueueStatus:', err);
+    }
+  };
+
+  const handleToggleQueue = async (active: boolean) => {
+    if (!cafeteriaId) return;
+    setIsUpdatingStatus(true);
+    
+    try {
+      // Optimistic update
+      setIsQueueActive(active);
+
+      const { error } = await supabase
+        .from('cafeterias')
+        .update({ is_open: active })
+        .eq('id', cafeteriaId);
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success(active ? "Queue is now active" : "Queue paused - No new orders");
+    } catch (err) {
+      console.error('Error updating queue status:', err);
+      toast.error('Failed to update queue status');
+      // Revert on error
+      setIsQueueActive(!active);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   useEffect(() => {
     if (!cafeteriaId) {
         setIsLoading(false);
@@ -113,6 +166,7 @@ export default function LiveQueueDashboard({ cafeteriaId }: LiveQueueDashboardPr
     }
 
     fetchOrders();
+    fetchQueueStatus();
 
     const channel = supabase
       .channel('queue-dashboard')
@@ -203,6 +257,66 @@ export default function LiveQueueDashboard({ cafeteriaId }: LiveQueueDashboardPr
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Queue Settings Control */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-2">
+           <h2 className="text-lg font-semibold text-slate-800">Queue Settings</h2>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">Control queue intake and operational settings</p>
+        
+        <div className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${
+          isQueueActive ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'
+        }`}>
+          <div className="flex items-center gap-4">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              isQueueActive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+            }`}>
+              {isQueueActive ? <Play className="w-5 h-5 fill-current" /> : <Pause className="w-5 h-5 fill-current" />}
+            </div>
+            <div>
+              <p className={`font-semibold ${isQueueActive ? 'text-green-900' : 'text-red-900'}`}>
+                Queue Intake Status
+              </p>
+              <p className={`text-sm ${isQueueActive ? 'text-green-700' : 'text-red-700'}`}>
+                {isQueueActive 
+                  ? 'Queue is active - Accepting new orders' 
+                  : 'Queue is paused - Not accepting new orders'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+             <Button 
+               variant={isQueueActive ? "destructive" : "default"}
+               size="sm"
+               onClick={() => handleToggleQueue(!isQueueActive)}
+               disabled={isUpdatingStatus}
+               className={isQueueActive ? "bg-red-600 hover:bg-red-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"}
+             >
+               {isQueueActive ? (
+                 <>
+                   <Pause className="w-4 h-4 mr-2" />
+                   Pause Queue
+                 </>
+               ) : (
+                 <>
+                   <Play className="w-4 h-4 mr-2" />
+                   Resume Queue
+                 </>
+               )}
+             </Button>
+          </div>
+        </div>
+
+        {!isQueueActive && (
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+             <p className="text-sm text-amber-800">
+               Your cafeteria is currently unavailable to customers. Existing orders will continue to be processed.
+             </p>
+          </div>
+        )}
+      </div>
 
       {/* Queue Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

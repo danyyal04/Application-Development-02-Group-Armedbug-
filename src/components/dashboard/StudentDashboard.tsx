@@ -116,6 +116,7 @@ export default function StudentDashboard({
       const safeData =
         (data || []).map((row: any) => ({
           ...row,
+          isOpen: row.is_open ?? true,
           image: row.shop_image_url || row.image || "/UTMMunch-Logo.jpg",
         })) || [];
       setFeaturedCafeterias(safeData);
@@ -631,11 +632,9 @@ export default function StudentDashboard({
                   alt={cafeteria.name}
                   className="w-full h-full object-cover"
                 />
-                {cafeteria.isOpen && (
-                  <Badge className="absolute top-3 right-3 bg-green-600">
-                    Open Now
-                  </Badge>
-                )}
+                <Badge className={`absolute top-3 right-3 ${cafeteria.isOpen ? 'bg-green-600' : 'bg-slate-600'}`}>
+                  {cafeteria.isOpen ? 'Open Now' : 'Closed'}
+                </Badge>
               </div>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
@@ -665,8 +664,14 @@ export default function StudentDashboard({
                     size="sm"
                     className="text-white hover:opacity-90"
                     style={{ backgroundColor: "oklch(40.8% 0.153 2.432)" }}
+                    disabled={!cafeteria.isOpen}
+                    onClick={(e) => {
+                       e.stopPropagation();
+                       setSelectedCafeteria(cafeteria);
+                       onNavigate("menu");
+                    }}
                   >
-                    Pre-Order
+                    {cafeteria.isOpen ? 'Pre-Order' : 'Closed'}
                   </Button>
                 </div>
               </CardContent>
