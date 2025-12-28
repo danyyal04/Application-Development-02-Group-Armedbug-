@@ -389,7 +389,7 @@ export default function Navbar({
                 )}
               </Button>
             )}
-            {!isAdmin && (
+            {!isAdmin && !isOwner && (
               <Button
                 variant="ghost"
                 className="relative"
