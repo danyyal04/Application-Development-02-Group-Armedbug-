@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
 import {
   Clock,
   ShoppingBag,
@@ -7,25 +7,32 @@ import {
   MapPin,
   Search,
   ShoppingCart,
-} from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import MenuList from '../menu/MenuList';
-import type { CartSummaryItem } from '../menu/MenuList';
-import OrderTracking from '../orders/OrderTracking';
-import PaymentMethods from '../payment/PaymentMethods';
-import ProfileSettings from '../profile/ProfileSettings';
-import CafeteriaList from '../cafeteria/CafeteriaList';
-import CheckoutPage from '../checkout/CheckoutPage';
-import CartPage from '../cart/CartPage';
-import CartSideBar from '../cart/CartSideBar';
-import SplitBill from '../cart/SplitBill';
-import SplitBillPage from '../cart/SplitBillPage';
-import { toast } from 'sonner';
-import { supabase } from '../../lib/supabaseClient';
-import SplitBillInvitations from '../splitbill/SplitBillInvitations';
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import MenuList from "../menu/MenuList";
+import type { CartSummaryItem } from "../menu/MenuList";
+import OrderTracking from "../orders/OrderTracking";
+import PaymentMethods from "../payment/PaymentMethods";
+import ProfileSettings from "../profile/ProfileSettings";
+import CafeteriaList from "../cafeteria/CafeteriaList";
+import CheckoutPage from "../checkout/CheckoutPage";
+import CartPage from "../cart/CartPage";
+import CartSideBar from "../cart/CartSideBar";
+import SplitBill from "../cart/SplitBill";
+import SplitBillPage from "../cart/SplitBillPage";
+import { toast } from "sonner";
+import { supabase } from "../../lib/supabaseClient";
+import SplitBillInvitations from "../splitbill/SplitBillInvitations";
+import PaymentPage from "../payment/PaymentPage";
 
 type CartItem = {
   id: string;
@@ -46,17 +53,22 @@ interface StudentDashboardProps {
 
 const DEFAULT_CAFETERIA = {
   id: null as string | null, // avoid non-uuid ids in orders
-  name: 'UTMMunch Cafeterias',
-  location: 'Universiti Teknologi Malaysia',
+  name: "UTMMunch Cafeterias",
+  location: "Universiti Teknologi Malaysia",
 };
 
-export default function StudentDashboard({ user, currentPage, onNavigate, onCartCountChange }: StudentDashboardProps) {
+export default function StudentDashboard({
+  user,
+  currentPage,
+  onNavigate,
+  onCartCountChange,
+}: StudentDashboardProps) {
   const MAX_CART_QUANTITY = 10;
   const [selectedCafeteria, setSelectedCafeteria] = useState<any>(null);
   const [checkoutData, setCheckoutData] = useState<any>(null);
   const [featuredCafeterias, setFeaturedCafeterias] = useState<any[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [cartPickupTime, setCartPickupTime] = useState('asap');
+  const [cartPickupTime, setCartPickupTime] = useState("asap");
   const [cartCafeteria, setCartCafeteria] = useState<any | null>(null);
   const [isCartSidebarOpen, setIsCartSidebarOpen] = useState(false);
   const [showSplitDialog, setShowSplitDialog] = useState(false);
@@ -72,39 +84,39 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
 
   // Persist active split bill across refreshes
   useEffect(() => {
-    const saved = localStorage.getItem('activeSplitBill');
+    const saved = localStorage.getItem("activeSplitBill");
     if (saved) {
       try {
         setActiveSplitBillState(JSON.parse(saved));
       } catch (e) {
-        console.error('Failed to parse saved split bill', e);
+        console.error("Failed to parse saved split bill", e);
       }
     }
   }, []);
 
   const persistActiveSplit = (data: typeof activeSplitBill) => {
     setActiveSplitBillState(data);
-    localStorage.setItem('activeSplitBill', JSON.stringify(data));
-    window.dispatchEvent(new Event('utm-active-split-changed'));
+    localStorage.setItem("activeSplitBill", JSON.stringify(data));
+    window.dispatchEvent(new Event("utm-active-split-changed"));
   };
-  
+
   const clearActiveSplit = () => {
     setActiveSplitBillState(null);
-    localStorage.removeItem('activeSplitBill');
-    window.dispatchEvent(new Event('utm-active-split-changed'));
+    localStorage.removeItem("activeSplitBill");
+    window.dispatchEvent(new Event("utm-active-split-changed"));
   };
 
   useEffect(() => {
     const loadFeatured = async () => {
       const { data } = await supabase
-        .from('cafeterias')
-        .select('*')
-        .order('rating', { ascending: false })
+        .from("cafeterias")
+        .select("*")
+        .order("rating", { ascending: false })
         .limit(3);
       const safeData =
         (data || []).map((row: any) => ({
           ...row,
-          image: row.shop_image_url || row.image || '/UTMMunch-Logo.jpg',
+          image: row.shop_image_url || row.image || "/UTMMunch-Logo.jpg",
         })) || [];
       setFeaturedCafeterias(safeData);
     };
@@ -177,18 +189,19 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
     }
   }, [totalCartItems, onCartCountChange]);
 
-  const cartPageCafeteria = cartCafeteria ?? selectedCafeteria ?? DEFAULT_CAFETERIA;
-  const addItemToCart = (item: Omit<CartItem, 'quantity'>, notify = false) => {
+  const cartPageCafeteria =
+    cartCafeteria ?? selectedCafeteria ?? DEFAULT_CAFETERIA;
+  const addItemToCart = (item: Omit<CartItem, "quantity">, notify = false) => {
     let updated = false;
-    setCartItems(prev => {
-      const existing = prev.find(ci => ci.id === item.id);
+    setCartItems((prev) => {
+      const existing = prev.find((ci) => ci.id === item.id);
       if (existing) {
         if (existing.quantity >= MAX_CART_QUANTITY) {
-          if (notify) toast.error('Maximum quantity reached.');
+          if (notify) toast.error("Maximum quantity reached.");
           return prev;
         }
         updated = true;
-        return prev.map(ci =>
+        return prev.map((ci) =>
           ci.id === item.id ? { ...ci, quantity: ci.quantity + 1 } : ci
         );
       }
@@ -207,15 +220,15 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
 
   const decreaseCartItem = (itemId: string, notify = false) => {
     let message: string | null = null;
-    setCartItems(prev => {
-      const target = prev.find(item => item.id === itemId);
+    setCartItems((prev) => {
+      const target = prev.find((item) => item.id === itemId);
       if (!target) return prev;
       if (target.quantity <= 1) {
-        message = 'Item removed from cart';
-        return prev.filter(item => item.id !== itemId);
+        message = "Item removed from cart";
+        return prev.filter((item) => item.id !== itemId);
       }
-      message = 'Quantity updated';
-      return prev.map(item =>
+      message = "Quantity updated";
+      return prev.map((item) =>
         item.id === itemId ? { ...item, quantity: item.quantity - 1 } : item
       );
     });
@@ -226,20 +239,20 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
   };
 
   const removeCartItem = (itemId: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== itemId));
+    setCartItems((prev) => prev.filter((item) => item.id !== itemId));
   };
 
   const updateCartQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity > MAX_CART_QUANTITY) {
-      toast.error('Maximum quantity reached.');
+      toast.error("Maximum quantity reached.");
       return;
     }
     if (newQuantity <= 0) {
       removeCartItem(itemId);
       return;
     }
-    setCartItems(prev =>
-      prev.map(item =>
+    setCartItems((prev) =>
+      prev.map((item) =>
         item.id === itemId ? { ...item, quantity: newQuantity } : item
       )
     );
@@ -247,7 +260,7 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
 
   const handleMenuCheckout = (items: CartSummaryItem[], pickup: string) => {
     if (items.length === 0) {
-      toast.error('Your cart is empty');
+      toast.error("Your cart is empty");
       return;
     }
     setCartPickupTime(pickup);
@@ -255,18 +268,18 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
       setCartCafeteria(selectedCafeteria);
     }
     // Go to cart page to review before checkout
-    onNavigate('cart-preview');
+    onNavigate("cart-preview");
   };
 
   const handleProceedToSplitBill = () => {
     if (cartItems.length === 0) {
-      toast.error('Add items to your cart before checking out.');
+      toast.error("Add items to your cart before checking out.");
       return;
     }
     setCartPickupTime(cartPickupTime);
     setCheckoutData({
       cafeteria: cartCafeteria ?? selectedCafeteria,
-      cartItems: cartItems.map(item => ({
+      cartItems: cartItems.map((item) => ({
         id: item.id,
         name: item.name,
         price: item.price,
@@ -274,72 +287,92 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
       })),
       pickupTime: cartPickupTime,
     });
-    onNavigate('menu');
+    onNavigate("menu");
   };
 
   const renderContent = () => {
-    if (currentPage === 'cart-preview') {
+    if (currentPage === "cart-preview") {
       return (
         <CartPage
           cartItems={cartItems}
           cafeteria={cartPageCafeteria}
           onUpdateQuantity={updateCartQuantity}
           onRemoveItem={removeCartItem}
-          onBackToMenu={() => onNavigate(selectedCafeteria ? 'menu' : 'dashboard')}
+          onBackToMenu={() =>
+            onNavigate(selectedCafeteria ? "menu" : "dashboard")
+          }
           onProceedToCheckout={handleProceedToSplitBill}
         />
       );
     }
 
-    if (currentPage === 'splitbill-invitations') {
+    if (currentPage === "splitbill-invitations") {
       return (
         <SplitBillInvitations
-          onNavigateToPayment={({ splitBillId, totalAmount, myShare, cafeteria, _cafeteriaObj, items }: any) => {
+          onNavigateToPayment={({
+            splitBillId,
+            totalAmount,
+            myShare,
+            cafeteria,
+            _cafeteriaObj,
+            items,
+          }: any) => {
             // Use the rich object if available (contains ID)
-            const safeCafeteria = _cafeteriaObj || (typeof cafeteria === 'object' ? cafeteria : { name: cafeteria || 'Cafeteria', location: 'UTM' });
-            
-            console.log("Navigating to split bill with items:", { splitBillId, safeCafeteria, itemCount: items?.length });
+            const safeCafeteria =
+              _cafeteriaObj ||
+              (typeof cafeteria === "object"
+                ? cafeteria
+                : { name: cafeteria || "Cafeteria", location: "UTM" });
+
+            console.log("Navigating to split bill with items:", {
+              splitBillId,
+              safeCafeteria,
+              itemCount: items?.length,
+            });
 
             persistActiveSplit({
               sessionId: splitBillId,
               cartItems: items || [], // Pass the items!
               cafeteria: safeCafeteria,
-              pickupTime: 'asap',
+              pickupTime: "asap",
               totalAmount: totalAmount || myShare || 0,
             });
-            onNavigate('split-bill-tracking');
+            onNavigate("split-bill-tracking");
           }}
         />
       );
     }
 
-  if (currentPage === 'split-bill-tracking' && activeSplitBill) {
-    return (
-      <SplitBillPage
-        splitBillId={activeSplitBill.sessionId}
-        cartItems={activeSplitBill.cartItems}
+    if (currentPage === "split-bill-tracking" && activeSplitBill) {
+      return (
+        <SplitBillPage
+          splitBillId={activeSplitBill.sessionId}
+          cartItems={activeSplitBill.cartItems}
           totalAmount={
             activeSplitBill.totalAmount ??
-            activeSplitBill.cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+            activeSplitBill.cartItems.reduce(
+              (sum, item) => sum + item.price * item.quantity,
+              0
+            )
           }
           cafeteria={activeSplitBill.cafeteria}
-        pickupTime={activeSplitBill.pickupTime}
-        initiatorName={user?.name || 'You'}
-        currentUserEmail={user?.email}
-        onPaymentComplete={() => toast.success('Payment recorded')}
-        onCancel={() => {
-          persistActiveSplit(null);
-          onNavigate('menu');
-        }}
-        onCompleteSplitBill={() => {
-          persistActiveSplit(null);
-          toast.success('Split bill completed');
-        }}
-      />
-    );
-  }
+          pickupTime={activeSplitBill.pickupTime}
+          initiatorName={user?.name || "You"}
+          currentUserEmail={user?.email}
+          onPaymentComplete={() => toast.success("Payment recorded")}
+          onCancel={() => {
+            persistActiveSplit(null);
+            onNavigate("menu");
+          }}
+          onCompleteSplitBill={() => {
+            persistActiveSplit(null);
+            toast.success("Split bill completed");
+          }}
+        />
+      );
+    }
 
-    if (currentPage === 'menu') {
+    if (currentPage === "menu") {
       if (checkoutData) {
         return (
           <CheckoutPage
@@ -352,8 +385,8 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
               setCheckoutData(null);
               setCartItems([]);
               setSelectedCafeteria(null);
-              toast.success('Order placed successfully!');
-              onNavigate('orders');
+              toast.success("Order placed successfully!");
+              onNavigate("orders");
             }}
             onSplitBill={() => setShowSplitDialog(true)}
           />
@@ -369,24 +402,61 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
             cartItems={cartItems}
             pickupTime={cartPickupTime}
             onPickupTimeChange={setCartPickupTime}
-            onAddToCart={item => addItemToCart(item, true)}
-            onDecreaseItem={itemId => decreaseCartItem(itemId, true)}
+            onAddToCart={(item) => addItemToCart(item, true)}
+            onDecreaseItem={(itemId) => decreaseCartItem(itemId, true)}
           />
         );
       }
 
-      return <CafeteriaList onSelectCafeteria={(caf: any) => setSelectedCafeteria(caf)} />;
+      return (
+        <CafeteriaList
+          onSelectCafeteria={(caf: any) => setSelectedCafeteria(caf)}
+        />
+      );
     }
 
-    if (currentPage === 'orders') {
+    if (currentPage === "orders") {
       return <OrderTracking userId={user.id} />;
     }
 
-    if (currentPage === 'payment') {
-      return <PaymentMethods />;
+    if (currentPage === "payment") {
+      return (
+        <PaymentPage
+          onNavigateToSplitBillPayment={({
+            splitBillId,
+            totalAmount,
+            myShare,
+            cafeteria,
+            _cafeteriaObj,
+            items,
+          }: any) => {
+            // Use the rich object if available (contains ID)
+            const safeCafeteria =
+              _cafeteriaObj ||
+              (typeof cafeteria === "object"
+                ? cafeteria
+                : { name: cafeteria || "Cafeteria", location: "UTM" });
+
+            console.log("Navigating to split bill with items:", {
+              splitBillId,
+              safeCafeteria,
+              itemCount: items?.length,
+            });
+
+            persistActiveSplit({
+              sessionId: splitBillId,
+              cartItems: items || [], // Pass the items!
+              cafeteria: safeCafeteria,
+              pickupTime: "asap",
+              totalAmount: totalAmount || myShare || 0,
+            });
+            onNavigate("split-bill-tracking");
+          }}
+        />
+      );
     }
 
-    if (currentPage === 'profile') {
+    if (currentPage === "profile") {
       return <ProfileSettings user={user} />;
     }
 
@@ -396,7 +466,8 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
           <div>
             <h1 className="text-slate-900 mb-2">Welcome back, {user.name}!</h1>
             <p className="text-slate-600">
-              Pre-order your favorite meals from UTM cafeterias and skip the queue.
+              Pre-order your favorite meals from UTM cafeterias and skip the
+              queue.
             </p>
           </div>
           <Button
@@ -404,16 +475,18 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
             className="relative w-full md:w-auto"
             onClick={() => {
               if (cartItems.length === 0) {
-                toast.info('Your cart is empty.');
+                toast.info("Your cart is empty.");
                 return;
               }
-              onNavigate('cart-preview');
+              onNavigate("cart-preview");
             }}
           >
             <ShoppingCart className="w-4 h-4 mr-2" />
             View Cart
             {totalCartItems > 0 && (
-              <Badge className="ml-2 bg-purple-600 text-white">{totalCartItems}</Badge>
+              <Badge className="ml-2 bg-purple-600 text-white">
+                {totalCartItems}
+              </Badge>
             )}
           </Button>
         </div>
@@ -426,7 +499,7 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
                 type="text"
                 placeholder="Search for cafeterias or food..."
                 className="pl-10 bg-white"
-                onClick={() => onNavigate('menu')}
+                onClick={() => onNavigate("menu")}
               />
             </div>
           </CardContent>
@@ -435,10 +508,12 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card
             className="border-slate-200 hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => onNavigate('orders')}
+            onClick={() => onNavigate("orders")}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm text-slate-600">Active Orders</CardTitle>
+              <CardTitle className="text-sm text-slate-600">
+                Active Orders
+              </CardTitle>
               <ShoppingBag className="w-4 h-4 text-purple-600" />
             </CardHeader>
             <CardContent>
@@ -449,10 +524,12 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
 
           <Card
             className="border-slate-200 hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => onNavigate('payment')}
+            onClick={() => onNavigate("payment")}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm text-slate-600">Payment Methods</CardTitle>
+              <CardTitle className="text-sm text-slate-600">
+                Payment Methods
+              </CardTitle>
               <CreditCard className="w-4 h-4 text-amber-600" />
             </CardHeader>
             <CardContent>
@@ -463,7 +540,9 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
 
           <Card className="border-slate-200 hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm text-slate-600">Favorite Cafeterias</CardTitle>
+              <CardTitle className="text-sm text-slate-600">
+                Favorite Cafeterias
+              </CardTitle>
               <Star className="w-4 h-4 text-pink-600" />
             </CardHeader>
             <CardContent>
@@ -481,9 +560,23 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
           <CardContent>
             <div className="space-y-4">
               {[
-                { id: 'ORD-001', cafeteria: 'Cafe Angkasa', items: 'Nasi Lemak, Teh Tarik', status: 'Ready for Pickup', time: '10:30 AM', pickup: '11:00 AM' },
-                { id: 'ORD-002', cafeteria: 'Cafe Siswa', items: 'Chicken Rice, Ice Lemon Tea', status: 'Cooking', time: '11:00 AM', pickup: '11:45 AM' },
-              ].map(order => (
+                {
+                  id: "ORD-001",
+                  cafeteria: "Cafe Angkasa",
+                  items: "Nasi Lemak, Teh Tarik",
+                  status: "Ready for Pickup",
+                  time: "10:30 AM",
+                  pickup: "11:00 AM",
+                },
+                {
+                  id: "ORD-002",
+                  cafeteria: "Cafe Siswa",
+                  items: "Chicken Rice, Ice Lemon Tea",
+                  status: "Cooking",
+                  time: "11:00 AM",
+                  pickup: "11:45 AM",
+                },
+              ].map((order) => (
                 <div
                   key={order.id}
                   className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
@@ -491,14 +584,22 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-slate-900">{order.id}</p>
-                      <Badge variant={order.status === 'Ready for Pickup' ? 'default' : 'secondary'}>
+                      <Badge
+                        variant={
+                          order.status === "Ready for Pickup"
+                            ? "default"
+                            : "secondary"
+                        }
+                      >
                         {order.status}
                       </Badge>
                     </div>
                     <p className="text-sm text-slate-600">
                       {order.cafeteria} - {order.items}
                     </p>
-                    <p className="text-xs text-slate-500 mt-1">Pickup: {order.pickup}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Pickup: {order.pickup}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 text-slate-500">
                     <Clock className="w-4 h-4" />
@@ -514,19 +615,25 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
           <h2 className="text-slate-900 mb-4">Featured Cafeterias</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {featuredCafeterias.map(cafeteria => (
+          {featuredCafeterias.map((cafeteria) => (
             <Card
               key={cafeteria.id}
               className="overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
               onClick={() => {
                 setSelectedCafeteria(cafeteria);
-                onNavigate('menu');
+                onNavigate("menu");
               }}
             >
               <div className="aspect-video w-full overflow-hidden bg-slate-100 relative">
-                <img src={cafeteria.image || '/UTMMunch-Logo.jpg'} alt={cafeteria.name} className="w-full h-full object-cover" />
+                <img
+                  src={cafeteria.image || "/UTMMunch-Logo.jpg"}
+                  alt={cafeteria.name}
+                  className="w-full h-full object-cover"
+                />
                 {cafeteria.isOpen && (
-                  <Badge className="absolute top-3 right-3 bg-green-600">Open Now</Badge>
+                  <Badge className="absolute top-3 right-3 bg-green-600">
+                    Open Now
+                  </Badge>
                 )}
               </div>
               <CardContent className="p-4">
@@ -535,7 +642,9 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
                     <h3 className="text-slate-900 mb-1">{cafeteria.name}</h3>
                     <div className="flex items-center gap-1 text-amber-500 mb-2">
                       <Star className="w-4 h-4 fill-current" />
-                      <span className="text-sm text-slate-900">{cafeteria.rating}</span>
+                      <span className="text-sm text-slate-900">
+                        {cafeteria.rating}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -543,13 +652,19 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
                   <MapPin className="w-4 h-4" />
                   <p className="text-sm">{cafeteria.location}</p>
                 </div>
-                <p className="text-sm text-slate-600 mb-3">{cafeteria.description}</p>
+                <p className="text-sm text-slate-600 mb-3">
+                  {cafeteria.description}
+                </p>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1 text-slate-500">
                     <Clock className="w-4 h-4" />
                     <span className="text-xs">{cafeteria.estimatedTime}</span>
                   </div>
-                  <Button size="sm" className="text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>
+                  <Button
+                    size="sm"
+                    className="text-white hover:opacity-90"
+                    style={{ backgroundColor: "oklch(40.8% 0.153 2.432)" }}
+                  >
                     Pre-Order
                   </Button>
                 </div>
@@ -566,8 +681,8 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
             </p>
             <Button
               className="text-white hover:opacity-90"
-              style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
-              onClick={() => onNavigate('menu')}
+              style={{ backgroundColor: "oklch(40.8% 0.153 2.432)" }}
+              onClick={() => onNavigate("menu")}
             >
               Browse All Cafeterias
             </Button>
@@ -584,25 +699,38 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
     return (
       <SplitBill
         cartItems={splitCartItems}
-        totalAmount={splitCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)}
-        cafeteria={{ name: splitCafeteria?.name, location: splitCafeteria?.location, id: splitCafeteria?.id }}
+        totalAmount={splitCartItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        )}
+        cafeteria={{
+          name: splitCafeteria?.name,
+          location: splitCafeteria?.location,
+          id: splitCafeteria?.id,
+        }}
         pickupTime={checkoutData.pickupTime}
         autoOpenDialog
         onInitiateSplitBill={({ sessionId }) => {
           setShowSplitDialog(false);
           persistActiveSplit({
-            sessionId: sessionId || 'new-session',
+            sessionId: sessionId || "new-session",
             cartItems: splitCartItems,
-            cafeteria: { name: splitCafeteria?.name, location: splitCafeteria?.location, id: splitCafeteria?.id },
+            cafeteria: {
+              name: splitCafeteria?.name,
+              location: splitCafeteria?.location,
+              id: splitCafeteria?.id,
+            },
             pickupTime: checkoutData.pickupTime,
           });
-          toast.success('Split bill initiated.');
-          onNavigate('split-bill-tracking');
+          toast.success("Split bill initiated.");
+          onNavigate("split-bill-tracking");
         }}
         onCancel={() => {
           setShowSplitDialog(false);
-          setCheckoutData(prev => (prev ? { ...prev, mode: 'normal' } : prev));
-          onNavigate('menu');
+          setCheckoutData((prev) =>
+            prev ? { ...prev, mode: "normal" } : prev
+          );
+          onNavigate("menu");
         }}
       />
     );
@@ -617,13 +745,13 @@ export default function StudentDashboard({ user, currentPage, onNavigate, onCart
         onRemoveItem={removeCartItem}
         onCheckout={() => {
           setIsCartSidebarOpen(false);
-          onNavigate('cart-preview');
+          onNavigate("cart-preview");
         }}
         isOpen={isCartSidebarOpen}
         onOpenChange={setIsCartSidebarOpen}
       />
       {renderContent()}
-      {currentPage === 'dashboard' && totalCartItems > 0 && (
+      {currentPage === "dashboard" && totalCartItems > 0 && (
         <Button
           onClick={() => setIsCartSidebarOpen(true)}
           className="fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-lg bg-gradient-to-r from-purple-700 to-pink-700 hover:opacity-90"

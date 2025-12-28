@@ -46,7 +46,10 @@ interface SplitBillInvitationsProps {
     totalAmount: number;
     myShare: number;
     cafeteria?: string;
+    _cafeteriaObj?: any; // Allow passing full object
+    items?: any[]; // Allow passing items
   }) => void;
+  viewMode?: "full" | "payment-only";
 }
 
 const getSplitMethodLabel = (method: string) => {
@@ -78,6 +81,7 @@ const formatRelativeTime = (value: string) => {
 
 export default function SplitBillInvitations({
   onNavigateToPayment,
+  viewMode = "full",
 }: SplitBillInvitationsProps) {
   const [invitations, setInvitations] = useState<SplitBillInvitation[]>([]);
   const [selectedInvitation, setSelectedInvitation] =
@@ -453,54 +457,58 @@ export default function SplitBillInvitations({
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-slate-900 mb-2">Split Bill Invitations</h1>
-        <p className="text-slate-600">
-          Manage your split bill invitations and join group orders
-        </p>
-      </div>
+      {viewMode === "full" && (
+        <div className="mb-8">
+          <h1 className="text-slate-900 mb-2">Split Bill Invitations</h1>
+          <p className="text-slate-600">
+            Manage your split bill invitations and join group orders
+          </p>
+        </div>
+      )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Pending Invitations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Mail className="w-5 h-5 text-orange-600" />
-              <p className="text-slate-900">{pendingInvitations.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">Accepted</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <p className="text-slate-900">{acceptedInvitations.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">Declined</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-slate-600" />
-              <p className="text-slate-900">{declinedInvitations.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {viewMode === "full" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-600">
+                Pending Invitations
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-orange-600" />
+                <p className="text-slate-900">{pendingInvitations.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-600">Accepted</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <p className="text-slate-900">{acceptedInvitations.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-600">Declined</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-slate-600" />
+                <p className="text-slate-900">{declinedInvitations.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Pending Invitations */}
-      {pendingInvitations.length > 0 && (
+      {/* Pending Invitations - Show ONLY in full/notification mode */}
+      {viewMode === "full" && pendingInvitations.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Pending Invitations</CardTitle>
@@ -593,7 +601,7 @@ export default function SplitBillInvitations({
       )}
 
       {/* No Pending Invitations */}
-      {pendingInvitations.length === 0 && (
+      {viewMode === "full" && pendingInvitations.length === 0 && (
         <Card className="mb-8">
           <CardContent className="py-12 text-center">
             <Mail className="w-12 h-12 mx-auto mb-4 text-slate-300" />
@@ -606,8 +614,8 @@ export default function SplitBillInvitations({
         </Card>
       )}
 
-      {/* Ongoing Payments (includes accepted/pending in sessions) */}
-      {ongoingInvitations.length > 0 && (
+      {/* Ongoing Payments - Show ONLY in payment-only mode */}
+      {viewMode === "payment-only" && ongoingInvitations.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Ongoing Payments</CardTitle>
@@ -653,7 +661,7 @@ export default function SplitBillInvitations({
       )}
 
       {/* Declined Invitations */}
-      {declinedInvitations.length > 0 && (
+      {viewMode === "full" && declinedInvitations.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Declined Invitations</CardTitle>
