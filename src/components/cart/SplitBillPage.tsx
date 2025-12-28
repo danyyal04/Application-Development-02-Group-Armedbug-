@@ -108,6 +108,7 @@ export default function SplitBillPage({
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [generatedQueueNum, setGeneratedQueueNum] = useState<string>('');
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const normalizedEmail = (currentUserEmail || "").toLowerCase();
   const currentParticipant = participants.find(
@@ -566,13 +567,22 @@ export default function SplitBillPage({
             console.error("Failed to create order from split bill", orderError);
             toast.error("Payment complete, but failed to create order record.");
           } else {
+            // Show success dialog instead of just toast
+            setShowSuccessDialog(true);
+            
+            // Still notify parent possibly, but maybe wait until dialog close?
+            // If we notify parent immediately, they might unmount us.
+            // So let's NOT call onCompleteSplitBill here, let the dialog close handle it.
+            // But if onCompleteSplitBill changes the page, we need to be careful.
+            // The previous code had a timeout.
+            /* 
             toast.success("All payments completed. Order is confirmed! 🎉", {
               duration: 5000,
             });
-            // Notify parent to clear cart/session
             if (onCompleteSplitBill) {
                onCompleteSplitBill();
             }
+            */
           }
         } catch (err) {
           console.error(err);
@@ -1180,6 +1190,57 @@ export default function SplitBillPage({
             >
               {isProcessing ? "Processing..." : "Complete Payment"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showSuccessDialog} onOpenChange={(open) => {
+        if (!open) {
+           setShowSuccessDialog(false);
+           if (onCompleteSplitBill) onCompleteSplitBill();
+        } else {
+           setShowSuccessDialog(true);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Payment Successful</DialogTitle>
+            <DialogDescription>Your order has been placed.</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+            <CheckCircle className="w-5 h-5 text-emerald-600" />
+            <div>
+              <p className="text-slate-900 font-semibold">RM {totalAmount.toFixed(2)}</p>
+              <p className="text-sm text-slate-600">Split Bill Completed</p>
+            </div>
+          </div>
+
+          <div className="mt-6 mb-6 text-center">
+             <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">
+                <div className="flex items-center justify-center gap-2 mb-2 opacity-90">
+                  <CreditCard className="w-4 h-4" />
+                  <span className="text-sm font-medium">Your Queue Number</span>
+                </div>
+                <div className="text-5xl font-bold mb-2 tracking-wider">
+                  {generatedQueueNum}
+                </div>
+                <p className="text-sm opacity-90">Please remember this number for pickup</p>
+             </div>
+          </div>
+
+          <div className="space-y-3">
+             <p className="text-sm text-center text-slate-600">
+               We will notify the cafeteria and update your order status shortly.
+             </p>
+             <Button 
+               className="w-full text-white" 
+               style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }} 
+               onClick={() => {
+                 setShowSuccessDialog(false);
+                 if (onCompleteSplitBill) onCompleteSplitBill();
+               }}
+             >
+               View My Orders
+             </Button>
           </div>
         </DialogContent>
       </Dialog>
