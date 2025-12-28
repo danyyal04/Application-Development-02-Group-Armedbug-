@@ -25,6 +25,7 @@ import PaymentMethods from "../payment/PaymentMethods";
 import ProfileSettings from "../profile/ProfileSettings";
 import CafeteriaList from "../cafeteria/CafeteriaList";
 import CheckoutPage from "../checkout/CheckoutPage";
+import TransactionHistory from "../transactions/TransactionHistory";
 import CartPage from "../cart/CartPage";
 import CartSideBar from "../cart/CartSideBar";
 import SplitBill from "../cart/SplitBill";
@@ -421,6 +422,10 @@ export default function StudentDashboard({
       return <OrderTracking userId={user.id} />;
     }
 
+    if (currentPage === "history") {
+      return <TransactionHistory />;
+    }
+
     if (currentPage === "payment") {
       return (
         <PaymentPage
@@ -555,9 +560,18 @@ export default function StudentDashboard({
         </div>
 
         <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Recent Orders</CardTitle>
-            <CardDescription>Track your latest pre-orders</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Recent Orders</CardTitle>
+              <CardDescription>Track your latest pre-orders</CardDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onNavigate("history")}
+            >
+              View History
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

@@ -10,6 +10,7 @@ import {
 } from "../ui/card";
 import PaymentMethods from "./PaymentMethods";
 import SplitBillInvitations from "../splitbill/SplitBillInvitations";
+import TransactionHistory from "../transactions/TransactionHistory";
 
 interface PaymentPageProps {
   onNavigateToSplitBillPayment?: (invitation: {
@@ -82,18 +83,7 @@ export default function PaymentPage({
         </TabsContent>
 
         <TabsContent value="history" className="mt-0">
-          <Card>
-            <CardHeader>
-              <CardTitle>Transaction History</CardTitle>
-              <CardDescription>
-                View your recent transactions and download receipts
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="py-12 text-center text-slate-500">
-              <History className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-              <p>No transactions recorded yet.</p>
-            </CardContent>
-          </Card>
+          <TransactionHistory />
         </TabsContent>
       </Tabs>
     </div>
