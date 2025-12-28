@@ -539,6 +539,9 @@ export default function SplitBillPage({
               paid_at: new Date().toISOString(),
               items: JSON.stringify(cartItems),
               payment_method: paymentMethodString,
+              subtotal: totalAmount - 0.5,
+              tax: 0,
+              service_fee: 0.5,
             },
           ]);
 
