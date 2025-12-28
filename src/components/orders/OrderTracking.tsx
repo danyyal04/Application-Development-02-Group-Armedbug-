@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, CheckCircle, ChefHat, Package, Bell } from "lucide-react";
+import { Clock, CheckCircle, ChefHat, Package, Bell, Star, Upload, X, MessageSquare } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs.js";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog.js";
+import { Textarea } from "../ui/textarea.js";
+import { Label } from "../ui/label.js";
 import {
   Card,
   CardContent,
@@ -39,6 +43,7 @@ interface Order {
   createdAt: string;
   queueNumber: string;
   estimatedTime?: number;
+  feedbackSubmitted?: boolean;
 }
 
 const parseItems = (raw: any): OrderItem[] => {
@@ -65,6 +70,7 @@ const mapRowToOrder = (row: any): Order => ({
   status: (row.status as OrderStatus) ?? "Pending",
   createdAt: row.created_at,
   queueNumber: row.queue_number || "-",
+  feedbackSubmitted: row.feedback_submitted,
   estimatedTime: calculateEstimatedPickupTime(
     {
       id: row.id,
@@ -80,6 +86,15 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+
+  // Feedback State
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const loadOrders = async () => {
     setIsLoading(true);
@@ -254,13 +269,13 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
       orders.map((o) => (o.id === orderId ? { ...o, status: "Completed" } : o))
     );
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("orders")
       .update({ status: "Completed" })
       .eq("id", orderId)
-      .eq("user_id", userId);
+      .select();
 
-    if (error) {
+    if (error || (data && data.length === 0)) {
       setOrders(previous);
       toast.error("Unable to confirm pickup. Please try again later.");
       return;
@@ -275,6 +290,99 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
     "Ready for Pickup",
     "Completed",
   ];
+
+  // UC033 - NF: Open feedback dialog
+  const handleOpenFeedback = (order: Order) => {
+    // UC033 - AF1: Check if feedback already submitted
+    if (order.feedbackSubmitted) {
+      toast.error('You have already submitted feedback for this order.');
+      return;
+    }
+    setSelectedOrder(order);
+    setFeedbackDialogOpen(true);
+    setRating(0);
+    setComment('');
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  };
+
+  // UC033 - NF: Handle photo upload
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Photo size must be less than 5MB');
+        return;
+      }
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  };
+
+  // UC033 - NF: Submit feedback
+  const handleSubmitFeedback = () => {
+    if (!selectedOrder) return;
+    
+    // Validation
+    if (rating === 0) {
+      toast.error('Please select a star rating');
+      return;
+    }
+    if (!comment.trim()) {
+      toast.error('Please provide a comment');
+      return;
+    }
+    
+    // Update order with feedback submitted
+    setOrders(orders.map(order =>
+      order.id === selectedOrder.id
+        ? { ...order, feedbackSubmitted: true }
+        : order
+    ));
+    
+    // UC033 - NF: Confirmation message
+    toast.success('Thank you for your feedback!', {
+      description: 'Your review helps us improve our service',
+    });
+    
+    // Close dialog and reset form
+    setFeedbackDialogOpen(false);
+    setSelectedOrder(null);
+    setRating(0);
+    setComment('');
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  };
+
+  // Render star rating
+  const renderStars = (interactive: boolean = false) => {
+    return (
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`w-8 h-8 cursor-pointer transition-all ${
+              star <= (interactive ? (hoverRating || rating) : rating)
+                ? 'fill-amber-400 text-amber-400'
+                : 'text-slate-300'
+            } ${interactive ? 'hover:scale-110' : ''}`}
+            onClick={() => interactive && setRating(star)}
+            onMouseEnter={() => interactive && setHoverRating(star)}
+            onMouseLeave={() => interactive && setHoverRating(0)}
+          />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -307,175 +415,319 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
         </Card>
       ) : (
         <>
-          {activeOrders.length === 0 && (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Package className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                <p className="text-slate-500">No active orders found.</p>
-              </CardContent>
-            </Card>
-          )}
+          <Tabs defaultValue="active" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="active">
+                Active Orders ({activeOrders.length})
+              </TabsTrigger>
+              <TabsTrigger value="history">
+                Order History ({completedOrders.length})
+              </TabsTrigger>
+            </TabsList>
 
-          <div className="space-y-6">
-            {activeOrders.map((order) => {
-              const progress = getStatusProgress(order.status);
-              return (
-                <Card
-                  key={order.id}
-                  className="overflow-hidden border border-slate-200 bg-white shadow-sm"
-                >
-                  <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          ORD-{order.orderNumber.toString().padStart(3, "0")}
-                          <Badge className={getStatusColor(order.status)}>
-                            {getStatusIcon(order.status)}
-                            <span className="ml-1">{order.status}</span>
-                          </Badge>
-                        </CardTitle>
-                        <CardDescription className="mt-1">
-                          {order.cafeteria} • Queue #{order.queueNumber}
-                        </CardDescription>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-slate-600">
-                          {order.createdAt
-                            ? new Date(order.createdAt).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                            : ""}
-                        </p>
-                        <p className="text-purple-700">
-                          RM {order.total.toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="pt-6 space-y-6">
-                    {order.status === "Ready for Pickup" ? (
-                      <div className="border border-emerald-400 bg-emerald-50 text-emerald-800 rounded-lg p-3 text-sm">
-                        Your Order is Ready! Please proceed to {order.cafeteria}{" "}
-                        to collect your order.
-                      </div>
-                    ) : (
-                      <div className="border border-blue-200 bg-blue-50 text-blue-800 rounded-lg p-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          <span>Estimated Pickup Time</span>
-                        </div>
-                        <p className="text-xs mt-1">
-                          Ready in approximately{" "}
-                          {order.estimatedTime
-                            ? `${order.estimatedTime} minutes`
-                            : formatEstimatedPickupTime(0)}
-                        </p>
-                      </div>
-                    )}
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-slate-600">
-                          Order Progress
-                        </span>
-                        <span className="text-sm text-slate-900">
-                          {progress}%
-                        </span>
-                      </div>
-                      <Progress
-                        value={progress}
-                        className="h-2 bg-slate-200 [&>div]:bg-slate-900"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-sm text-slate-600">Items:</p>
-                      {order.items.length === 0 ? (
-                        <p className="text-sm text-slate-400">
-                          No items recorded.
-                        </p>
-                      ) : (
-                        order.items.map((item, index) => (
-                          <div
-                            key={index}
-                            className="flex justify-between items-center py-2 px-3 bg-slate-50 rounded"
-                          >
-                            <span className="text-sm text-slate-900">
-                              {item.quantity}x {item.name}
-                            </span>
-                            <span className="text-sm text-slate-600">
-                              RM {(item.price * item.quantity).toFixed(2)}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-4 text-center text-xs text-slate-600">
-                      {stages.map((label) => (
-                        <div
-                          key={label}
-                          className="flex flex-col items-center gap-2 py-3"
-                        >
-                          <span
-                            className={`h-9 w-9 rounded-full flex items-center justify-center border ${
-                              order.status === label
-                                ? "border-purple-600 text-purple-700 bg-purple-50"
-                                : "border-slate-200 text-slate-400 bg-white"
-                            }`}
-                          >
-                            {getStatusIcon(label)}
-                          </span>
-                          <span>{label}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {order.status === "Ready for Pickup" && (
-                      <Button
-                        onClick={() => handleConfirmPickup(order.id)}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" /> Confirm Pickup
-                      </Button>
-                    )}
+            <TabsContent value="active">
+              {activeOrders.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <Package className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                    <p className="text-slate-500">No active orders found.</p>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
+              ) : (
+                <div className="space-y-6">
+                  {activeOrders.map((order) => {
+                    const progress = getStatusProgress(order.status);
+                    return (
+                      <Card
+                        key={order.id}
+                        className="overflow-hidden border border-slate-200 bg-white shadow-sm"
+                      >
+                        <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="flex items-center gap-2">
+                                ORD-{order.orderNumber.toString().padStart(3, "0")}
+                                <Badge className={getStatusColor(order.status)}>
+                                  {getStatusIcon(order.status)}
+                                  <span className="ml-1">{order.status}</span>
+                                </Badge>
+                              </CardTitle>
+                              <CardDescription className="mt-1">
+                                {order.cafeteria} • Queue #{order.queueNumber}
+                              </CardDescription>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-slate-600">
+                                {order.createdAt
+                                  ? new Date(order.createdAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : ""}
+                              </p>
+                              <p className="text-purple-700">
+                                RM {order.total.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </CardHeader>
 
-          {completedOrders.length > 0 && (
-            <div className="mt-12">
-              <h2 className="text-slate-900 mb-4">Order History</h2>
+                        <CardContent className="pt-6 space-y-6">
+                          {order.status === "Ready for Pickup" ? (
+                            <div className="border border-emerald-400 bg-emerald-50 text-emerald-800 rounded-lg p-3 text-sm">
+                              Your Order is Ready! Please proceed to {order.cafeteria}{" "}
+                              to collect your order.
+                            </div>
+                          ) : (
+                            <div className="border border-blue-200 bg-blue-50 text-blue-800 rounded-lg p-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4" />
+                                <span>Estimated Pickup Time</span>
+                              </div>
+                              <p className="text-xs mt-1">
+                                Ready in approximately{" "}
+                                {order.estimatedTime
+                                  ? `${order.estimatedTime} minutes`
+                                  : formatEstimatedPickupTime(0)}
+                              </p>
+                            </div>
+                          )}
+
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-slate-600">
+                                Order Progress
+                              </span>
+                              <span className="text-sm text-slate-900">
+                                {progress}%
+                              </span>
+                            </div>
+                            <Progress
+                              value={progress}
+                              className="h-2 bg-slate-200 [&>div]:bg-slate-900"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-sm text-slate-600">Items:</p>
+                            {order.items.length === 0 ? (
+                              <p className="text-sm text-slate-400">
+                                No items recorded.
+                              </p>
+                            ) : (
+                              order.items.map((item, index) => (
+                                <div
+                                  key={index}
+                                  className="flex justify-between items-center py-2 px-3 bg-slate-50 rounded"
+                                >
+                                  <span className="text-sm text-slate-900">
+                                    {item.quantity}x {item.name}
+                                  </span>
+                                  <span className="text-sm text-slate-600">
+                                    RM {(item.price * item.quantity).toFixed(2)}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-4 text-center text-xs text-slate-600">
+                            {stages.map((label) => (
+                              <div
+                                key={label}
+                                className="flex flex-col items-center gap-2 py-3"
+                              >
+                                <span
+                                  className={`h-9 w-9 rounded-full flex items-center justify-center border ${
+                                    order.status === label
+                                      ? "border-purple-600 text-purple-700 bg-purple-50"
+                                      : "border-slate-200 text-slate-400 bg-white"
+                                  }`}
+                                >
+                                  {getStatusIcon(label)}
+                                </span>
+                                <span>{label}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {order.status === "Ready for Pickup" && (
+                            <Button
+                              onClick={() => handleConfirmPickup(order.id)}
+                              className="w-full bg-emerald-600 hover:bg-emerald-700"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" /> Confirm Pickup
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="history">
               <div className="space-y-4">
                 {completedOrders.map((order) => (
-                  <Card key={order.id} className="opacity-80">
-                    <CardContent className="py-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-slate-900">
-                            ORD-{order.orderNumber.toString().padStart(3, "0")}
-                          </p>
-                          <p className="text-sm text-slate-600">
-                            {order.cafeteria} • {order.items.length} items
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant="secondary">Completed</Badge>
-                          <p className="text-sm text-slate-600 mt-1">
-                            RM {order.total.toFixed(2)}
-                          </p>
-                        </div>
+                  <Card key={order.id}>
+                    <CardContent className="py-6">
+                      {/* Order Details */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <p>{order.id}</p>
+                        <Badge variant="secondary">Completed</Badge>
+                        {order.feedbackSubmitted && (
+                          <Badge className="bg-purple-100 text-purple-700">
+                            <Star className="w-3 h-3 mr-1 fill-purple-700" />
+                            Feedback Submitted
+                          </Badge>
+                        )}
                       </div>
+
+                      <div className="flex items-center justify-between mb-4">
+                         <div>
+                            <p className="text-sm text-slate-600">
+                              {order.cafeteria} • {order.items.length} items
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : ''}
+                            </p>
+                         </div>
+                         <p className="text-slate-900 font-medium">RM {order.total.toFixed(2)}</p>
+                      </div>
+                      
+                      {/* UC033 - Submit Feedback Button */}
+                      {!order.feedbackSubmitted ? (
+                        <Button
+                          onClick={() => handleOpenFeedback(order)}
+                          variant="outline"
+                          className="w-full border-purple-200 text-purple-700 hover:bg-purple-50"
+                        >
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          Submit Feedback
+                        </Button>
+                      ) : (
+                        <div className="text-center py-2 text-sm text-slate-500">
+                          Thank you for your feedback!
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
+                {completedOrders.length === 0 && (
+                   <div className="text-center py-10 text-slate-500">
+                       No completed orders found.
+                   </div>
+                )}
               </div>
-            </div>
-          )}
+            </TabsContent>
+          </Tabs>
+
+          {/* UC033 - Feedback Submission Dialog */}
+          <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Submit Order Feedback</DialogTitle>
+                <DialogDescription>
+                  Share your experience with {selectedOrder?.cafeteria}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6 py-4">
+                {/* Order Summary */}
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <p className="text-sm text-slate-600 mb-2">Order: {selectedOrder?.id}</p>
+                  <div className="space-y-1">
+                    {selectedOrder?.items.map((item, index) => (
+                      <p key={index} className="text-sm text-slate-700">
+                        {item.quantity}x {item.name}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                {/* UC033 - NF: Star Rating */}
+                <div>
+                  <Label className="mb-3 block">Rate your experience *</Label>
+                  <div className="flex items-center gap-4">
+                    {renderStars(true)}
+                    {rating > 0 && (
+                      <span className="text-sm text-slate-600">
+                        {rating === 1 ? 'Poor' : rating === 2 ? 'Fair' : rating === 3 ? 'Good' : rating === 4 ? 'Very Good' : 'Excellent'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* UC033 - NF: Comment Field */}
+                <div>
+                  <Label htmlFor="comment" className="mb-2 block">
+                    Your feedback *
+                  </Label>
+                  <Textarea
+                    id="comment"
+                    placeholder="Tell us about your experience with the food, service, and overall satisfaction..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    className="min-h-[120px]"
+                  />
+                </div>
+
+                {/* UC033 - NF: Optional Photo Upload */}
+                <div>
+                  <Label className="mb-2 block">Add a photo (optional)</Label>
+                  {!photoPreview ? (
+                    <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-purple-400 transition-colors cursor-pointer">
+                      <input
+                        type="file"
+                        id="photo-upload"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                      <label htmlFor="photo-upload" className="cursor-pointer">
+                        <Upload className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+                        <p className="text-sm text-slate-600">Click to upload a photo</p>
+                        <p className="text-xs text-slate-400 mt-1">PNG, JPG up to 5MB</p>
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <img
+                        src={photoPreview}
+                        alt="Feedback photo"
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="absolute top-2 right-2"
+                        onClick={handleRemovePhoto}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={handleSubmitFeedback}
+                    className="flex-1 bg-purple-800 hover:bg-purple-900"
+                  >
+                    Submit Feedback
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setFeedbackDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>

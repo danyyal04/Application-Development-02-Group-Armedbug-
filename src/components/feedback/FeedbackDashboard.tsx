@@ -6,7 +6,7 @@ import { Badge } from '../ui/badge';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Alert, AlertDescription } from '../ui/alert';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface Feedback {
   id: string;
