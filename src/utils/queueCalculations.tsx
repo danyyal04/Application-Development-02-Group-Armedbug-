@@ -119,3 +119,20 @@ export function isBulkOrder(order: Order): boolean {
   const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
   return totalItems > BULK_ORDER_THRESHOLD;
 }
+
+/**
+ * Generate a formatted queue number
+ * @param cafeteriaName Name of the cafeteria
+ * @param dailyOrderCount Number of orders for the day so far
+ * @returns Formatted queue number (e.g. A01, B12)
+ */
+export function generateQueueNumber(cafeteriaName: string, dailyOrderCount: number): string {
+  // Get first letter of cafeteria name, default to 'A' if invalid
+  const prefix = (cafeteriaName && cafeteriaName[0]) ? cafeteriaName[0].toUpperCase() : 'A';
+  
+  // Format number with leading zero (e.g. 1 -> 01, 10 -> 10)
+  // We add 1 to count because this is the *new* order
+  const number = (dailyOrderCount + 1).toString().padStart(2, '0');
+  
+  return `${prefix}${number}`;
+}
