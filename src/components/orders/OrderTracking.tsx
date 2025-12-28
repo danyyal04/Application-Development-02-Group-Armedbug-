@@ -81,33 +81,101 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
-const loadOrders = async () => {
-  setIsLoading(true);
-  try {
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: true });
+  const loadOrders = async () => {
+    setIsLoading(true);
+    try {
+      // 1. Get current user email for split bill lookup
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const userEmail = user?.email?.toLowerCase();
+      let splitBillPaymentMethods: string[] = [];
 
-    if (error) throw error;
-    
-    // Calculate order numbers based on user's sequence
-    const mappedOrders = (data || []).map(mapRowToOrder);
-    const ordersWithNumbers = mappedOrders.map((order, index) => ({
-      ...order,
-      orderNumber: index + 1
-    }));
-    
-    setOrders(ordersWithNumbers);
-    setHasError(false);
-  } catch {
-    setHasError(true);
-    toast.error("Unable to retrieve orders. Please check your connection.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+      if (userEmail) {
+        // Find all sessions I am part of
+        const { data: participation } = await supabase
+          .from("split_bill_participants")
+          .select("session_id")
+          .eq("identifier", userEmail);
+
+        if (participation && participation.length > 0) {
+          splitBillPaymentMethods = participation.map(
+            (p) => `Split Bill ${p.session_id}`
+          );
+        }
+      }
+
+      // 2. Fetch Personal Orders
+      const personalOrdersHelp = supabase
+        .from("orders")
+        .select("*")
+        .eq("user_id", userId);
+
+      // 3. Fetch Split Bill Orders (if any)
+      const splitOrdersPromise =
+        splitBillPaymentMethods.length > 0
+          ? supabase
+              .from("orders")
+              .select("*")
+              .in("payment_method", splitBillPaymentMethods)
+          : Promise.resolve({ data: [], error: null });
+
+      const [personalRes, splitRes] = await Promise.all([
+        personalOrdersHelp,
+        splitOrdersPromise,
+      ]);
+
+      if (personalRes.error) throw personalRes.error;
+      if (splitRes.error) throw splitRes.error;
+
+      // 4. Merge and Deduplicate
+      const allRawOrders = [
+        ...(personalRes.data || []),
+        ...(splitRes.data || []),
+      ];
+
+      // Remove duplicates (in case I am the initiator, I might get it twice)
+      const uniqueOrders = Array.from(
+        new Map(allRawOrders.map((o) => [o.id, o])).values()
+      );
+
+      // Sort by created_at desc (newest first)
+      uniqueOrders.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      // Calculate order numbers
+      const mappedOrders = uniqueOrders.map(mapRowToOrder);
+      // We can just use the DB order number or re-index.
+      // Re-indexing might be confusing if they change position.
+      // Let's use the actual order number from DB if reasonable, or index.
+      // preserving existing logic:
+      const ordersWithNumbers = mappedOrders.map((order, index) => ({
+        ...order,
+        orderNumber: order.orderNumber || index + 1, // Fallback to index if 0
+      }));
+
+      // Re-sort ascending if desired (original code was ascending)
+      // Original: .order("created_at", { ascending: true });
+      // Let's stick to original sort order: Oldest first?
+      // Typically history is Newest first. But original was Ascending.
+      // Let's reverse to match original "ascending" intent if that's what user had.
+      ordersWithNumbers.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+
+      setOrders(ordersWithNumbers);
+      setHasError(false);
+    } catch (err) {
+      console.error(err);
+      setHasError(true);
+      toast.error("Unable to retrieve orders. Please check your connection.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadOrders();
@@ -260,7 +328,7 @@ const loadOrders = async () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle className="flex items-center gap-2">
-                          ORD-{order.orderNumber.toString().padStart(3, '0')}
+                          ORD-{order.orderNumber.toString().padStart(3, "0")}
                           <Badge className={getStatusColor(order.status)}>
                             {getStatusIcon(order.status)}
                             <span className="ml-1">{order.status}</span>
@@ -273,13 +341,10 @@ const loadOrders = async () => {
                       <div className="text-right">
                         <p className="text-sm text-slate-600">
                           {order.createdAt
-                            ? new Date(order.createdAt).toLocaleTimeString(
-                                [],
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )
+                            ? new Date(order.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
                             : ""}
                         </p>
                         <p className="text-purple-700">
@@ -292,8 +357,8 @@ const loadOrders = async () => {
                   <CardContent className="pt-6 space-y-6">
                     {order.status === "Ready for Pickup" ? (
                       <div className="border border-emerald-400 bg-emerald-50 text-emerald-800 rounded-lg p-3 text-sm">
-                        Your Order is Ready! Please proceed to {order.cafeteria} to
-                        collect your order.
+                        Your Order is Ready! Please proceed to {order.cafeteria}{" "}
+                        to collect your order.
                       </div>
                     ) : (
                       <div className="border border-blue-200 bg-blue-50 text-blue-800 rounded-lg p-3 text-sm">
@@ -315,15 +380,22 @@ const loadOrders = async () => {
                         <span className="text-sm text-slate-600">
                           Order Progress
                         </span>
-                        <span className="text-sm text-slate-900">{progress}%</span>
+                        <span className="text-sm text-slate-900">
+                          {progress}%
+                        </span>
                       </div>
-                      <Progress value={progress} className="h-2 bg-slate-200 [&>div]:bg-slate-900" />
+                      <Progress
+                        value={progress}
+                        className="h-2 bg-slate-200 [&>div]:bg-slate-900"
+                      />
                     </div>
 
                     <div className="space-y-2">
                       <p className="text-sm text-slate-600">Items:</p>
                       {order.items.length === 0 ? (
-                        <p className="text-sm text-slate-400">No items recorded.</p>
+                        <p className="text-sm text-slate-400">
+                          No items recorded.
+                        </p>
                       ) : (
                         order.items.map((item, index) => (
                           <div
@@ -385,7 +457,7 @@ const loadOrders = async () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-slate-900">
-                            ORD-{order.orderNumber.toString().padStart(3, '0')}
+                            ORD-{order.orderNumber.toString().padStart(3, "0")}
                           </p>
                           <p className="text-sm text-slate-600">
                             {order.cafeteria} • {order.items.length} items

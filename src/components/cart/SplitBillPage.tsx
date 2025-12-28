@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, useRef, type ChangeEvent } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ChangeEvent,
+} from "react";
 import {
   Users,
   CreditCard,
@@ -9,25 +15,31 @@ import {
   XCircle,
   Wallet,
   AlertTriangle,
-} from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Separator } from '../ui/separator';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Label } from '../ui/label';
-import { Input } from '../ui/input';
-import { Progress } from '../ui/progress';
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Separator } from "../ui/separator";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Label } from "../ui/label";
+import { Input } from "../ui/input";
+import { Progress } from "../ui/progress";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
-import { Alert, AlertDescription } from '../ui/alert';
-import { toast } from 'sonner';
-import { supabase } from '../../lib/supabaseClient';
+} from "../ui/dialog";
+import { Alert, AlertDescription } from "../ui/alert";
+import { toast } from "sonner";
+import { supabase } from "../../lib/supabaseClient";
 
 interface CartItem {
   id: string;
@@ -44,13 +56,13 @@ interface Participant {
   paid: boolean;
   paymentTime?: string | undefined;
   paymentMethod?: string | undefined;
-  paymentStatus: 'pending' | 'paid' | 'failed';
-  invitationStatus: 'pending' | 'accepted' | 'rejected';
+  paymentStatus: "pending" | "paid" | "failed";
+  invitationStatus: "pending" | "accepted" | "rejected";
 }
 
 interface PaymentMethod {
   id: string;
-  type: 'fpx' | 'ewallet' | 'card';
+  type: "fpx" | "ewallet" | "card";
   name: string;
   details: string;
   is_default?: boolean;
@@ -88,36 +100,38 @@ export default function SplitBillPage({
   const [participants, setParticipants] = useState<Participant[]>([]);
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [selectedPaymentId, setSelectedPaymentId] = useState<string>('');
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string>("");
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const [paymentCredentials, setPaymentCredentials] = useState('');
+  const [paymentCredentials, setPaymentCredentials] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
 
-  const normalizedEmail = (currentUserEmail || '').toLowerCase();
+  const normalizedEmail = (currentUserEmail || "").toLowerCase();
   const currentParticipant = participants.find(
-    p => (p.email || '').toLowerCase() === normalizedEmail
+    (p) => (p.email || "").toLowerCase() === normalizedEmail
   );
-  const paidCount = participants.filter(p => p.paid).length;
-  const totalPaid = participants.filter(p => p.paid).reduce((sum, p) => sum + p.amount, 0);
+  const paidCount = participants.filter((p) => p.paid).length;
+  const totalPaid = participants
+    .filter((p) => p.paid)
+    .reduce((sum, p) => sum + p.amount, 0);
   const unpaidAmount = totalAmount - totalPaid;
   const progressPercentage = (totalPaid / totalAmount) * 100;
-  const allPaid = participants.every(p => p.paid);
+  const allPaid = participants.every((p) => p.paid);
   const isInitiator = currentUserEmail === participants[0]?.email;
 
   const getPickupTimeLabel = (value: string) => {
     switch (value) {
-      case 'asap':
-        return 'ASAP';
-      case '30min':
-        return 'In 30 minutes';
-      case '1hour':
-        return 'In 1 hour';
-      case '1.5hour':
-        return 'In 1.5 hours';
-      case '2hour':
-        return 'In 2 hours';
+      case "asap":
+        return "ASAP";
+      case "30min":
+        return "In 30 minutes";
+      case "1hour":
+        return "In 1 hour";
+      case "1.5hour":
+        return "In 1.5 hours";
+      case "2hour":
+        return "In 2 hours";
       default:
         return value;
     }
@@ -125,9 +139,9 @@ export default function SplitBillPage({
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'paid':
+      case "paid":
         return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'failed':
+      case "failed":
         return <XCircle className="w-5 h-5 text-red-600" />;
       default:
         return <Clock className="w-5 h-5 text-amber-600" />;
@@ -136,30 +150,44 @@ export default function SplitBillPage({
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'paid':
+      case "paid":
         return <Badge className="bg-green-600">Paid</Badge>;
-      case 'failed':
+      case "failed":
         return <Badge className="bg-red-600">Failed</Badge>;
       default:
         return <Badge className="bg-amber-600">Pending</Badge>;
     }
   };
 
-  const getInvitationBadge = (status: Participant['invitationStatus']) => {
-    if (status === 'accepted') return <Badge className="bg-green-100 text-green-700 border border-green-200">Accepted</Badge>;
-    if (status === 'rejected') return <Badge className="bg-red-100 text-red-700 border border-red-200">Rejected</Badge>;
-    return <Badge className="bg-amber-100 text-amber-700 border border-amber-200">Pending Invite</Badge>;
+  const getInvitationBadge = (status: Participant["invitationStatus"]) => {
+    if (status === "accepted")
+      return (
+        <Badge className="bg-green-100 text-green-700 border border-green-200">
+          Accepted
+        </Badge>
+      );
+    if (status === "rejected")
+      return (
+        <Badge className="bg-red-100 text-red-700 border border-red-200">
+          Rejected
+        </Badge>
+      );
+    return (
+      <Badge className="bg-amber-100 text-amber-700 border border-amber-200">
+        Pending Invite
+      </Badge>
+    );
   };
 
   // Load participants from DB
   const refreshParticipants = useCallback(async () => {
     const { data, error } = await supabase
-      .from('split_bill_participants')
-      .select('id, identifier, amount_due, status')
-      .eq('session_id', splitBillId);
+      .from("split_bill_participants")
+      .select("id, identifier, amount_due, status")
+      .eq("session_id", splitBillId);
 
     if (error) {
-      toast.error('Failed to load participants');
+      toast.error("Failed to load participants");
       return;
     }
 
@@ -167,26 +195,27 @@ export default function SplitBillPage({
       // fallback to at least show the initiator
       setParticipants([
         {
-          id: 'initiator',
+          id: "initiator",
           name: initiatorName,
-          email: currentUserEmail || 'you',
+          email: currentUserEmail || "you",
           amount: totalAmount,
           paid: false,
-          paymentStatus: 'pending',
-          invitationStatus: 'accepted',
+          paymentStatus: "pending",
+          invitationStatus: "accepted",
         },
       ]);
       return;
     }
 
-    const mapped: Participant[] = data.map(row => ({
+    const mapped: Participant[] = data.map((row) => ({
       id: row.id,
       name: row.identifier,
       email: row.identifier,
       amount: Number(row.amount_due) || totalAmount / data.length,
-      paid: row.status === 'paid',
-      paymentStatus: (row.status as Participant['paymentStatus']) || 'pending',
-      invitationStatus: (row.status as Participant['invitationStatus']) || 'pending',
+      paid: row.status === "paid",
+      paymentStatus: (row.status as Participant["paymentStatus"]) || "pending",
+      invitationStatus:
+        (row.status as Participant["invitationStatus"]) || "pending",
     }));
 
     setParticipants(mapped);
@@ -199,18 +228,20 @@ export default function SplitBillPage({
   // Load saved payment methods for current user
   useEffect(() => {
     const loadPaymentMethods = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('payment')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: true });
+        .from("payment")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: true });
 
       if (error) {
-        toast.error('Failed to load payment methods');
+        toast.error("Failed to load payment methods");
         return;
       }
 
@@ -223,7 +254,7 @@ export default function SplitBillPage({
 
   // Pick default payment selection whenever methods load/change
   useEffect(() => {
-    const defaultMethod = paymentMethods.find(m => m.is_default);
+    const defaultMethod = paymentMethods.find((m) => m.is_default);
     if (!selectedPaymentId && (defaultMethod || paymentMethods[0])) {
       setSelectedPaymentId((defaultMethod || paymentMethods[0]).id);
     }
@@ -231,22 +262,22 @@ export default function SplitBillPage({
 
   const handlePayMyPortion = () => {
     if (!currentParticipant) {
-      toast.error('Unable to identify your payment portion');
+      toast.error("Unable to identify your payment portion");
       return;
     }
 
-    if (currentParticipant.invitationStatus !== 'accepted') {
-      toast.error('Please accept the invitation before paying.');
+    if (currentParticipant.invitationStatus !== "accepted") {
+      toast.error("Please accept the invitation before paying.");
       return;
     }
 
     if (currentParticipant.paid) {
-      toast.info('You have already paid your portion');
+      toast.info("You have already paid your portion");
       return;
     }
 
     if (paymentMethods.length === 0) {
-      toast.error('Please add a payment method first (Payments page).');
+      toast.error("Please add a payment method first (Payments page).");
       return;
     }
 
@@ -255,18 +286,20 @@ export default function SplitBillPage({
 
   const handleConfirmPayment = () => {
     if (!paymentCredentials) {
-      toast.error('Invalid payment details. Please check and try again.');
+      toast.error("Invalid payment details. Please check and try again.");
       return;
     }
 
     if (!selectedPaymentId) {
-      toast.error('Please select a payment method');
+      toast.error("Please select a payment method");
       return;
     }
 
-    const selectedMethod = paymentMethods.find(m => m.id === selectedPaymentId);
+    const selectedMethod = paymentMethods.find(
+      (m) => m.id === selectedPaymentId
+    );
     if (!selectedMethod) {
-      toast.error('Invalid payment method. Please choose another.');
+      toast.error("Invalid payment method. Please choose another.");
       return;
     }
 
@@ -278,13 +311,13 @@ export default function SplitBillPage({
 
       if (isSuccess) {
         // Update participant payment status
-        setParticipants(prev =>
-          prev.map(p =>
+        setParticipants((prev) =>
+          prev.map((p) =>
             p.email === currentUserEmail
               ? {
                   ...p,
                   paid: true,
-                  paymentStatus: 'paid',
+                  paymentStatus: "paid",
                   paymentTime: new Date().toLocaleTimeString(),
                   paymentMethod: selectedMethod?.name,
                 }
@@ -295,13 +328,15 @@ export default function SplitBillPage({
         // Persist to DB so reloads stay paid
         if (currentParticipant?.id) {
           const { error } = await supabase
-            .from('split_bill_participants')
-            .update({ status: 'paid' })
-            .eq('id', currentParticipant.id);
+            .from("split_bill_participants")
+            .update({ status: "paid" })
+            .eq("id", currentParticipant.id);
 
           if (error) {
-            console.error('split_bill_participants update error', error);
-            toast.error(error.message || 'Unable to record payment. Please try again.');
+            console.error("split_bill_participants update error", error);
+            toast.error(
+              error.message || "Unable to record payment. Please try again."
+            );
             setIsProcessing(false);
             return;
           }
@@ -309,7 +344,7 @@ export default function SplitBillPage({
           await refreshParticipants();
         }
 
-        toast.success('Payment successful! Thank you for your contribution.');
+        toast.success("Payment successful! Thank you for your contribution.");
         setShowPaymentDialog(false);
 
         if (currentParticipant) {
@@ -317,24 +352,54 @@ export default function SplitBillPage({
         }
       } else {
         // Simulate payment failure
-        setParticipants(prev =>
-          prev.map(p =>
-            p.email === currentUserEmail
-              ? { ...p, paymentStatus: 'failed' }
-              : p
+        setParticipants((prev) =>
+          prev.map((p) =>
+            p.email === currentUserEmail ? { ...p, paymentStatus: "failed" } : p
           )
         );
-        toast.error('Payment failed. Please retry.');
+        toast.error("Payment failed. Please retry.");
       }
 
       setIsProcessing(false);
-      setPaymentCredentials('');
+      setPaymentCredentials("");
     }, 2000);
+  };
+
+  const handleCancelSession = async () => {
+    if (allPaid) {
+      toast.error(
+        "Cannot cancel split bill because all participants have paid."
+      );
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      // Update session status to cancelled in Supabase
+      const { error } = await supabase
+        .from("split_bill_sessions")
+        .update({ status: "cancelled" })
+        .eq("id", splitBillId);
+
+      if (error) {
+        console.error("Failed to cancel session:", error);
+        toast.error(`Failed to cancel split bill: ${error.message}`);
+        setIsProcessing(false);
+        return;
+      }
+
+      toast.success("Split bill cancelled.");
+      onCancel(); // Navigate away
+    } catch (err) {
+      console.error("Error cancelling session:", err);
+      toast.error("An error occurred.");
+      setIsProcessing(false);
+    }
   };
 
   const handleCoverRemainingAmount = () => {
     if (unpaidAmount <= 0) {
-      toast.info('All payments have been completed');
+      toast.info("All payments have been completed");
       return;
     }
 
@@ -350,31 +415,33 @@ export default function SplitBillPage({
 
       if (isSuccess) {
         // Mark all unpaid participants as paid (covered by initiator)
-        setParticipants(prev =>
-          prev.map(p => ({
+        setParticipants((prev) =>
+          prev.map((p) => ({
             ...p,
             paid: true,
-            paymentStatus: 'paid',
-            paymentTime: p.paid ? p.paymentTime : new Date().toLocaleTimeString(),
-            paymentMethod: p.paid ? p.paymentMethod : 'Covered by initiator',
-            invitationStatus: 'accepted',
+            paymentStatus: "paid",
+            paymentTime: p.paid
+              ? p.paymentTime
+              : new Date().toLocaleTimeString(),
+            paymentMethod: p.paid ? p.paymentMethod : "Covered by initiator",
+            invitationStatus: "accepted",
           }))
         );
 
         // Persist paid status for pending participants
         const { error } = await supabase
-          .from('split_bill_participants')
-          .update({ status: 'paid' })
-          .eq('session_id', splitBillId)
-          .eq('status', 'pending');
+          .from("split_bill_participants")
+          .update({ status: "paid" })
+          .eq("session_id", splitBillId)
+          .eq("status", "pending");
 
         if (error) {
-          console.warn('Failed to persist complete payment', error);
+          console.warn("Failed to persist complete payment", error);
         } else {
           await refreshParticipants();
         }
 
-        toast.success('Split bill payment completed successfully! ??');
+        toast.success("Split bill payment completed successfully! ??");
         setShowCompleteDialog(false);
 
         if (onCompleteSplitBill) {
@@ -383,7 +450,7 @@ export default function SplitBillPage({
           }, 1500);
         }
       } else {
-        toast.error('Payment failed. Please try again.');
+        toast.error("Payment failed. Please try again.");
       }
 
       setIsProcessing(false);
@@ -399,20 +466,22 @@ export default function SplitBillPage({
       const createOrder = async () => {
         try {
           // Get current user and session details
-          const { data: { user } } = await supabase.auth.getUser();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
           if (!user) return;
 
           // Check if I am the initiator (to prevent race conditions/duplicates from multiple users)
           // We fetch the session to get the initiator_user_id
           const { data: session } = await supabase
-            .from('split_bill_sessions')
-            .select('initiator_user_id')
-            .eq('id', splitBillId)
+            .from("split_bill_sessions")
+            .select("initiator_user_id")
+            .eq("id", splitBillId)
             .single();
 
           if (!session || session.initiator_user_id !== user.id) {
-             // Not the initiator, do not create the order
-             return;
+            // Not the initiator, do not create the order
+            return;
           }
 
           // Prevent double creation
@@ -421,43 +490,52 @@ export default function SplitBillPage({
           // Check if order already exists for this split bill
           const paymentMethodString = `Split Bill ${splitBillId}`;
           const { data: existingOrder } = await supabase
-            .from('orders')
-            .select('id')
-            .eq('payment_method', paymentMethodString)
+            .from("orders")
+            .select("id")
+            .eq("payment_method", paymentMethodString)
             .maybeSingle();
 
           if (existingOrder) {
-            console.log('Order already exists for this split bill');
+            console.log("Order already exists for this split bill");
             return;
           }
 
           // Resolve cafeteria ID
           let cafeId = (cafeteria as any).id || null;
-          console.log(`[Order Creation] Initial Cafe ID from props: ${cafeId}`, cafeteria);
+          console.log(
+            `[Order Creation] Initial Cafe ID from props: ${cafeId}`,
+            cafeteria
+          );
 
           if (!cafeId) {
-            console.log(`[Order Creation] ID missing, attempting lookup by name: ${cafeteria.name}`);
+            console.log(
+              `[Order Creation] ID missing, attempting lookup by name: ${cafeteria.name}`
+            );
             const { data: cafeData } = await supabase
-              .from('cafeterias')
-              .select('id')
-              .eq('name', cafeteria.name)
+              .from("cafeterias")
+              .select("id")
+              .eq("name", cafeteria.name)
               .maybeSingle();
             cafeId = cafeData?.id || null;
             console.log(`[Order Creation] Lookup result: ${cafeId}`);
           }
-          
+
           if (!cafeId) {
-              console.error('[Order Creation] CRITICAL: Could not resolve Cafeteria ID. Order will not be visible to manager.');
-              toast.error('Warning: Cafeteria ID not found. Order may not appear in management view.');
+            console.error(
+              "[Order Creation] CRITICAL: Could not resolve Cafeteria ID. Order will not be visible to manager."
+            );
+            toast.error(
+              "Warning: Cafeteria ID not found. Order may not appear in management view."
+            );
           }
 
           // Create the order
-          const { error: orderError } = await supabase.from('orders').insert([
+          const { error: orderError } = await supabase.from("orders").insert([
             {
               user_id: user.id,
               cafeteria_id: cafeId,
               total_amount: totalAmount,
-              status: 'Pending',
+              status: "Pending",
               paid_at: new Date().toISOString(),
               items: JSON.stringify(cartItems),
               payment_method: paymentMethodString,
@@ -465,14 +543,13 @@ export default function SplitBillPage({
           ]);
 
           if (orderError) {
-             console.error('Failed to create order from split bill', orderError);
-             toast.error('Payment complete, but failed to create order record.');
+            console.error("Failed to create order from split bill", orderError);
+            toast.error("Payment complete, but failed to create order record.");
           } else {
-             toast.success('All payments completed. Order is confirmed! 🎉', {
-               duration: 5000,
-             });
+            toast.success("All payments completed. Order is confirmed! 🎉", {
+              duration: 5000,
+            });
           }
-
         } catch (err) {
           console.error(err);
         }
@@ -480,7 +557,14 @@ export default function SplitBillPage({
 
       createOrder();
     }
-  }, [allPaid, participants.length, cafeteria, cartItems, totalAmount, splitBillId]);
+  }, [
+    allPaid,
+    participants.length,
+    cafeteria,
+    cartItems,
+    totalAmount,
+    splitBillId,
+  ]);
 
   // Simulate session expiry after 30 minutes (for demo, using shorter time)
   useEffect(() => {
@@ -502,7 +586,8 @@ export default function SplitBillPage({
             <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-red-600" />
             <h2 className="text-slate-900 mb-2">Split Bill Session Expired</h2>
             <p className="text-slate-600 mb-6">
-              This split bill session is no longer active. The order may have been cancelled or expired.
+              This split bill session is no longer active. The order may have
+              been cancelled or expired.
             </p>
             <Button onClick={onCancel} variant="outline">
               Return to Order History
@@ -521,7 +606,9 @@ export default function SplitBillPage({
           <Users className="w-6 h-6 text-purple-700" />
           <h1 className="text-slate-900">Split Bill Payment Tracking</h1>
         </div>
-        <p className="text-slate-600">Real-time payment status for group order</p>
+        <p className="text-slate-600">
+          Real-time payment status for group order
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -538,19 +625,19 @@ export default function SplitBillPage({
                       RM {totalPaid.toFixed(2)} / RM {totalAmount.toFixed(2)}
                     </p>
                   </div>
-                  <Badge className={allPaid ? 'bg-green-600' : 'bg-amber-600'}>
+                  <Badge className={allPaid ? "bg-green-600" : "bg-amber-600"}>
                     {paidCount} / {participants.length} paid
                   </Badge>
                 </div>
                 <Progress value={progressPercentage} className="h-2" />
-                
+
                 {/* UC020: All Paid Confirmation */}
                 {allPaid && (
                   <Alert className="border-green-200 bg-green-50">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <AlertDescription className="text-green-800">
-                      All split bill payments completed. Your order is now confirmed and will be sent to the
-                      cafeteria!
+                      All split bill payments completed. Your order is now
+                      confirmed and will be sent to the cafeteria!
                     </AlertDescription>
                   </Alert>
                 )}
@@ -571,26 +658,32 @@ export default function SplitBillPage({
           {/* UC020: Participants Payment Status */}
           <Card>
             <CardHeader>
-              <CardTitle>Payment Status ({participants.length} Participants)</CardTitle>
-              <CardDescription>Real-time status for each participant</CardDescription>
+              <CardTitle>
+                Payment Status ({participants.length} Participants)
+              </CardTitle>
+              <CardDescription>
+                Real-time status for each participant
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {participants.map(participant => (
+                {participants.map((participant) => (
                   <div
                     key={participant.id}
                     className={`flex items-center justify-between p-4 border rounded-lg ${
-                      participant.paid ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'
+                      participant.paid
+                        ? "bg-green-50 border-green-200"
+                        : "bg-slate-50 border-slate-200"
                     }`}
                   >
                     <div className="flex items-center gap-3 flex-1">
                       <div
                         className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          participant.paymentStatus === 'paid'
-                            ? 'bg-green-100'
-                            : participant.paymentStatus === 'failed'
-                            ? 'bg-red-100'
-                            : 'bg-slate-100'
+                          participant.paymentStatus === "paid"
+                            ? "bg-green-100"
+                            : participant.paymentStatus === "failed"
+                            ? "bg-red-100"
+                            : "bg-slate-100"
                         }`}
                       >
                         {getStatusIcon(participant.paymentStatus)}
@@ -603,54 +696,64 @@ export default function SplitBillPage({
                               <span className="text-purple-700"> (You)</span>
                             )}
                           </p>
-                          {participant.id === '1' && (
+                          {participant.id === "1" && (
                             <Badge variant="secondary" className="text-xs">
                               Initiator
                             </Badge>
                           )}
                           {getInvitationBadge(participant.invitationStatus)}
                         </div>
-                        <p className="text-sm text-slate-600">{participant.email}</p>
+                        <p className="text-sm text-slate-600">
+                          {participant.email}
+                        </p>
                         {participant.paymentTime && (
                           <p className="text-xs text-slate-500 mt-1">
-                            Paid at {participant.paymentTime} via {participant.paymentMethod}
+                            Paid at {participant.paymentTime} via{" "}
+                            {participant.paymentMethod}
                           </p>
                         )}
-                        {participant.email === currentUserEmail && participant.invitationStatus === 'pending' && (
-                          <div className="flex gap-2 mt-2">
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() =>
-                                setParticipants(prev =>
-                                  prev.map(p =>
-                                    p.email === currentUserEmail ? { ...p, invitationStatus: 'accepted' } : p
+                        {participant.email === currentUserEmail &&
+                          participant.invitationStatus === "pending" && (
+                            <div className="flex gap-2 mt-2">
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() =>
+                                  setParticipants((prev) =>
+                                    prev.map((p) =>
+                                      p.email === currentUserEmail
+                                        ? { ...p, invitationStatus: "accepted" }
+                                        : p
+                                    )
                                   )
-                                )
-                              }
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-red-500 text-red-600"
-                              onClick={() =>
-                                setParticipants(prev =>
-                                  prev.map(p =>
-                                    p.email === currentUserEmail ? { ...p, invitationStatus: 'rejected' } : p
+                                }
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-500 text-red-600"
+                                onClick={() =>
+                                  setParticipants((prev) =>
+                                    prev.map((p) =>
+                                      p.email === currentUserEmail
+                                        ? { ...p, invitationStatus: "rejected" }
+                                        : p
+                                    )
                                   )
-                                )
-                              }
-                            >
-                              Reject
-                            </Button>
-                          </div>
-                        )}
+                                }
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          )}
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-slate-900 mb-1">RM {participant.amount.toFixed(2)}</p>
+                      <p className="text-slate-900 mb-1">
+                        RM {participant.amount.toFixed(2)}
+                      </p>
                       {getStatusBadge(participant.paymentStatus)}
                     </div>
                   </div>
@@ -663,17 +766,23 @@ export default function SplitBillPage({
           <Card>
             <CardHeader>
               <CardTitle>Order Items</CardTitle>
-              <CardDescription>{cartItems.length} items in this order</CardDescription>
+              <CardDescription>
+                {cartItems.length} items in this order
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {cartItems.map(item => (
+                {cartItems.map((item) => (
                   <div key={item.id} className="flex justify-between py-2">
                     <div className="flex-1">
                       <p className="text-slate-900">{item.name}</p>
-                      <p className="text-sm text-slate-500">Qty: {item.quantity}</p>
+                      <p className="text-sm text-slate-500">
+                        Qty: {item.quantity}
+                      </p>
                     </div>
-                    <p className="text-slate-900">RM {(item.price * item.quantity).toFixed(2)}</p>
+                    <p className="text-slate-900">
+                      RM {(item.price * item.quantity).toFixed(2)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -692,7 +801,9 @@ export default function SplitBillPage({
               <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
                 <p className="text-sm text-purple-900 mb-2">Pickup Details</p>
                 <p className="text-slate-900">{cafeteria.name}</p>
-                <p className="text-sm text-slate-600 mb-2">{cafeteria.location}</p>
+                <p className="text-sm text-slate-600 mb-2">
+                  {cafeteria.location}
+                </p>
                 <Badge className="bg-purple-600">
                   <Clock className="w-3 h-3 mr-1" />
                   {getPickupTimeLabel(pickupTime)}
@@ -709,11 +820,15 @@ export default function SplitBillPage({
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Paid</span>
-                  <span className="text-green-600">RM {totalPaid.toFixed(2)}</span>
+                  <span className="text-green-600">
+                    RM {totalPaid.toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-slate-900">
                   <span>Unpaid</span>
-                  <span className="text-red-600">RM {unpaidAmount.toFixed(2)}</span>
+                  <span className="text-red-600">
+                    RM {unpaidAmount.toFixed(2)}
+                  </span>
                 </div>
               </div>
 
@@ -739,15 +854,17 @@ export default function SplitBillPage({
               {/* Action Buttons */}
               <div className="space-y-2">
                 {/* Pay My Portion Button */}
-                {currentParticipant && !currentParticipant.paid && currentParticipant.invitationStatus === 'accepted' && (
-                  <Button
-                    onClick={handlePayMyPortion}
-                    className="w-full bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"
-                  >
-                    <Wallet className="w-4 h-4 mr-2" />
-                    Pay My Portion
-                  </Button>
-                )}
+                {currentParticipant &&
+                  !currentParticipant.paid &&
+                  currentParticipant.invitationStatus === "accepted" && (
+                    <Button
+                      onClick={handlePayMyPortion}
+                      className="w-full bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"
+                    >
+                      <Wallet className="w-4 h-4 mr-2" />
+                      Pay My Portion
+                    </Button>
+                  )}
 
                 {currentParticipant?.paid && (
                   <Button disabled className="w-full bg-green-600">
@@ -770,11 +887,11 @@ export default function SplitBillPage({
 
                 <Button
                   variant="outline"
-                  onClick={onCancel}
+                  onClick={handleCancelSession}
                   className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                  disabled={isProcessing}
+                  disabled={isProcessing || allPaid}
                 >
-                  Cancel
+                  Cancel Split Bill (End Session)
                 </Button>
               </div>
 
@@ -783,8 +900,8 @@ export default function SplitBillPage({
                 <AlertCircle className="w-4 h-4 text-blue-600" />
                 <AlertDescription className="text-xs text-blue-800">
                   {allPaid
-                    ? 'All participants have paid. The order will be sent to the cafeteria.'
-                    : 'Waiting for all participants to complete payment. The initiator can cover the remaining balance.'}
+                    ? "All participants have paid. The order will be sent to the cafeteria."
+                    : "Waiting for all participants to complete payment. The initiator can cover the remaining balance."}
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -797,14 +914,18 @@ export default function SplitBillPage({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Pay Your Portion</DialogTitle>
-            <DialogDescription>Complete payment for your share of the bill</DialogDescription>
+            <DialogDescription>
+              Complete payment for your share of the bill
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Amount Summary */}
             <div className="p-4 bg-slate-50 rounded-lg space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Your portion</span>
-                <span className="text-slate-900">RM {currentParticipant?.amount.toFixed(2)}</span>
+                <span className="text-slate-900">
+                  RM {currentParticipant?.amount.toFixed(2)}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Service Fee</span>
@@ -826,26 +947,35 @@ export default function SplitBillPage({
                 <Alert className="border-amber-200 bg-amber-50">
                   <AlertCircle className="w-4 h-4 text-amber-600" />
                   <AlertDescription className="text-xs text-amber-800">
-                    No payment methods found. Please add one on the Payments page before paying.
+                    No payment methods found. Please add one on the Payments
+                    page before paying.
                   </AlertDescription>
                 </Alert>
               ) : (
-                <RadioGroup value={selectedPaymentId} onValueChange={setSelectedPaymentId}>
+                <RadioGroup
+                  value={selectedPaymentId}
+                  onValueChange={setSelectedPaymentId}
+                >
                   <div className="space-y-2">
-                    {paymentMethods.map(method => (
+                    {paymentMethods.map((method) => (
                       <div
                         key={method.id}
                         className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
                           selectedPaymentId === method.id
-                            ? 'border-purple-600 bg-purple-50'
-                            : 'border-slate-200 hover:border-slate-300'
+                            ? "border-purple-600 bg-purple-50"
+                            : "border-slate-200 hover:border-slate-300"
                         }`}
                         onClick={() => setSelectedPaymentId(method.id)}
                       >
                         <RadioGroupItem value={method.id} id={method.id} />
-                        <Label htmlFor={method.id} className="flex-1 cursor-pointer">
+                        <Label
+                          htmlFor={method.id}
+                          className="flex-1 cursor-pointer"
+                        >
                           <p className="text-slate-900">{method.name}</p>
-                          <p className="text-sm text-slate-600">{method.details}</p>
+                          <p className="text-sm text-slate-600">
+                            {method.details}
+                          </p>
                         </Label>
                         <CreditCard className="w-4 h-4 text-slate-400" />
                       </div>
@@ -858,14 +988,19 @@ export default function SplitBillPage({
             {/* Payment Credentials */}
             <div className="space-y-2">
               <Label htmlFor="credentials">
-                {paymentMethods.find(m => m.id === selectedPaymentId)?.type === 'card' ? 'Card CVV' : 'PIN'}
+                {paymentMethods.find((m) => m.id === selectedPaymentId)
+                  ?.type === "card"
+                  ? "Card CVV"
+                  : "PIN"}
               </Label>
               <Input
                 id="credentials"
                 type="password"
                 placeholder="Enter credentials"
                 value={paymentCredentials}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setPaymentCredentials(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setPaymentCredentials(e.target.value)
+                }
               />
             </div>
 
@@ -890,7 +1025,7 @@ export default function SplitBillPage({
               disabled={isProcessing || !selectedPaymentId}
               className="flex-1 bg-gradient-to-r from-purple-700 to-pink-700"
             >
-              {isProcessing ? 'Processing...' : 'Confirm Payment'}
+              {isProcessing ? "Processing..." : "Confirm Payment"}
             </Button>
           </div>
         </DialogContent>
@@ -911,11 +1046,13 @@ export default function SplitBillPage({
               <p className="text-sm text-red-900 mb-2">Unpaid Participants:</p>
               <div className="space-y-1">
                 {participants
-                  .filter(p => !p.paid)
-                  .map(p => (
+                  .filter((p) => !p.paid)
+                  .map((p) => (
                     <div key={p.id} className="flex justify-between text-sm">
                       <span className="text-red-800">{p.name}</span>
-                      <span className="text-red-800">RM {p.amount.toFixed(2)}</span>
+                      <span className="text-red-800">
+                        RM {p.amount.toFixed(2)}
+                      </span>
                     </div>
                   ))}
               </div>
@@ -925,7 +1062,9 @@ export default function SplitBillPage({
             <div className="p-4 bg-slate-50 rounded-lg space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Remaining unpaid amount</span>
-                <span className="text-slate-900">RM {unpaidAmount.toFixed(2)}</span>
+                <span className="text-slate-900">
+                  RM {unpaidAmount.toFixed(2)}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Service Fee</span>
@@ -934,7 +1073,9 @@ export default function SplitBillPage({
               <Separator />
               <div className="flex justify-between">
                 <span className="text-slate-900">Total to pay</span>
-                <span className="text-slate-900">RM {(unpaidAmount + 0.5).toFixed(2)}</span>
+                <span className="text-slate-900">
+                  RM {(unpaidAmount + 0.5).toFixed(2)}
+                </span>
               </div>
             </div>
 
@@ -945,26 +1086,35 @@ export default function SplitBillPage({
                 <Alert className="border-amber-200 bg-amber-50">
                   <AlertCircle className="w-4 h-4 text-amber-600" />
                   <AlertDescription className="text-xs text-amber-800">
-                    No payment methods found. Please add one on the Payments page before paying.
+                    No payment methods found. Please add one on the Payments
+                    page before paying.
                   </AlertDescription>
                 </Alert>
               ) : (
-                <RadioGroup value={selectedPaymentId} onValueChange={setSelectedPaymentId}>
+                <RadioGroup
+                  value={selectedPaymentId}
+                  onValueChange={setSelectedPaymentId}
+                >
                   <div className="space-y-2">
-                    {paymentMethods.map(method => (
+                    {paymentMethods.map((method) => (
                       <div
                         key={method.id}
                         className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
                           selectedPaymentId === method.id
-                            ? 'border-purple-600 bg-purple-50'
-                            : 'border-slate-200 hover:border-slate-300'
+                            ? "border-purple-600 bg-purple-50"
+                            : "border-slate-200 hover:border-slate-300"
                         }`}
                         onClick={() => setSelectedPaymentId(method.id)}
                       >
                         <RadioGroupItem value={method.id} id={method.id} />
-                        <Label htmlFor={method.id} className="flex-1 cursor-pointer">
+                        <Label
+                          htmlFor={method.id}
+                          className="flex-1 cursor-pointer"
+                        >
                           <p className="text-slate-900">{method.name}</p>
-                          <p className="text-sm text-slate-600">{method.details}</p>
+                          <p className="text-sm text-slate-600">
+                            {method.details}
+                          </p>
                         </Label>
                         <CreditCard className="w-4 h-4 text-slate-400" />
                       </div>
@@ -977,8 +1127,9 @@ export default function SplitBillPage({
             <Alert className="border-blue-200 bg-blue-50">
               <AlertCircle className="w-4 h-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-800">
-                By covering the remaining balance, you agree to pay for the unpaid portions. The order
-                will be confirmed and sent to the cafeteria.
+                By covering the remaining balance, you agree to pay for the
+                unpaid portions. The order will be confirmed and sent to the
+                cafeteria.
               </AlertDescription>
             </Alert>
           </div>
@@ -996,7 +1147,7 @@ export default function SplitBillPage({
               disabled={isProcessing || !selectedPaymentId}
               className="flex-1 bg-gradient-to-r from-purple-700 to-pink-700"
             >
-              {isProcessing ? 'Processing...' : 'Complete Payment'}
+              {isProcessing ? "Processing..." : "Complete Payment"}
             </Button>
           </div>
         </DialogContent>
@@ -1004,13 +1155,3 @@ export default function SplitBillPage({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-

@@ -126,7 +126,7 @@ export default function SplitBillInvitations({
           `
           id, session_id, identifier, identifier_type, status, amount_due, created_at,
           session:split_bill_sessions (
-            id, total_amount, split_method, initiator_user_id, created_at, 
+            id, total_amount, split_method, initiator_user_id, created_at, status,
             items, cafeteria_id,
             cafeteria:cafeterias (id, name, location)
           )
@@ -322,7 +322,7 @@ export default function SplitBillInvitations({
           participants: Math.max(1, participantCounts[row.session_id] || 0),
           items: parsedItems, // Pass parsed items
           status: row.status || "pending",
-          sessionStatus: "active",
+          sessionStatus: session?.status || "active",
           invitedAt: row.created_at || "",
           expiresAt: "N/A",
         };
