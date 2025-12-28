@@ -367,6 +367,7 @@ export default function StudentDashboard({
           }}
           onCompleteSplitBill={() => {
             persistActiveSplit(null);
+            setCartItems([]);
             toast.success("Split bill completed");
           }}
         />

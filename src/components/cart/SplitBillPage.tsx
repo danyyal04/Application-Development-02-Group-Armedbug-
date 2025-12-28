@@ -40,6 +40,7 @@ import {
 import { Alert, AlertDescription } from "../ui/alert";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabaseClient";
+import { generateQueueNumber } from "../../utils/queueCalculations";
 
 interface CartItem {
   id: string;
@@ -106,6 +107,8 @@ export default function SplitBillPage({
   const [paymentCredentials, setPaymentCredentials] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [generatedQueueNum, setGeneratedQueueNum] = useState<string>("");
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const normalizedEmail = (currentUserEmail || "").toLowerCase();
   const currentParticipant = participants.find(
@@ -529,6 +532,25 @@ export default function SplitBillPage({
             );
           }
 
+          // Generate Queue Number
+          // 1. Get count of orders for this cafeteria today
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const startOfDay = today.toISOString();
+
+          const { count } = await supabase
+            .from("orders")
+            .select("*", { count: "exact", head: true })
+            .eq("cafeteria_id", cafeId)
+            .gte("created_at", startOfDay);
+
+          // Use safe access for cafeteria name
+          const cafeName =
+            (cafeteria as any).name ||
+            (cafeteria as any).cafeteria_name ||
+            "Cafeteria";
+          const qNum = generateQueueNumber(cafeName, count || 0);
+
           // Create the order
           const { error: orderError } = await supabase.from("orders").insert([
             {
@@ -542,16 +564,31 @@ export default function SplitBillPage({
               subtotal: totalAmount - 0.5,
               tax: 0,
               service_fee: 0.5,
+              queue_number: qNum,
             },
           ]);
+          setGeneratedQueueNum(qNum);
 
           if (orderError) {
             console.error("Failed to create order from split bill", orderError);
             toast.error("Payment complete, but failed to create order record.");
           } else {
+            // Show success dialog instead of just toast
+            setShowSuccessDialog(true);
+
+            // Still notify parent possibly, but maybe wait until dialog close?
+            // If we notify parent immediately, they might unmount us.
+            // So let's NOT call onCompleteSplitBill here, let the dialog close handle it.
+            // But if onCompleteSplitBill changes the page, we need to be careful.
+            // The previous code had a timeout.
+            /* 
             toast.success("All payments completed. Order is confirmed! 🎉", {
               duration: 5000,
             });
+            if (onCompleteSplitBill) {
+               onCompleteSplitBill();
+            }
+            */
           }
         } catch (err) {
           console.error(err);
@@ -567,6 +604,7 @@ export default function SplitBillPage({
     cartItems,
     totalAmount,
     splitBillId,
+    onCompleteSplitBill, // added dependency
   ]);
 
   // Simulate session expiry after 30 minutes (for demo, using shorter time)
@@ -642,6 +680,16 @@ export default function SplitBillPage({
                       All split bill payments completed. Your order is now
                       confirmed and will be sent to the cafeteria!
                     </AlertDescription>
+                    {generatedQueueNum && (
+                      <div className="mt-4 p-4 bg-white rounded-lg border border-green-200 text-center shadow-sm max-w-xs mx-auto">
+                        <p className="text-xs uppercase tracking-wider text-green-600 font-semibold mb-1">
+                          Queue Number
+                        </p>
+                        <p className="text-4xl font-bold text-green-700">
+                          {generatedQueueNum}
+                        </p>
+                      </div>
+                    )}
                   </Alert>
                 )}
 
@@ -1151,6 +1199,64 @@ export default function SplitBillPage({
               className="flex-1 bg-gradient-to-r from-purple-700 to-pink-700"
             >
               {isProcessing ? "Processing..." : "Complete Payment"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={showSuccessDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowSuccessDialog(false);
+            if (onCompleteSplitBill) onCompleteSplitBill();
+          } else {
+            setShowSuccessDialog(true);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Payment Successful</DialogTitle>
+            <DialogDescription>Your order has been placed.</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+            <CheckCircle className="w-5 h-5 text-emerald-600" />
+            <div>
+              <p className="text-slate-900 font-semibold">
+                RM {totalAmount.toFixed(2)}
+              </p>
+              <p className="text-sm text-slate-600">Split Bill Completed</p>
+            </div>
+          </div>
+
+          <div className="mt-6 mb-6 text-center">
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">
+              <div className="flex items-center justify-center gap-2 mb-2 opacity-90">
+                <CreditCard className="w-4 h-4" />
+                <span className="text-sm font-medium">Your Queue Number</span>
+              </div>
+              <div className="text-5xl font-bold mb-2 tracking-wider">
+                {generatedQueueNum}
+              </div>
+              <p className="text-sm opacity-90">
+                Please remember this number for pickup
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm text-center text-slate-600">
+              We will notify the cafeteria and update your order status shortly.
+            </p>
+            <Button
+              className="w-full text-white"
+              style={{ backgroundColor: "oklch(40.8% 0.153 2.432)" }}
+              onClick={() => {
+                setShowSuccessDialog(false);
+                if (onCompleteSplitBill) onCompleteSplitBill();
+              }}
+            >
+              View My Orders
             </Button>
           </div>
         </DialogContent>

@@ -46,7 +46,13 @@ const ALLOWED_ADMIN_EMAILS = [
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [currentPage, setCurrentPage] = useState<Page>('login');
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('zenith_last_page');
+      return (saved as Page) || 'login';
+    }
+    return 'login';
+  });
   const [cartCount, setCartCount] = useState(0);
 
   const normalizeRole = (role?: string | null): UserRole => {
@@ -118,7 +124,12 @@ export default function App() {
       const normalized = await buildUserFromSession(data.session || null);
       if (normalized) {
         setCurrentUser(normalized);
-        setCurrentPage('dashboard');
+        const savedPage = localStorage.getItem('zenith_last_page') as Page | null;
+        if (savedPage) {
+            setCurrentPage(savedPage);
+        } else {
+            setCurrentPage('dashboard');
+        }
       } else {
         setCurrentUser(null);
         setCurrentPage('login');
@@ -129,12 +140,22 @@ export default function App() {
 
     // Listen to auth state changes
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
+      (event: AuthChangeEvent, session: Session | null) => {
         (async () => {
           const normalized = await buildUserFromSession(session);
           if (normalized) {
             setCurrentUser(normalized);
-            setCurrentPage('dashboard');
+            
+            // Only redirect to dashboard on explicit sign in from a non-authenticated page
+            // This prevents redirection if an unexpected SIGNED_IN fires while the user is browsing
+            if (event === 'SIGNED_IN') {
+              setCurrentPage((prev) => {
+                  if (prev === 'login' || prev === 'register') {
+                      return 'dashboard';
+                  }
+                  return prev;
+              });
+            }
           } else {
             setCurrentUser(null);
             setCurrentPage('login');
@@ -148,6 +169,13 @@ export default function App() {
     };
   }, []);
 
+  // Save current page to local storage
+  useEffect(() => {
+    if (currentUser && currentPage !== 'login' && currentPage !== 'register') {
+      localStorage.setItem('zenith_last_page', currentPage);
+    }
+  }, [currentPage, currentUser]);
+
   // Handle login
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -159,11 +187,13 @@ export default function App() {
     await supabase.auth.signOut();
     setCurrentUser(null);
     setCurrentPage('login');
+    localStorage.removeItem('zenith_last_page');
   };
 
   // After registration, redirect to login
   const handleRegister = () => {
     setCurrentPage('login');
+    localStorage.removeItem('zenith_last_page');
   };
 
   return (
