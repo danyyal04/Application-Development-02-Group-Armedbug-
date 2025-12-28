@@ -10,6 +10,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '../ui/input';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabaseClient';
+import {  calculateEstimatedPickupTime,
+  formatEstimatedPickupTime,
+  generateQueueNumber,
+} from '../../utils/queueCalculations';
 
 interface CartItem {
   id: string;
@@ -72,6 +76,7 @@ export default function CheckoutPage({
   const [checkoutMode, setCheckoutMode] = useState<'normal' | 'split'>(initialMode);
   const [splitMethod, setSplitMethod] = useState<'even' | 'items'>('even');
   const [participantCount, setParticipantCount] = useState<number>(2);
+  const [generatedQueueNum, setGeneratedQueueNum] = useState<string>('');
 
   const safeCafeteriaId = useMemo(() => {
     const id = cafeteria?.id;
@@ -285,6 +290,21 @@ export default function CheckoutPage({
         return;
       }
 
+
+      // Generate Queue Number
+      // 1. Get count of orders for this cafeteria today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const startOfDay = today.toISOString();
+
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('cafeteria_id', safeCafeteriaId)
+        .gte('created_at', startOfDay);
+      
+      const qNum = generateQueueNumber(cafeteria.name, count || 0);
+
       const { error: orderError } = await supabase.from('orders').insert([{
         user_id: user.id,
         cafeteria_id: safeCafeteriaId,
@@ -294,11 +314,14 @@ export default function CheckoutPage({
         status: 'Pending',
         paid_at: new Date().toISOString(),
         items: JSON.stringify(cartItems),
+        queue_number: qNum,
       }]);
       if (orderError) {
         toast.error(orderError.message || 'Unable to connect to payment service. Please try again later.');
         return;
       }
+
+      setGeneratedQueueNum(qNum);
 
       const { error: updateError } = await supabase
         .from('payment')
@@ -768,7 +791,19 @@ export default function CheckoutPage({
               <p className="text-sm text-slate-600">Paid with {paymentSummary.method || 'your selected method'}</p>
             </div>
           </div>
-          <p className="text-sm text-slate-600 mt-4">We will notify the cafeteria and update your order status shortly.</p>
+
+          <div className="mt-6 mb-6 text-center">
+             <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">
+                <div className="flex items-center justify-center gap-2 mb-2 opacity-90">
+                  <CreditCard className="w-4 h-4" />
+                  <span className="text-sm font-medium">Your Queue Number</span>
+                </div>
+                <div className="text-5xl font-bold mb-2 tracking-wider">{generatedQueueNum}</div>
+                <p className="text-sm opacity-90">Please remember this number for pickup</p>
+             </div>
+          </div>
+
+          <p className="text-sm text-slate-600 mt-4 text-center">We will notify the cafeteria and update your order status shortly.</p>
           <div className="flex gap-2 mt-4">
             <Button
               className="flex-1 text-white hover:opacity-90"
