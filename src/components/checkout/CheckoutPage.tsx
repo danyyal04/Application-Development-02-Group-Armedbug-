@@ -421,7 +421,7 @@ export default function CheckoutPage({
             total_amount: total,
             payment_id: payment.id,
             payment_method: payment.type,
-            status: "Completed",
+            status: "Pending",
             paid_at: new Date().toISOString(),
             items: cartItems, // Pass object directly for JSONB
             queue_number: qNum,
@@ -1136,7 +1136,7 @@ export default function CheckoutPage({
             receipt={receiptData}
             onClose={() => {
               setShowSuccessDialog(false);
-              props.onSuccess?.();
+              onSuccess();
             }}
           />
         </div>

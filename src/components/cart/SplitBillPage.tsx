@@ -226,6 +226,10 @@ export default function SplitBillPage({
 
   useEffect(() => {
     refreshParticipants();
+
+    // Poll for updates (in case other participants pay)
+    const interval = setInterval(refreshParticipants, 3000);
+    return () => clearInterval(interval);
   }, [refreshParticipants]);
 
   // Load saved payment methods for current user
@@ -460,6 +464,31 @@ export default function SplitBillPage({
     }, 2000);
   };
 
+  // Fetch Queue Number for all participants
+  useEffect(() => {
+    if (allPaid && !generatedQueueNum) {
+      const fetchQueueNumber = async () => {
+        const paymentMethodString = `Split Bill ${splitBillId}`;
+        const { data: existingOrder } = await supabase
+          .from("orders")
+          .select("queue_number")
+          .eq("payment_method", paymentMethodString)
+          .maybeSingle();
+
+        if (existingOrder?.queue_number) {
+          setGeneratedQueueNum(existingOrder.queue_number);
+        }
+      };
+
+      // Poll slightly or just run once? 
+      // Running it inside an interval might be safer to catch it after creation
+      const interval = setInterval(fetchQueueNumber, 2000);
+      fetchQueueNumber();
+
+      return () => clearInterval(interval);
+    }
+  }, [allPaid, generatedQueueNum, splitBillId]);
+
   // Order Creation Ref to prevent duplicates
   const orderCreatedRef = useRef(false);
 
@@ -494,12 +523,15 @@ export default function SplitBillPage({
           const paymentMethodString = `Split Bill ${splitBillId}`;
           const { data: existingOrder } = await supabase
             .from("orders")
-            .select("id")
+            .select("id, queue_number")
             .eq("payment_method", paymentMethodString)
             .maybeSingle();
 
           if (existingOrder) {
             console.log("Order already exists for this split bill");
+            if (existingOrder.queue_number) {
+               setGeneratedQueueNum(existingOrder.queue_number);
+            }
             return;
           }
 
@@ -575,20 +607,6 @@ export default function SplitBillPage({
           } else {
             // Show success dialog instead of just toast
             setShowSuccessDialog(true);
-
-            // Still notify parent possibly, but maybe wait until dialog close?
-            // If we notify parent immediately, they might unmount us.
-            // So let's NOT call onCompleteSplitBill here, let the dialog close handle it.
-            // But if onCompleteSplitBill changes the page, we need to be careful.
-            // The previous code had a timeout.
-            /* 
-            toast.success("All payments completed. Order is confirmed! 🎉", {
-              duration: 5000,
-            });
-            if (onCompleteSplitBill) {
-               onCompleteSplitBill();
-            }
-            */
           }
         } catch (err) {
           console.error(err);
@@ -978,15 +996,11 @@ export default function SplitBillPage({
                   RM {currentParticipant?.amount.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Service Fee</span>
-                <span className="text-slate-900">RM 0.50</span>
-              </div>
               <Separator />
               <div className="flex justify-between">
                 <span className="text-slate-900">Total to pay</span>
                 <span className="text-slate-900">
-                  RM {((currentParticipant?.amount || 0) + 0.5).toFixed(2)}
+                  RM {(currentParticipant?.amount || 0).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -1117,15 +1131,11 @@ export default function SplitBillPage({
                   RM {unpaidAmount.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Service Fee</span>
-                <span className="text-slate-900">RM 0.50</span>
-              </div>
               <Separator />
               <div className="flex justify-between">
                 <span className="text-slate-900">Total to pay</span>
                 <span className="text-slate-900">
-                  RM {(unpaidAmount + 0.5).toFixed(2)}
+                  RM {unpaidAmount.toFixed(2)}
                 </span>
               </div>
             </div>

@@ -65,6 +65,7 @@ interface SplitBillInitiationProps {
     splitMethod: "equal" | "items";
     participants: Participant[];
     sessionId?: string;
+    totalAmount?: number;
   }) => void;
   onCancel: () => void;
   autoOpenDialog?: boolean;
@@ -241,6 +242,7 @@ export default function SplitBillInitiation({
         splitMethod: "equal",
         participants,
         sessionId: session.id,
+        totalAmount: totalToSplit,
       });
       setIsDialogOpen(false);
     } catch (err: any) {

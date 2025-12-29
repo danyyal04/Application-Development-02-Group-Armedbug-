@@ -370,6 +370,7 @@ export default function StudentDashboard({
             persistActiveSplit(null);
             setCartItems([]);
             toast.success("Split bill completed");
+            onNavigate("orders");
           }}
         />
       );
@@ -730,7 +731,7 @@ export default function StudentDashboard({
         }}
         pickupTime={checkoutData.pickupTime}
         autoOpenDialog
-        onInitiateSplitBill={({ sessionId }) => {
+        onInitiateSplitBill={({ sessionId, totalAmount }) => {
           setShowSplitDialog(false);
           persistActiveSplit({
             sessionId: sessionId || "new-session",
@@ -741,6 +742,7 @@ export default function StudentDashboard({
               id: splitCafeteria?.id,
             },
             pickupTime: checkoutData.pickupTime,
+            totalAmount: totalAmount || 0,
           });
           toast.success("Split bill initiated.");
           onNavigate("split-bill-tracking");
