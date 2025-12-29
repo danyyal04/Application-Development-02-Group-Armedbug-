@@ -8,7 +8,7 @@ import PaymentManagement from '../payment/PaymentManagement.js';
 import LiveQueueDashboard from '../queue/LiveQueueDashboard.js';
 import CafeteriaInformation from '../profile/CafeteriaInformation.js';
 import { ensureCafeteriaContext } from '../../utils/cafeteria.js';
-import FeedbackDashboard from '../feedback/FeedbackDashboard';
+
 
 interface StaffDashboardProps {
   user: any;
@@ -54,10 +54,7 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
     ownerCafeteria?.name || profile?.cafeteria_name || `${user.name || 'My'} Cafeteria`;
 
 
-  // UC033 & UC034 - Customer Feedback Dashboard
-  if (currentPage === 'feedback-dashboard') {
-    return <FeedbackDashboard />;
-  }
+
 
   if (currentPage === 'manage-menu') {
     if (isProfileLoading) return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
@@ -216,18 +213,7 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
         </Card>
       </div>
 
-      {/* UC033 & UC034 - Customer Feedback Card */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        <Card 
-          className="border-pink-200 bg-gradient-to-br from-pink-50 to-rose-50 cursor-pointer hover:shadow-lg transition-shadow" 
-          onClick={() => onNavigate('feedback-dashboard')}
-        >
-          <CardHeader>
-            <CardTitle className="text-pink-900">Customer Feedback</CardTitle>
-            <CardDescription className="text-pink-700">View and respond to customer reviews</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+
     </div>
   );
 }

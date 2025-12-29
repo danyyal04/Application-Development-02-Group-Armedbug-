@@ -213,12 +213,7 @@ export default function FeedbackDashboard() {
   // UC033 - AF1: No feedback available
   if (feedbackList.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-slate-900 mb-2">Customer Feedback Dashboard 💬</h1>
-          <p className="text-slate-600">View and respond to customer reviews</p>
-        </div>
-
+      <div className="py-8">
         <Card className="text-center py-16">
           <CardContent>
             <MessageSquare className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -233,12 +228,8 @@ export default function FeedbackDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-slate-900 mb-2">Customer Feedback Dashboard 💬</h1>
-        <p className="text-slate-600">View and respond to customer reviews</p>
-      </div>
+    <div>
+
 
       {/* UC033 - NF: Overall Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

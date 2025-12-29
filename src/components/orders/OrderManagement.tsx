@@ -25,6 +25,7 @@ import {
   getQueueLength,
   isBulkOrder,
 } from "../../utils/queueCalculations";
+import FeedbackDashboard from '../feedback/FeedbackDashboard';
 
 interface Order {
   id: string;
@@ -77,6 +78,7 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
   const notifiedRef = useRef<Record<string, boolean>>({});
   const [avgWait, setAvgWait] = useState(0);
   const [queueLen, setQueueLen] = useState(0);
+  const [view, setView] = useState<'orders' | 'feedback'>('orders');
 
   useEffect(() => {
     let isMounted = true;
@@ -223,12 +225,32 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-slate-900 mb-2">Manage Pre-Orders</h1>
-        <p className="text-slate-600">
-          Update order status and track customer pre-orders in real-time
-        </p>
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-slate-900 mb-2">
+            {view === 'orders' ? 'Manage Pre-Orders' : 'Customer Feedback'}
+          </h1>
+          <p className="text-slate-600">
+            {view === 'orders' 
+              ? 'Update order status and track customer pre-orders in real-time'
+              : 'View and respond to customer reviews'}
+          </p>
+        </div>
+        <div className="w-full md:w-auto">
+          <Select value={view} onValueChange={(v: any) => setView(v)}>
+            <SelectTrigger className="w-full md:w-[200px]">
+              <SelectValue placeholder="Select View" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="orders">Manage Orders</SelectItem>
+              <SelectItem value="feedback">Customer Feedback</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      {view === 'orders' ? (
+        <>
 
       <Card className="mb-6 border-2 border-purple-200">
         <CardHeader>
@@ -406,6 +428,10 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
         <div className="text-center text-slate-500 mt-8">
           <p>No menu orders have been placed yet.</p>
         </div>
+      )}
+        </>
+      ) : (
+        <FeedbackDashboard />
       )}
     </div>
   );
