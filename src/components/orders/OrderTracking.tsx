@@ -95,6 +95,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
   const [comment, setComment] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const loadOrders = async () => {
     setIsLoading(true);
@@ -363,6 +364,36 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
     setPhotoPreview(null);
   };
 
+  // Handle notification toggle
+  const handleToggleNotifications = async () => {
+    if (!notificationsEnabled) {
+      // Request permission to enable notifications
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          setNotificationsEnabled(true);
+          toast.success('Notifications enabled!', {
+            description: 'You will receive updates about your orders',
+          });
+        } else {
+          toast.error('Notification permission denied', {
+            description: 'Please enable notifications in your browser settings',
+          });
+        }
+      } else {
+        toast.error('Notifications not supported', {
+          description: 'Your browser does not support notifications',
+        });
+      }
+    } else {
+      // Disable notifications
+      setNotificationsEnabled(false);
+      toast.info('Notifications disabled', {
+        description: 'You can re-enable them anytime',
+      });
+    }
+  };
+
   // Render star rating
   const renderStars = (interactive: boolean = false) => {
     return (
@@ -394,10 +425,19 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
         <Button
           variant="outline"
           size="sm"
-          className="rounded-full border-slate-300 text-slate-50 bg-slate-900 hover:bg-slate-800 gap-2"
+          onClick={handleToggleNotifications}
+          className={`rounded-full gap-2 transition-all ${
+            notificationsEnabled
+              ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-300'
+              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
+          }`}
         >
-          <Bell className="w-4 h-4 text-white" />
-          <span className="text-white">Notifications On</span>
+          <Bell className={`w-4 h-4 ${
+            notificationsEnabled ? 'text-white' : 'text-slate-700'
+          }`} />
+          <span>
+            Notifications {notificationsEnabled ? 'On' : 'Off'}
+          </span>
         </Button>
       </div>
 
