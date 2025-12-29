@@ -94,6 +94,93 @@ export default function TransactionHistory() {
 
       if (ordersError) throw ordersError;
 
+      const { data: resolvedEmail, error: resolvedError } = await supabase.rpc(
+        "current_user_email_resolved"
+      );
+      if (resolvedError) {
+        console.warn("Failed to resolve email:", resolvedError.message);
+      }
+
+      const possibleIdentifiers = Array.from(
+        new Set(
+          [
+            resolvedEmail,
+            user.email,
+            user.user_metadata?.email,
+            user.user_metadata?.username,
+          ]
+            .filter(Boolean)
+            .map((value) => String(value).trim().toLowerCase())
+        )
+      );
+
+      let splitBillSessionIds: string[] = [];
+      let splitBillOrdersData: any[] = [];
+      let participantSessionsData: any[] = [];
+
+      if (possibleIdentifiers.length > 0) {
+        const { data: participantRows, error: participantError } =
+          await supabase
+            .from("split_bill_participants")
+            .select("session_id")
+            .in("identifier", possibleIdentifiers);
+
+        if (participantError) {
+          console.error(
+            "Failed to fetch split bill participation",
+            participantError
+          );
+        } else {
+          splitBillSessionIds = Array.from(
+            new Set(
+              (participantRows || [])
+                .map((row: any) => row.session_id)
+                .filter(Boolean)
+            )
+          );
+        }
+
+        if (splitBillSessionIds.length > 0) {
+          const { data: splitOrders, error: splitOrdersError } = await supabase
+            .from("orders")
+            .select("*")
+            .in(
+              "payment_method",
+              splitBillSessionIds.map((id) => `Split Bill ${id}`)
+            );
+
+          if (splitOrdersError) {
+            console.error("Failed to fetch split bill orders", splitOrdersError);
+          } else {
+            splitBillOrdersData = splitOrders || [];
+          }
+
+          const { data: participantSessions, error: participantSessionsError } =
+            await supabase
+              .from("split_bill_sessions")
+              .select("*")
+              .in("id", splitBillSessionIds)
+              .eq("status", "active");
+
+          if (participantSessionsError) {
+            console.error(
+              "Failed to fetch participant split bill sessions",
+              participantSessionsError
+            );
+          } else {
+            participantSessionsData = participantSessions || [];
+          }
+        }
+      }
+
+      const combinedOrders = [
+        ...(ordersData || []),
+        ...(splitBillOrdersData || []),
+      ];
+      const uniqueOrders = Array.from(
+        new Map(combinedOrders.map((order: any) => [order.id, order])).values()
+      );
+
       // Fetch all cafeterias to map names manually (avoids FK dependency issues)
       const { data: cafeteriasData } = await supabase
         .from("cafeterias")
@@ -131,7 +218,7 @@ export default function TransactionHistory() {
         // Don't fail entire view if split bills fail
       }
 
-      const mappedOrders: Transaction[] = (ordersData || []).map(
+      const mappedOrders: Transaction[] = uniqueOrders.map(
         (order: any) => {
           let items = [];
           try {
@@ -142,6 +229,10 @@ export default function TransactionHistory() {
           } catch (e) {
             items = [];
           }
+
+          const isSplitBillOrder =
+            typeof order.payment_method === "string" &&
+            order.payment_method.startsWith("Split Bill ");
 
           return {
             id: order.id,
@@ -176,7 +267,9 @@ export default function TransactionHistory() {
             total: order.total_amount,
             paymentMethod: order.payment_method || "Unknown",
             paymentStatus:
-              order.status === "Pending"
+              isSplitBillOrder && order.paid_at
+                ? "Completed"
+                : order.status === "Pending"
                 ? "Pending"
                 : order.status === "Paid" || order.status === "Completed"
                 ? "Completed"
@@ -188,7 +281,16 @@ export default function TransactionHistory() {
         }
       );
 
-      const mappedSessions: Transaction[] = (sessionsData || []).map(
+      const combinedSessions = [
+        ...(sessionsData || []),
+        ...(participantSessionsData || []),
+      ];
+      const uniqueSessions = Array.from(
+        new Map(combinedSessions.map((session: any) => [session.id, session]))
+          .values()
+      );
+
+      const mappedSessions: Transaction[] = uniqueSessions.map(
         (session: any) => ({
           id: session.id,
           transactionId: `SB-${session.id.slice(0, 8).toUpperCase()}`,
