@@ -414,7 +414,13 @@ export default function StudentDashboard({
 
       return (
         <CafeteriaList
-          onSelectCafeteria={(caf: any) => setSelectedCafeteria(caf)}
+          onSelectCafeteria={(caf: any) => {
+            if (!caf.isOpen) {
+              toast.error("This cafeteria is currently closed. Please come again later.");
+              return;
+            }
+            setSelectedCafeteria(caf);
+          }}
         />
       );
     }
@@ -637,6 +643,10 @@ export default function StudentDashboard({
               key={cafeteria.id}
               className="overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
               onClick={() => {
+                if (!cafeteria.isOpen) {
+                  toast.error("This cafeteria is currently closed. Please come again later.");
+                  return;
+                }
                 setSelectedCafeteria(cafeteria);
                 onNavigate("menu");
               }}
@@ -682,6 +692,10 @@ export default function StudentDashboard({
                     disabled={!cafeteria.isOpen}
                     onClick={(e) => {
                        e.stopPropagation();
+                       if (!cafeteria.isOpen) {
+                         toast.error("This cafeteria is currently closed. Please come again later.");
+                         return;
+                       }
                        setSelectedCafeteria(cafeteria);
                        onNavigate("menu");
                     }}
