@@ -419,7 +419,7 @@ export default function TransactionHistory() {
           <div className="flex gap-2 ml-auto">
             <Button
               onClick={handleApplyFilters}
-              className="bg-purple-800 hover:bg-purple-900"
+              className="bg-[#800000] text-white hover:bg-[#6b0000] hover:text-white"
               size="sm"
             >
               Apply
@@ -477,7 +477,7 @@ export default function TransactionHistory() {
       </div>
 
       {/* Transaction List */}
-      <Card>
+      <Card className="bg-white">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Receipt className="w-5 h-5" />
@@ -514,7 +514,7 @@ export default function TransactionHistory() {
               {filteredTransactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="border rounded-lg p-4 hover:bg-slate-50 transition-colors"
+                  className="bg-white border rounded-lg p-4 hover:bg-slate-50 transition-colors"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
