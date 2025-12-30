@@ -6,6 +6,7 @@ import { Badge } from '../ui/badge';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Alert, AlertDescription } from '../ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -35,6 +36,7 @@ export default function FeedbackDashboard() {
   const [replyText, setReplyText] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [editingReply, setEditingReply] = useState<string | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   // Load feedback from database
   const loadFeedback = async () => {
@@ -73,6 +75,7 @@ export default function FeedbackDashboard() {
       });
 
       setFeedbackList(transformedFeedback);
+      console.log('Loaded feedback with photos:', transformedFeedback.map(f => ({ id: f.id, photoUrl: f.photoUrl })));
     } catch (error) {
       console.error('Error loading feedback:', error);
       toast.error('Failed to load feedback');
@@ -409,6 +412,18 @@ export default function FeedbackDashboard() {
                   </div>
                 </div>
 
+                {/* Customer Photo (if exists) */}
+                {feedback.photoUrl && (
+                  <div className="mb-4">
+                    <img
+                      src={feedback.photoUrl}
+                      alt="Customer feedback"
+                      className="w-32 h-32 object-cover rounded-lg border-2 border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => setZoomedImage(feedback.photoUrl!)}
+                    />
+                  </div>
+                )}
+
                 {/* Customer Comment */}
                 <div className="bg-slate-50 rounded-lg p-4 mb-4">
                   <p className="text-slate-700">{feedback.comment}</p>
@@ -518,6 +533,24 @@ export default function FeedbackDashboard() {
           ))
         )}
       </div>
+
+      {/* Image Zoom Dialog */}
+      <Dialog open={!!zoomedImage} onOpenChange={() => setZoomedImage(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Customer Feedback Photo</DialogTitle>
+          </DialogHeader>
+          {zoomedImage && (
+            <div className="flex items-center justify-center">
+              <img
+                src={zoomedImage}
+                alt="Zoomed feedback"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

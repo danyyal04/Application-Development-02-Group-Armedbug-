@@ -363,6 +363,9 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
 
         if (uploadError) {
           console.error('Photo upload error:', uploadError);
+          toast.error('Photo upload failed', {
+            description: 'Storage bucket may not exist. Feedback will be saved without photo.',
+          });
           // Continue without photo if upload fails
         } else if (uploadData) {
           const { data: { publicUrl } } = supabase.storage
