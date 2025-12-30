@@ -407,7 +407,6 @@ export default function CheckoutPage({
       const { count } = await supabase
         .from("orders")
         .select("*", { count: "exact", head: true })
-        .eq("cafeteria_id", safeCafeteriaId)
         .gte("created_at", startOfDay);
 
       const qNum = generateQueueNumber(cafeteria.name, count || 0);
