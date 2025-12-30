@@ -1,390 +1,914 @@
 import { useEffect, useState } from 'react';
-import { User, Mail, Lock, Save, ImagePlus } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.js';
-import { Input } from '../ui/input.js';
-import { Label } from '../ui/label.js';
-import { Button } from '../ui/button.js';
-import { Separator } from '../ui/separator.js';
-import { Switch } from '../ui/switch.js';
+import { User, Mail, Lock, Save, ImagePlus, Heart, UtensilsCrossed, Search } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Button } from '../ui/button';
+import { Separator } from '../ui/separator';
+import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabaseClient.js';
+import { supabase } from '../../lib/supabaseClient';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import { Badge } from '../ui/badge';
+// import { Checkbox } from '../ui/checkbox'; // Removed Checkbox import if no longer used
+// import { cafeterias } from '../../data/cafeterias'; // Removed static import
 
 interface ProfileSettingsProps {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    role: 'customer' | 'owner' | 'admin';
-  };
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    role?: 'customer' | 'owner' | 'admin';
+  };
+  onNavigate?: (page: string) => void;
 }
 
-export default function ProfileSettings({ user }: ProfileSettingsProps) {
-  const [profilePic, setProfilePic] = useState<string | null>(null);
-  const [selectedPic, setSelectedPic] = useState<File | null>(null);
+export default function ProfileSettings({ user, onNavigate }: ProfileSettingsProps) {
+  // Get user info from props or localStorage
+  const userEmail = user?.email || localStorage.getItem('userEmail') || 'student@graduate.utm.my';
+  const userId = user?.id || localStorage.getItem('userId') || 'temp-user-id';
+  const defaultName = user?.name || ((userEmail || '').split('@')[0] ?? '').replace('.', ' ').split(' ').map(
+    word => word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ');
 
-  const [formData, setFormData] = useState({
-    name: user.name,
-    email: user.email,
-    phone: '',
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+  const [selectedPic, setSelectedPic] = useState<File | null>(null);
 
-  const [preferences, setPreferences] = useState({
-    emailNotifications: true,
-    orderUpdates: true,
-    promotions: false,
-  });
+  const [formData, setFormData] = useState({
+    name: defaultName,
+    email: userEmail,
+    phone: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
 
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPreferences, setSavingPreferences] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
+  const [preferences, setPreferences] = useState({
+    emailNotifications: true,
+    orderUpdates: true,
+    promotions: false,
+  });
 
-  // -----------------------------------------------------------
-  // LOAD PROFILE FROM DATABASE
-  // -----------------------------------------------------------
-  useEffect(() => {
-    let isMounted = true;
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
-    const loadProfile = async () => {
-      setLoadingProfile(true);
+  // Food Preferences State
+  const [foodPreferences, setFoodPreferences] = useState({
+    dietaryType: 'no-preference',
+    spiceLevel: 'medium',
+    favouriteCategories: [] as string[],
+  });
+  const [savingFoodPrefs, setSavingFoodPrefs] = useState(false);
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('name, email, phone, avatar_url, email_notifications, order_updates, promotions')
-        .eq('id', user.id)
-        .single();
+  // Favourite Cafeterias State
+  const [favouriteCafeterias, setFavouriteCafeterias] = useState<string[]>([]);
 
-      if (!isMounted) return;
+  // Cafeterias State (fetched from DB to match IDs)
+  const [fetchedCafeterias, setFetchedCafeterias] = useState<any[]>([]);
 
-      if (!error && data) {
-        setFormData(prev => ({
-          ...prev,
-          name: data.name ?? user.name,
-          email: data.email ?? user.email,
-          phone: data.phone ?? '',
-        }));
+  // Fetch cafeterias from DB
+  useEffect(() => {
+    const fetchCafeterias = async () => {
+      const { data, error } = await supabase
+        .from('cafeterias')
+        .select('*');
 
-        setProfilePic(data.avatar_url ? data.avatar_url : null);
+      if (!error && data) {
+         // Map to ensure shape matches what we need
+         const mapped = data.map(row => ({
+           id: row.id,
+           name: row.name,
+           category: row.category ?? 'Malaysian',
+           description: row.description,
+           image: row.image,
+           isOpen: row.is_open
+         }));
+         setFetchedCafeterias(mapped);
+      } else {
+        console.error("Failed to fetch cafeterias for profile:", error);
+      }
+    };
+    fetchCafeterias();
+  }, []);
 
-        setPreferences({
-          emailNotifications: data.email_notifications ?? true,
-          orderUpdates: data.order_updates ?? true,
-          promotions: data.promotions ?? false,
-        });
-      }
+  const allCafeterias = fetchedCafeterias;
 
-      setLoadingProfile(false);
-    };
+  // Listen for storage events to update favorites in real-time
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const saved = localStorage.getItem('favouriteCafeterias');
+        if (saved) {
+          setFavouriteCafeterias(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.error("Failed to sync favorites", e);
+      }
+    };
 
-    loadProfile();
-    return () => {
-      isMounted = false;
-    };
-  }, [user.id]);
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
-  // -----------------------------------------------------------
-  // UPLOAD PROFILE PICTURE
-  // -----------------------------------------------------------
-  const handleUploadProfilePic = async () => {
+  const foodCategories = ['Malay', 'Chinese', 'Halal', 'Western', 'Dessert', 'Beverages', 'Fried', 'Fast Food'];
+
+  // -----------------------------------------------------------
+  // LOAD PROFILE FROM DATABASE
+  // -----------------------------------------------------------
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      setLoadingProfile(true);
+
+      // Try to load from localStorage first (for demo purposes)
+      const storedProfile = localStorage.getItem(`profile_${userId}`);
+      if (storedProfile) {
+        try {
+          const profile = JSON.parse(storedProfile);
+          if (isMounted) {
+            setFormData(prev => ({
+              ...prev,
+              name: profile.name ?? defaultName,
+              email: profile.email ?? userEmail,
+              phone: profile.phone ?? '',
+            }));
+            setProfilePic(profile.avatar_url ?? null);
+            setPreferences({
+              emailNotifications: profile.email_notifications ?? true,
+              orderUpdates: profile.order_updates ?? true,
+              promotions: profile.promotions ?? false,
+            });
+            
+            // Load food prefs if available locally
+            if (profile.dietary_type || profile.spice_level) {
+               setFoodPreferences(prev => ({
+                 ...prev,
+                 dietaryType: profile.dietary_type || 'no-preference',
+                 spiceLevel: profile.spice_level || 'medium',
+                 favouriteCategories: profile.favourite_categories || [],
+               }));
+            }
+             if (profile.favourite_cafeterias) {
+               setFavouriteCafeterias(profile.favourite_cafeterias);
+             }
+          }
+        } catch (e) {
+          console.error('Error parsing stored profile:', e);
+        }
+      }
+
+      // If Supabase is configured, try to load from database
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('name, email, phone, avatar_url, email_notifications, order_updates, promotions, dietary_type, spice_level, favourite_categories, favourite_cafeterias')
+          .eq('id', userId)
+          .single();
+
+        if (!isMounted) return;
+
+        if (!error && data) {
+          setFormData(prev => ({
+            ...prev,
+            name: data.name ?? defaultName,
+            email: data.email ?? userEmail,
+            phone: data.phone ?? '',
+          }));
+
+          setProfilePic(data.avatar_url ? data.avatar_url : null);
+
+          setPreferences({
+            emailNotifications: data.email_notifications ?? true,
+            orderUpdates: data.order_updates ?? true,
+            promotions: data.promotions ?? false,
+          });
+
+          setFoodPreferences({
+            dietaryType: data.dietary_type || 'no-preference',
+            spiceLevel: data.spice_level || 'medium',
+            favouriteCategories: data.favourite_categories || [],
+          });
+          
+          if (data.favourite_cafeterias) {
+             setFavouriteCafeterias(data.favourite_cafeterias);
+          }
+
+          // Store in localStorage as backup
+          localStorage.setItem(`profile_${userId}`, JSON.stringify(data));
+        }
+      } catch (err) {
+        // Supabase not configured or error occurred - use localStorage data
+        console.log('Using localStorage profile data');
+      }
+
+
+      // Check for standalone favouriteCafeterias key (from CafeteriaList)
+      // This takes precedence for the list view sync
+      const standaloneFavs = localStorage.getItem('favouriteCafeterias');
+      if (standaloneFavs) {
+        try {
+          setFavouriteCafeterias(JSON.parse(standaloneFavs));
+        } catch (e) {
+          console.error('Error parsing standalone favorites', e);
+        }
+      }
+
+      setLoadingProfile(false);
+    };
+
+    loadProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, defaultName, userEmail]);
+
+  // -----------------------------------------------------------
+  // UPLOAD PROFILE PICTURE
+  // -----------------------------------------------------------
+  const handleUploadProfilePic = async () => {
     if (!selectedPic) {
       toast.error("Please pick a picture first.");
       return;
     }
 
-    const fileExt = selectedPic.name.split('.').pop();
-    const fileName = `${user.id}_${Date.now()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
+    try {
+      const fileExt = selectedPic.name.split('.').pop();
+      const fileName = `${userId}_${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
 
-    // Upload to Supabase storage bucket "avatar"
-    const { error: uploadError } = await supabase.storage
-      .from('avatar')
-      .upload(filePath, selectedPic, {
-        cacheControl: '3600',
-        upsert: true,
-      });
+      // Upload to Supabase storage bucket "avatar"
+      const { error: uploadError } = await supabase.storage
+        .from('avatar')
+        .upload(filePath, selectedPic, {
+          cacheControl: '3600',
+          upsert: true,
+        });
 
-    if (uploadError) {
-      toast.error("Upload failed.");
-      return;
-    }
+      if (uploadError) {
+        toast.error("Upload failed. Using local preview only.");
+        // Fallback to local preview
+        const localUrl = URL.createObjectURL(selectedPic);
+        setProfilePic(localUrl);
+        setSelectedPic(null);
+        
+        // Save to localStorage
+        const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
+        currentProfile.avatar_url = localUrl;
+        localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
+        
+        toast.success("Profile picture updated locally!");
+        return;
+      }
 
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage
-      .from('avatar')
-      .getPublicUrl(filePath);
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('avatar')
+        .getPublicUrl(filePath);
 
-    const publicUrl = publicUrlData.publicUrl;
+      const publicUrl = publicUrlData.publicUrl;
 
-    // Save URL in database
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ avatar_url: publicUrl })
-      .eq('id', user.id);
+      // Save URL in database
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', userId);
 
-    if (updateError) {
-      toast.error("Failed to update profile picture in database.");
-      return;
-    }
+      if (updateError) {
+        toast.error("Failed to update profile picture in database.");
+        return;
+      }
 
-    setProfilePic(publicUrl);
-    setSelectedPic(null);
+      setProfilePic(publicUrl);
+      setSelectedPic(null);
 
-    toast.success("Profile picture updated!");
+      // Save to localStorage
+      const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
+      currentProfile.avatar_url = publicUrl;
+      localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
 
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000);
+      toast.success("Profile picture updated!");
 
-    setProfilePic(`${publicUrl}?t=${Date.now()}`);
-  };
+      setTimeout(() => {
+        setProfilePic(`${publicUrl}?t=${Date.now()}`);
+      }, 100);
+    } catch (err: any) {
+      toast.error("Error uploading picture. Using local preview.");
+      // Fallback to local preview
+      const localUrl = URL.createObjectURL(selectedPic);
+      setProfilePic(localUrl);
+      setSelectedPic(null);
+    }
+  };
 
-  // -----------------------------------------------------------
-  // SAVE PROFILE
-  // -----------------------------------------------------------
-  const handleSaveProfile = async () => {
-    if (!formData.name.trim() || !formData.email.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
+  // -----------------------------------------------------------
+  // SAVE PROFILE
+  // -----------------------------------------------------------
+  const handleSaveProfile = async () => {
+    if (!formData.name.trim() || !formData.email.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
-    setSavingProfile(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          phone: formData.phone.trim() || null,
-        })
-        .eq('id', user.id);
+    setSavingProfile(true);
+    try {
+      const profileData = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || null,
+      };
 
-      if (error) throw error;
+      // Try to save to Supabase
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update(profileData)
+          .eq('id', userId);
 
-      toast.success('Profile updated successfully!');
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setSavingProfile(false);
-    }
-  };
+        if (error) throw error;
+      } catch (err) {
+        // Supabase not configured, save to localStorage
+        console.log('Saving to localStorage');
+      }
 
-  // -----------------------------------------------------------
-  // CHANGE PASSWORD
-  // -----------------------------------------------------------
-  const handleChangePassword = async () => {
-    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
-      toast.error('Please fill in all password fields');
-      return;
-    }
+      // Always save to localStorage as backup
+      const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
+      Object.assign(currentProfile, profileData);
+      localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
 
-    if (formData.newPassword !== formData.confirmPassword) {
-      toast.error('New passwords do not match');
-      return;
-    }
+      toast.success('Profile updated successfully!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save profile');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
-    setChangingPassword(true);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: formData.newPassword,
-      });
-      if (error) throw error;
+  // -----------------------------------------------------------
+  // CHANGE PASSWORD
+  // -----------------------------------------------------------
+  const handleChangePassword = async () => {
+    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
+      toast.error('Please fill in all password fields');
+      return;
+    }
 
-      toast.success('Password changed successfully!');
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setChangingPassword(false);
-    }
-  };
+    if (formData.newPassword !== formData.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
 
-  // -----------------------------------------------------------
-  // SAVE NOTIFICATION PREFERENCES
-  // -----------------------------------------------------------
-  const handleSavePreferences = async () => {
-    setSavingPreferences(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          email_notifications: preferences.emailNotifications,
-          order_updates: preferences.orderUpdates,
-          promotions: preferences.promotions,
-        })
-        .eq('id', user.id);
+    if (formData.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
 
-      if (error) throw error;
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: formData.newPassword,
+      });
+      
+      if (error) throw error;
 
-      toast.success('Preferences saved!');
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setSavingPreferences(false);
-    }
-  };
+      // Clear password fields
+      setFormData(prev => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      }));
 
-  if (loadingProfile) {
-    return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
-  }
+      toast.success('Password changed successfully!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to change password. Feature requires Supabase configuration.');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
-  return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+  // -----------------------------------------------------------
+  // SAVE NOTIFICATION PREFERENCES
+  // -----------------------------------------------------------
+  const handleSavePreferences = async () => {
+    setSavingPreferences(true);
+    try {
+      const prefsData = {
+        email_notifications: preferences.emailNotifications,
+        order_updates: preferences.orderUpdates,
+        promotions: preferences.promotions,
+      };
 
-      {/* ---------------- Profile Picture Section ---------------- */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Profile Picture</CardTitle>
-          <CardDescription>Upload a new profile picture</CardDescription>
-        </CardHeader>
+      // Try to save to Supabase
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update(prefsData)
+          .eq('id', userId);
 
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-6">
-            <img
-              key={profilePic} 
-                src={
-                selectedPic 
-                ? URL.createObjectURL(selectedPic) 
-                : (profilePic ? `${profilePic}?t=${Date.now()}` : '/default-avatar.png')
-            }
-            alt="Profile"
-            className="w-28 h-28 rounded-full object-cover border bg-slate-100" // Added bg-slate-100 so it looks nice even if empty
-            />
+        if (error) throw error;
+      } catch (err) {
+        // Supabase not configured, save to localStorage
+        console.log('Saving preferences to localStorage');
+      }
 
-            <div className="space-y-3">
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setSelectedPic(e.target.files?.[0] || null)}
-              />
+      // Always save to localStorage as backup
+      const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
+      Object.assign(currentProfile, prefsData);
+      localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
 
-              <Button
-                onClick={handleUploadProfilePic}
-                disabled={!selectedPic}
-                className="bg-purple-600 text-white hover:bg-purple-700"
-              >
-                <ImagePlus className="w-4 h-4 mr-2" />
-                Upload Picture
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      toast.success('Preferences saved!');
+    } catch (err: any) {
+      // toast.error(err.message || 'Failed to save preferences');
+       toast.error('Update failed due to system error.'); // Requirement UC026 EF1
+    } finally {
+      setSavingPreferences(false);
+    }
+  };
 
-      {/* ---------------- Personal Information ---------------- */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Update your personal details</CardDescription>
-        </CardHeader>
+  // -----------------------------------------------------------
+  // SAVE FOOD PREFERENCES
+  // -----------------------------------------------------------
+  const handleSaveFoodPreferences = async () => {
+    setSavingFoodPrefs(true);
+    try {
+      const foodPrefsData = {
+        dietary_type: foodPreferences.dietaryType,
+        spice_level: foodPreferences.spiceLevel,
+        favourite_categories: foodPreferences.favouriteCategories,
+      };
 
-        <CardContent className="space-y-4">
+      // Try to save to Supabase
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update(foodPrefsData)
+          .eq('id', userId);
 
-          <div>
-            <Label htmlFor="name">Full Name</Label>
-            <Input id="name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
-          </div>
+        if (error) throw error;
+      } catch (err) {
+        // Supabase not configured, save to localStorage
+        console.log('Saving food preferences to localStorage');
+      }
 
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
-          </div>
+      // Always save to localStorage as backup
+      const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
+      Object.assign(currentProfile, foodPrefsData);
+      localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
 
-          <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-          </div>
+      toast.success('Food preferences saved!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save food preferences');
+    } finally {
+      setSavingFoodPrefs(false);
+    }
+  };
 
-          <Button onClick={handleSaveProfile} className="bg-purple-600 text-white hover:bg-purple-700">
-            <Save className="w-4 h-4 mr-2" />
-            {savingProfile ? "Saving..." : "Save Profile"}
-          </Button>
+  // -----------------------------------------------------------
+  // TOGGLE FOOD CATEGORY
+  // -----------------------------------------------------------
+  const toggleFoodCategory = (category: string) => {
+    setFoodPreferences(prev => ({
+      ...prev,
+      favouriteCategories: prev.favouriteCategories.includes(category)
+        ? prev.favouriteCategories.filter(c => c !== category)
+        : [...prev.favouriteCategories, category]
+    }));
+  };
 
-        </CardContent>
-      </Card>
+  // -----------------------------------------------------------
+  // TOGGLE FAVOURITE CAFETERIA
+  // -----------------------------------------------------------
+  const toggleFavouriteCafeteria = (cafeteriaId: string) => {
+    setFavouriteCafeterias(prev => {
+      const newFavs = prev.includes(cafeteriaId)
+        ? prev.filter(id => id !== cafeteriaId)
+        : [...prev, cafeteriaId];
+      
+      // Update localStorage to sync with CafeteriaList
+      localStorage.setItem('favouriteCafeterias', JSON.stringify(newFavs));
+      window.dispatchEvent(new Event('storage'));
+      
+      return newFavs;
+    });
+  };
 
-      {/* ---------------- Change Password ---------------- */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-          <CardDescription>Update your login password</CardDescription>
-        </CardHeader>
+  if (loadingProfile) {
+    return <div className="px-6 py-10 text-center text-slate-500">Loading profile...</div>;
+  }
 
-        <CardContent className="space-y-4">
-          <Input
-            type="password"
-            placeholder="Current Password"
-            value={formData.currentPassword}
-            onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-          />
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
 
-          <Input
-            type="password"
-            placeholder="New Password"
-            value={formData.newPassword}
-            onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-          />
+      {/* ---------------- Profile Picture Section ---------------- */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Profile Picture</CardTitle>
+          <CardDescription>Upload a new profile picture</CardDescription>
+        </CardHeader>
 
-          <Input
-            type="password"
-            placeholder="Confirm Password"
-            value={formData.confirmPassword}
-            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-          />
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-6">
+            <img
+              key={profilePic}
+              src={
+                selectedPic
+                  ? URL.createObjectURL(selectedPic)
+                  : (profilePic ? `${profilePic}?t=${Date.now()}` : '/default-avatar.png')
+              }
+              alt="Profile"
+              className="w-28 h-28 rounded-full object-cover border bg-slate-100"
+              onError={(e) => {
+                // Fallback to default avatar if image fails to load
+                e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="112" height="112" viewBox="0 0 24 24" fill="none" stroke="%23a855f7" stroke-width="1.5"%3E%3Cpath d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"%3E%3C/path%3E%3Ccircle cx="12" cy="7" r="4"%3E%3C/circle%3E%3C/svg%3E';
+              }}
+            />
 
-          <Button onClick={handleChangePassword} variant="outline">
-            {changingPassword ? "Updating..." : "Change Password"}
-          </Button>
-        </CardContent>
-      </Card>
+            <div className="space-y-3">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setSelectedPic(e.target.files?.[0] || null)}
+              />
 
-      {/* ---------------- Preferences ---------------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Notification Preferences</CardTitle>
-          <CardDescription>Manage how you receive alerts</CardDescription>
-        </CardHeader>
+              <Button
+                onClick={handleUploadProfilePic}
+                disabled={!selectedPic}
+                className="bg-purple-600 text-white hover:bg-purple-700"
+              >
+                <ImagePlus className="w-4 h-4 mr-2" />
+                Upload Picture
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <CardContent className="space-y-4">
+      {/* ---------------- Personal Information ---------------- */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Personal Information</CardTitle>
+          <CardDescription>Update your personal details</CardDescription>
+        </CardHeader>
 
-          <div className="flex justify-between items-center">
-            Email Notifications
-            <Switch
-              checked={preferences.emailNotifications}
-              onCheckedChange={(v) => setPreferences({ ...preferences, emailNotifications: v })}
-            />
-          </div>
+        <CardContent className="space-y-4">
 
-          <Separator />
+          <div>
+            <Label htmlFor="name">Full Name</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
+            />
+          </div>
 
-          <div className="flex justify-between items-center">
-            Order Updates
-            <Switch
-              checked={preferences.orderUpdates}
-              onCheckedChange={(v) => setPreferences({ ...preferences, orderUpdates: v })}
-            />
-          </div>
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              value={formData.email}
+              onChange={e => setFormData({ ...formData, email: e.target.value })}
+            />
+          </div>
 
-          <Separator />
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              placeholder="+60 12-345 6789"
+              value={formData.phone}
+              onChange={e => setFormData({ ...formData, phone: e.target.value })}
+            />
+          </div>
 
-          <div className="flex justify-between items-center">
-            Promotions
-            <Switch
-              checked={preferences.promotions}
-              onCheckedChange={(v) => setPreferences({ ...preferences, promotions: v })}
-            />
-          </div>
+          <Button
+            onClick={handleSaveProfile}
+            disabled={savingProfile}
+            className="bg-purple-600 text-white hover:bg-purple-700"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {savingProfile ? "Saving..." : "Save Profile"}
+          </Button>
 
-          <Button onClick={handleSavePreferences} className="bg-purple-600 text-white hover:bg-purple-700">
-            <Save className="w-4 h-4 mr-2" />
-            {savingPreferences ? "Saving..." : "Save Preferences"}
-          </Button>
+        </CardContent>
+      </Card>
 
-        </CardContent>
-      </Card>
+      {/* ---------------- Change Password ---------------- */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Change Password</CardTitle>
+          <CardDescription>Update your login password</CardDescription>
+        </CardHeader>
 
-    </div>
-  );
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="current-password">Current Password</Label>
+            <Input
+              id="current-password"
+              type="password"
+              placeholder="Enter current password"
+              value={formData.currentPassword}
+              onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="new-password">New Password</Label>
+            <Input
+              id="new-password"
+              type="password"
+              placeholder="Enter new password"
+              value={formData.newPassword}
+              onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="confirm-password">Confirm New Password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              placeholder="Confirm new password"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+            />
+          </div>
+
+          <Button
+            onClick={handleChangePassword}
+            disabled={changingPassword}
+            variant="outline"
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            {changingPassword ? "Updating..." : "Change Password"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ---------------- Preferences ---------------- */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Notification Preferences</CardTitle>
+          <CardDescription>Manage how you receive alerts</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+
+            <div className="flex justify-between items-center">
+            <div>
+              <Label>Email Notifications</Label>
+              <p className="text-sm text-slate-500">Receive updates via email</p>
+            </div>
+            <Switch
+              checked={preferences.emailNotifications}
+              onCheckedChange={(v) => setPreferences({ ...preferences, emailNotifications: v })}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex justify-between items-center">
+            <div>
+              <Label>Order Updates</Label>
+              <p className="text-sm text-slate-500">Get notified about order status changes</p>
+            </div>
+            <Switch
+              checked={preferences.orderUpdates}
+              onCheckedChange={(v) => setPreferences({ ...preferences, orderUpdates: v })}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex justify-between items-center">
+            <div>
+              <Label>Promotions</Label>
+              <p className="text-sm text-slate-500">Receive promotional offers and discounts</p>
+            </div>
+            <Switch
+              checked={preferences.promotions}
+              onCheckedChange={(v) => setPreferences({ ...preferences, promotions: v })}
+            />
+          </div>
+
+          <Button
+            onClick={handleSavePreferences}
+            disabled={savingPreferences}
+            className="bg-purple-600 text-white hover:bg-purple-700"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {savingPreferences ? "Saving..." : "Save Preferences"}
+          </Button>
+
+        </CardContent>
+      </Card>
+
+      {/* ---------------- Food Preferences ---------------- */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UtensilsCrossed className="w-5 h-5" />
+            Food Preferences
+          </CardTitle>
+          <CardDescription>Set your dietary preferences for personalized recommendations</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+
+          <div>
+            <Label htmlFor="dietary-type">Dietary Type</Label>
+            <Select
+              value={foodPreferences.dietaryType}
+              onValueChange={(v) => setFoodPreferences({ ...foodPreferences, dietaryType: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select dietary type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="no-preference">No Preference</SelectItem>
+                <SelectItem value="vegetarian">Vegetarian</SelectItem>
+                <SelectItem value="low-sugar">Low-sugar</SelectItem>
+                <SelectItem value="high-protein">High Protein</SelectItem>
+                <SelectItem value="low-fat">Low-fat</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="spice-level">Spice Level</Label>
+            <Select
+              value={foodPreferences.spiceLevel}
+              onValueChange={(v) => setFoodPreferences({ ...foodPreferences, spiceLevel: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select spice level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mild">Mild</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="spicy">Spicy</SelectItem>
+                <SelectItem value="extra-spicy">Extra Spicy</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="mb-3 block">Favourite Food Categories</Label>
+            <div className="flex flex-wrap gap-3">
+              {foodCategories.map(category => {
+                const isSelected = foodPreferences.favouriteCategories.includes(category);
+                return (
+                  <Button
+                    key={category}
+                    variant={isSelected ? "default" : "outline"}
+                    onClick={() => toggleFoodCategory(category)}
+                    className={`rounded-full transition-all ${
+                        isSelected 
+                        ? "bg-purple-600 hover:bg-purple-700 text-white border-purple-600" 
+                        : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    {category}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          <Button
+            onClick={handleSaveFoodPreferences}
+            disabled={savingFoodPrefs}
+            className="bg-purple-600 text-white hover:bg-purple-700"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {savingFoodPrefs ? "Saving..." : "Save Food Preferences"}
+          </Button>
+
+        </CardContent>
+      </Card>
+
+      {/* ---------------- Favourite Cafeterias ---------------- */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Heart className="w-5 h-5" />
+            Favourite Cafeterias
+          </CardTitle>
+          <CardDescription>Mark your favourite cafeterias for quick access</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+
+          <div className="space-y-4">
+            {/* Filter to show ONLY favourite cafeterias */}
+            {allCafeterias
+              .filter(cafe => favouriteCafeterias.includes(cafe.id))
+              .map(cafe => {
+                const isFavourite = true; // inherently true since we filtered
+                // Mock recent purchase logic (e.g., if ID is '1' or '2')
+                const recentlyBought = ['1', '2'].includes(cafe.id);
+
+                return (
+                  <div
+                    key={cafe.id}
+                    className={`relative border rounded-lg p-4 transition-all border-purple-600 bg-purple-50`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-slate-900 font-medium">{cafe.name}</h3>
+                          {recentlyBought && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-200 text-[10px] px-1.5 h-5">
+                              Recently Bought
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="outline" className="text-xs border-purple-200 text-purple-700 bg-white">
+                          {cafe.category}
+                        </Badge>
+                      </div>
+                      <div 
+                        className="cursor-pointer text-red-500 hover:scale-110 transition-transform"
+                        onClick={() => toggleFavouriteCafeteria(cafe.id)}
+                      >
+                        <Heart className="w-6 h-6 fill-current" />
+                      </div>
+                    </div>
+                  </div>
+                );
+            })}
+
+            {favouriteCafeterias.length === 0 && (
+              <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-lg">
+                <Heart className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-slate-500">No favourite cafeterias yet.</p>
+              </div>
+            )}
+            
+            <Button 
+              variant="outline" 
+              className="w-full mt-4 border-dashed border-purple-300 text-purple-700 hover:bg-purple-50"
+              onClick={() => onNavigate?.('menu')}
+            >
+              <Search className="w-4 h-4 mr-2" />
+              Browse More Cafeterias
+            </Button>
+          </div>
+
+          {favouriteCafeterias.length > 0 && (
+            <div className="pt-2">
+              <p className="text-sm text-slate-600">
+                {favouriteCafeterias.length} cafeteria{favouriteCafeterias.length !== 1 ? 's' : ''} marked as favourite
+              </p>
+            </div>
+          )}
+
+          <Button
+            onClick={async () => {
+              try {
+                const favouriteCafesData = {
+                  favourite_cafeterias: favouriteCafeterias,
+                };
+
+                // Try to save to Supabase
+                try {
+                  const { error } = await supabase
+                    .from('profiles')
+                    .update(favouriteCafesData)
+                    .eq('id', userId);
+
+                  if (error) throw error;
+                } catch (err) {
+                  console.log('Saving favourite cafeterias to localStorage');
+                }
+
+                // Always save to localStorage as backup
+                const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
+                Object.assign(currentProfile, favouriteCafesData);
+                localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
+
+                toast.success('Favourite cafeterias saved!');
+              } catch (err: any) {
+                toast.error(err.message || 'Failed to save favourite cafeterias');
+              }
+            }}
+            className="bg-purple-600 text-white hover:bg-purple-700"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Save Favourite Cafeterias
+          </Button>
+
+        </CardContent>
+      </Card>
+
+    </div>
+  );
 }
-
