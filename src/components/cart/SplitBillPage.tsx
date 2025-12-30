@@ -223,14 +223,14 @@ export default function SplitBillPage({
       serviceFee,
       total,
       paymentMethod: order?.payment_method || "Split Bill",
-      paymentStatus: "Completed",
+      paymentStatus: "Completed" as const,
       customerName:
         user?.user_metadata?.full_name ||
         user?.email ||
         initiatorName ||
         "Customer",
       customerEmail: user?.email || currentUserEmail || "",
-    };
+    } as ReceiptData;
   };
 
   const openReceipt = async (order: any) => {
@@ -380,8 +380,9 @@ export default function SplitBillPage({
   // Pick default payment selection whenever methods load/change
   useEffect(() => {
     const defaultMethod = paymentMethods.find((m) => m.is_default);
-    if (!selectedPaymentId && (defaultMethod || paymentMethods[0])) {
-      setSelectedPaymentId((defaultMethod || paymentMethods[0]).id);
+    const methodToSelect = defaultMethod || paymentMethods[0];
+    if (!selectedPaymentId && methodToSelect) {
+      setSelectedPaymentId(methodToSelect.id);
     }
   }, [paymentMethods, selectedPaymentId]);
 
@@ -679,7 +680,6 @@ export default function SplitBillPage({
           const { count } = await supabase
             .from("orders")
             .select("*", { count: "exact", head: true })
-            .eq("cafeteria_id", cafeId)
             .gte("created_at", startOfDay);
 
           // Use safe access for cafeteria name

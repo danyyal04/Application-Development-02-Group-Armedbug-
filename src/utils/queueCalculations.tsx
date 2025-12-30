@@ -131,8 +131,8 @@ export function generateQueueNumber(cafeteriaName: string, dailyOrderCount: numb
   const prefix = (cafeteriaName && cafeteriaName[0]) ? cafeteriaName[0].toUpperCase() : 'A';
   
   // Format number with leading zero (e.g. 1 -> 01, 10 -> 10)
-  // We add 1 to count because this is the *new* order
-  const number = (dailyOrderCount + 1).toString().padStart(2, '0');
+  // dailyOrderCount is the total orders across all cafes today
+  const sequenceNumber = (dailyOrderCount + 1).toString().padStart(2, '0');
   
-  return `${prefix}${number}`;
+  return `${prefix}${sequenceNumber}`;
 }
