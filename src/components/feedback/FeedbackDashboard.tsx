@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Star, MessageSquare, Calendar, Filter, TrendingUp, AlertCircle, Send, X } from 'lucide-react';
+import { Star, MessageSquare, Calendar, Filter, TrendingUp, AlertCircle, Send, X, Pencil } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -34,6 +34,7 @@ export default function FeedbackDashboard() {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [editingReply, setEditingReply] = useState<string | null>(null);
 
   // Load feedback from database
   const loadFeedback = async () => {
@@ -176,6 +177,7 @@ export default function FeedbackDashboard() {
       setFeedbackList(updatedFeedback);
       setReplyingTo(null);
       setReplyText('');
+      setEditingReply(null); // Exit edit mode
       
       // UC034 - NF: Confirmation message
       toast.success('Reply posted successfully', {
@@ -193,6 +195,13 @@ export default function FeedbackDashboard() {
   const handleCancelReply = () => {
     setReplyingTo(null);
     setReplyText('');
+    setEditingReply(null);
+  };
+
+  // Handle edit reply
+  const handleEditReply = (feedbackId: string, currentReplyText: string) => {
+    setEditingReply(feedbackId);
+    setReplyText(currentReplyText);
   };
 
   // Render star rating
@@ -408,14 +417,59 @@ export default function FeedbackDashboard() {
                 {/* Owner Reply (if exists) */}
                 {feedback.hasReply && feedback.reply && (
                   <div className="bg-purple-50 border-l-4 border-purple-600 rounded-lg p-4 mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MessageSquare className="w-4 h-4 text-purple-600" />
-                      <span className="text-sm text-purple-900">Your Reply</span>
-                      <span className="text-xs text-purple-600">
-                        {feedback.reply.date} at {feedback.reply.time}
-                      </span>
-                    </div>
-                    <p className="text-slate-700">{feedback.reply.text}</p>
+                    {editingReply === feedback.id ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageSquare className="w-4 h-4 text-purple-600" />
+                          <span className="text-sm text-purple-900">Edit Your Reply</span>
+                        </div>
+                        <Textarea
+                          placeholder="Update your response..."
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          className="min-h-[100px]"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handlePostReply(feedback.id)}
+                            className="bg-purple-800 hover:bg-purple-900"
+                            size="sm"
+                          >
+                            <Send className="w-4 h-4 mr-2" />
+                            Update Reply
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleCancelReply}
+                            size="sm"
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4 text-purple-600" />
+                            <span className="text-sm text-purple-900">Your Reply</span>
+                            <span className="text-xs text-purple-600">
+                              {feedback.reply.date} at {feedback.reply.time}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditReply(feedback.id, feedback.reply?.text || '')}
+                            className="h-8 w-8 p-0 text-purple-600 hover:text-purple-800 hover:bg-purple-100"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <p className="text-slate-700">{feedback.reply.text}</p>
+                      </>
+                    )}
                   </div>
                 )}
 
