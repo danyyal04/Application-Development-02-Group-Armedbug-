@@ -330,7 +330,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
   };
 
   // UC033 - NF: Submit feedback
-  const handleSubmitFeedback = () => {
+  const handleSubmitFeedback = async () => {
     if (!selectedOrder) return;
     
     // Validation
@@ -343,25 +343,86 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
       return;
     }
     
-    // Update order with feedback submitted
-    setOrders(orders.map(order =>
-      order.id === selectedOrder.id
-        ? { ...order, feedbackSubmitted: true }
-        : order
-    ));
-    
-    // UC033 - NF: Confirmation message
-    toast.success('Thank you for your feedback!', {
-      description: 'Your review helps us improve our service',
-    });
-    
-    // Close dialog and reset form
-    setFeedbackDialogOpen(false);
-    setSelectedOrder(null);
-    setRating(0);
-    setComment('');
-    setPhotoFile(null);
-    setPhotoPreview(null);
+    try {
+      // Get current user info
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('You must be logged in to submit feedback');
+        return;
+      }
+
+      // Handle photo upload if exists
+      let photoUrl = null;
+      if (photoFile) {
+        const fileExt = photoFile.name.split('.').pop();
+        const fileName = `${user.id}/${selectedOrder.id}_${Date.now()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('feedback-photos')
+          .upload(fileName, photoFile);
+
+        if (uploadError) {
+          console.error('Photo upload error:', uploadError);
+          // Continue without photo if upload fails
+        } else if (uploadData) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('feedback-photos')
+            .getPublicUrl(fileName);
+          photoUrl = publicUrl;
+        }
+      }
+
+      // Insert feedback into database
+      const { error: feedbackError } = await supabase
+        .from('feedback')
+        .insert({
+          order_id: selectedOrder.id,
+          user_id: user.id,
+          customer_name: user.user_metadata?.name || user.email?.split('@')[0] || 'Customer',
+          customer_email: user.email || '',
+          rating: rating,
+          comment: comment.trim(),
+          photo_url: photoUrl,
+          order_items: selectedOrder.items,
+          cafeteria_name: selectedOrder.cafeteria,
+          has_reply: false,
+        });
+
+      if (feedbackError) throw feedbackError;
+
+      // Update order with feedback submitted flag
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({ feedback_submitted: true })
+        .eq('id', selectedOrder.id);
+
+      if (orderError) throw orderError;
+
+      // Update local state
+      setOrders(orders.map(order =>
+        order.id === selectedOrder.id
+          ? { ...order, feedbackSubmitted: true }
+          : order
+      ));
+      
+      // UC033 - NF: Confirmation message
+      toast.success('Thank you for your feedback!', {
+        description: 'Your review helps us improve our service',
+      });
+      
+      // Close dialog and reset form
+      setFeedbackDialogOpen(false);
+      setSelectedOrder(null);
+      setRating(0);
+      setComment('');
+      setPhotoFile(null);
+      setPhotoPreview(null);
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      toast.error('Failed to submit feedback', {
+        description: 'Please try again later',
+      });
+    }
   };
 
   // Handle notification toggle

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star, MessageSquare, Calendar, Filter, TrendingUp, AlertCircle, Send, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -7,6 +7,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Alert, AlertDescription } from '../ui/alert';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Feedback {
   id: string;
@@ -18,103 +19,89 @@ interface Feedback {
   time: string;
   orderItems: string[];
   hasReply: boolean;
-  reply?: {
+  photoUrl?: string | null;
+  reply: {
     text: string;
     date: string;
     time: string;
-  };
+  } | undefined;
 }
 
-// Mock feedback data
-const mockFeedback: Feedback[] = [
-  {
-    id: '1',
-    customerName: 'Ahmad bin Ali',
-    customerEmail: 'ahmad@graduate.utm.my',
-    rating: 5,
-    comment: 'Excellent nasi lemak! The sambal is perfect and food was ready on time. Will definitely order again!',
-    date: '2024-12-27',
-    time: '12:30 PM',
-    orderItems: ['Nasi Lemak', 'Teh Tarik'],
-    hasReply: false,
-  },
-  {
-    id: '2',
-    customerName: 'Siti Nurhaliza',
-    customerEmail: 'siti@student.utm.my',
-    rating: 4,
-    comment: 'Good food and reasonable prices. The mee goreng was tasty but the portion could be slightly bigger.',
-    date: '2024-12-26',
-    time: '01:15 PM',
-    orderItems: ['Mee Goreng', 'Ice Lemon Tea'],
-    hasReply: true,
-    reply: {
-      text: 'Thank you for your feedback! We\'re glad you enjoyed the mee goreng. We\'ll consider increasing the portion size.',
-      date: '2024-12-26',
-      time: '02:30 PM',
-    },
-  },
-  {
-    id: '3',
-    customerName: 'Lee Wei Ming',
-    customerEmail: 'leewei@utm.my',
-    rating: 3,
-    comment: 'Food is okay but had to wait longer than the estimated time. Chicken rice was good though.',
-    date: '2024-12-25',
-    time: '12:45 PM',
-    orderItems: ['Chicken Rice'],
-    hasReply: true,
-    reply: {
-      text: 'We apologize for the delay. We experienced unexpected high demand during lunch hour. We\'re working to improve our time estimates. Thank you for your patience!',
-      date: '2024-12-25',
-      time: '03:00 PM',
-    },
-  },
-  {
-    id: '4',
-    customerName: 'Nurul Aina',
-    customerEmail: 'nurul@graduate.utm.my',
-    rating: 5,
-    comment: 'Amazing laksa! Best I\'ve had on campus. The service was quick and staff were friendly.',
-    date: '2024-12-24',
-    time: '11:30 AM',
-    orderItems: ['Laksa', 'Teh O Ais'],
-    hasReply: false,
-  },
-  {
-    id: '5',
-    customerName: 'Raj Kumar',
-    customerEmail: 'raj@student.utm.my',
-    rating: 2,
-    comment: 'The roti canai was cold when I picked it up. Not happy with the quality this time.',
-    date: '2024-12-23',
-    time: '08:15 AM',
-    orderItems: ['Roti Canai', 'Teh Tarik'],
-    hasReply: false,
-  },
-  {
-    id: '6',
-    customerName: 'Fatimah Hassan',
-    customerEmail: 'fatimah@utm.my',
-    rating: 4,
-    comment: 'Love the variety of menu options! The nasi ayam was delicious. Keep up the good work!',
-    date: '2024-12-22',
-    time: '12:00 PM',
-    orderItems: ['Nasi Ayam', 'Air Sirap'],
-    hasReply: false,
-  },
-];
-
 export default function FeedbackDashboard() {
-  const [feedbackList, setFeedbackList] = useState<Feedback[]>(mockFeedback);
+  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
   const [filterRating, setFilterRating] = useState<string>('all');
   const [filterDate, setFilterDate] = useState<string>('all');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load feedback from database
+  const loadFeedback = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('feedback')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Transform database data to match Feedback interface
+      const transformedFeedback: Feedback[] = (data || []).map((item: any) => {
+        const createdAt = new Date(item.created_at);
+        const replyDate = item.reply_date ? new Date(item.reply_date) : null;
+
+        return {
+          id: item.id,
+          customerName: item.customer_name,
+          customerEmail: item.customer_email,
+          rating: item.rating,
+          comment: item.comment,
+          date: createdAt.toISOString().split('T')[0] || '',
+          time: createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) || '',
+          orderItems: Array.isArray(item.order_items) 
+            ? item.order_items.map((i: any) => i.name || 'Item')
+            : [],
+          hasReply: item.has_reply || false,
+          photoUrl: item.photo_url,
+          reply: item.has_reply && item.reply_text && replyDate ? {
+            text: item.reply_text,
+            date: replyDate.toISOString().split('T')[0] || '',
+            time: replyDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) || '',
+          } : undefined,
+        };
+      });
+
+      setFeedbackList(transformedFeedback);
+    } catch (error) {
+      console.error('Error loading feedback:', error);
+      toast.error('Failed to load feedback');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load feedback on mount and subscribe to changes
+  useEffect(() => {
+    loadFeedback();
+
+    // Subscribe to real-time feedback updates
+    const channel = supabase
+      .channel('feedback-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feedback' },
+        () => loadFeedback()
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, []);
 
   // UC033 - NF: Calculate overall average rating
-  const calculateAverageRating = () => {
-    if (feedbackList.length === 0) return 0;
+  const calculateAverageRating = (): string => {
+    if (feedbackList.length === 0) return '0';
     const sum = feedbackList.reduce((acc, feedback) => acc + feedback.rating, 0);
     return (sum / feedbackList.length).toFixed(1);
   };
@@ -148,37 +135,58 @@ export default function FeedbackDashboard() {
   const filteredFeedback = filterByDate(filterByRating(feedbackList));
 
   // UC034 - NF: Handle reply submission
-  const handlePostReply = (feedbackId: string) => {
+  const handlePostReply = async (feedbackId: string) => {
     if (!replyText.trim()) {
       toast.error('Please enter a reply message');
       return;
     }
 
-    // Simulate API call
-    const now = new Date();
-    const updatedFeedback = feedbackList.map(f => {
-      if (f.id === feedbackId) {
-        return {
-          ...f,
-          hasReply: true,
-          reply: {
-            text: replyText,
-            date: now.toISOString().split('T')[0],
-            time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          },
-        };
-      }
-      return f;
-    });
+    try {
+      const now = new Date();
 
-    setFeedbackList(updatedFeedback);
-    setReplyingTo(null);
-    setReplyText('');
-    
-    // UC034 - NF: Confirmation message
-    toast.success('Reply posted successfully', {
-      description: 'Your response is now visible to the customer',
-    });
+      // Update feedback in database
+      const { error } = await supabase
+        .from('feedback')
+        .update({
+          has_reply: true,
+          reply_text: replyText.trim(),
+          reply_date: now.toISOString(),
+          updated_at: now.toISOString(),
+        })
+        .eq('id', feedbackId);
+
+      if (error) throw error;
+
+      // Update local state
+      const updatedFeedback = feedbackList.map(f => {
+        if (f.id === feedbackId) {
+          return {
+            ...f,
+            hasReply: true,
+            reply: {
+              text: replyText,
+              date: now.toISOString().split('T')[0] || '',
+              time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) || '',
+            },
+          };
+        }
+        return f;
+      });
+
+      setFeedbackList(updatedFeedback);
+      setReplyingTo(null);
+      setReplyText('');
+      
+      // UC034 - NF: Confirmation message
+      toast.success('Reply posted successfully', {
+        description: 'Your response is now visible to the customer',
+      });
+    } catch (error) {
+      console.error('Error posting reply:', error);
+      toast.error('Failed to post reply', {
+        description: 'Please try again later',
+      });
+    }
   };
 
   // UC034 - AF1: Handle cancel reply
@@ -209,6 +217,21 @@ export default function FeedbackDashboard() {
     if (rating === 3) return 'bg-orange-100 text-orange-700';
     return 'bg-red-100 text-red-700';
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="py-8">
+        <Card className="text-center py-16">
+          <CardContent>
+            <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-slate-900 mb-2">Loading feedback...</h3>
+            <p className="text-slate-600">Please wait while we fetch customer reviews</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // UC033 - AF1: No feedback available
   if (feedbackList.length === 0) {
