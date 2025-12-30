@@ -654,7 +654,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
       </Card>
 
       {/* ---------------- Preferences ---------------- */}
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Notification Preferences</CardTitle>
           <CardDescription>Manage how you receive alerts</CardDescription>
