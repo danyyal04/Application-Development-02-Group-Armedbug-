@@ -471,7 +471,7 @@ export default function StudentDashboard({
     }
 
     if (currentPage === "profile") {
-      return <ProfileSettings user={user} />;
+      return <ProfileSettings user={user} onNavigate={onNavigate} />;
     }
 
     return (
@@ -735,7 +735,7 @@ export default function StudentDashboard({
       <SplitBill
         cartItems={splitCartItems}
         totalAmount={splitCartItems.reduce(
-          (sum, item) => sum + item.price * item.quantity,
+          (sum: number, item: any) => sum + item.price * item.quantity,
           0
         )}
         cafeteria={{
@@ -763,7 +763,7 @@ export default function StudentDashboard({
         }}
         onCancel={() => {
           setShowSplitDialog(false);
-          setCheckoutData((prev) =>
+          setCheckoutData((prev: any) =>
             prev ? { ...prev, mode: "normal" } : prev
           );
           onNavigate("menu");

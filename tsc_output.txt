@@ -1,0 +1,42 @@
+src/components/admin/UserManagement.tsx(205,14): error TS2345: Argument of type '(prev: User[]) => (User | { accountStatus: "active"; suspensionReason: undefined; id: string; name: string; email: string; role: "customer" | "cafeteria_owner"; registeredAt: string; businessName?: string; })[]' is not assignable to parameter of type 'SetStateAction<User[]>'.
+  Type '(prev: User[]) => (User | { accountStatus: "active"; suspensionReason: undefined; id: string; name: string; email: string; role: "customer" | "cafeteria_owner"; registeredAt: string; businessName?: string; })[]' is not assignable to type '(prevState: User[]) => User[]'.
+    Type '(User | { accountStatus: "active"; suspensionReason: undefined; id: string; name: string; email: string; role: "customer" | "cafeteria_owner"; registeredAt: string; businessName?: string; })[]' is not assignable to type 'User[]'.
+      Type 'User | { accountStatus: "active"; suspensionReason: undefined; id: string; name: string; email: string; role: "customer" | "cafeteria_owner"; registeredAt: string; businessName?: string; }' is not assignable to type 'User' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+        Type '{ accountStatus: "active"; suspensionReason: undefined; id: string; name: string; email: string; role: "customer" | "cafeteria_owner"; registeredAt: string; businessName?: string; }' is not assignable to type 'User' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+          Types of property 'suspensionReason' are incompatible.
+            Type 'undefined' is not assignable to type 'string'.
+src/components/cart/SplitBillPage.tsx(266,28): error TS2532: Object is possibly 'undefined'.
+src/components/dashboard/StudentDashboard.tsx(738,12): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+src/components/dashboard/StudentDashboard.tsx(738,17): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/components/dashboard/StudentDashboard.tsx(766,28): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/components/feedback/FeedbackDashboard.tsx(174,21): error TS2345: Argument of type '(Feedback | { hasReply: boolean; reply: { text: string; date: string | undefined; time: string; }; id: string; customerName: string; customerEmail: string; rating: number; comment: string; date: string; time: string; orderItems: string[]; })[]' is not assignable to parameter of type 'SetStateAction<Feedback[]>'.
+  Type '(Feedback | { hasReply: boolean; reply: { text: string; date: string | undefined; time: string; }; id: string; customerName: string; customerEmail: string; rating: number; comment: string; date: string; time: string; orderItems: string[]; })[]' is not assignable to type 'Feedback[]'.
+    Type 'Feedback | { hasReply: boolean; reply: { text: string; date: string | undefined; time: string; }; id: string; customerName: string; customerEmail: string; rating: number; comment: string; date: string; time: string; orderItems: string[]; }' is not assignable to type 'Feedback' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+      Type '{ hasReply: boolean; reply: { text: string; date: string | undefined; time: string; }; id: string; customerName: string; customerEmail: string; rating: number; comment: string; date: string; time: string; orderItems: string[]; }' is not assignable to type 'Feedback'.
+        The types of 'reply.date' are incompatible between these types.
+          Type 'string | undefined' is not assignable to type 'string'.
+            Type 'undefined' is not assignable to type 'string'.
+src/components/feedback/FeedbackDashboard.tsx(247,50): error TS2345: Argument of type 'string | 0' is not assignable to parameter of type 'string'.
+  Type 'number' is not assignable to type 'string'.
+src/components/menu/MenuManagement.tsx(61,7): error TS2322: Type 'string | undefined' is not assignable to type 'string | null'.
+  Type 'undefined' is not assignable to type 'string | null'.
+src/components/orders/OrderManagement.tsx(129,36): error TS2345: Argument of type 'Order[]' is not assignable to parameter of type 'import("C:/Application Development/Application-Development-02-Group-Armedbug--1/src/utils/queueCalculations").Order[]'.
+  Type 'Order' is not assignable to type 'import("C:/Application Development/Application-Development-02-Group-Armedbug--1/src/utils/queueCalculations").Order'.
+    Types of property 'createdAt' are incompatible.
+      Type 'string' is not assignable to type 'Date'.
+src/components/orders/OrderManagement.tsx(130,45): error TS2345: Argument of type 'Order[]' is not assignable to parameter of type 'import("C:/Application Development/Application-Development-02-Group-Armedbug--1/src/utils/queueCalculations").Order[]'.
+  Type 'Order' is not assignable to type 'import("C:/Application Development/Application-Development-02-Group-Armedbug--1/src/utils/queueCalculations").Order'.
+    Types of property 'createdAt' are incompatible.
+      Type 'string' is not assignable to type 'Date'.
+src/components/payment/PaymentPage.tsx(78,14): error TS2375: Type '{ onNavigateToPayment: ((invitation: { splitBillId: string; totalAmount: number; myShare: number; cafeteria?: string; }) => void) | undefined; viewMode: "payment-only"; }' is not assignable to type 'SplitBillInvitationsProps' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'onNavigateToPayment' are incompatible.
+    Type '((invitation: { splitBillId: string; totalAmount: number; myShare: number; cafeteria?: string; }) => void) | undefined' is not assignable to type '(invitation: { splitBillId: string; totalAmount: number; myShare: number; cafeteria?: string; _cafeteriaObj?: any; items?: any[]; }) => void'.
+      Type 'undefined' is not assignable to type '(invitation: { splitBillId: string; totalAmount: number; myShare: number; cafeteria?: string; _cafeteriaObj?: any; items?: any[]; }) => void'.
+src/components/profile/ProfileSettings.tsx(35,37): error TS2532: Object is possibly 'undefined'.
+src/components/splitbill/SplitBillInvitations.tsx(238,25): error TS2532: Object is possibly 'undefined'.
+src/components/transactions/TransactionHistory.tsx(191,13): error TS2322: Type '{ id: any; transactionId: string; orderId: string; cafeteriaName: string; cafeteriaLocation: string; date: string | undefined; time: string; queueNumber: string; items: never[]; subtotal: any; tax: number; ... 8 more ...; splitBillPaid: number; }[]' is not assignable to type 'Transaction[]'.
+  Type '{ id: any; transactionId: string; orderId: string; cafeteriaName: string; cafeteriaLocation: string; date: string | undefined; time: string; queueNumber: string; items: never[]; subtotal: any; tax: number; ... 8 more ...; splitBillPaid: number; }' is not assignable to type 'Transaction'.
+    Types of property 'date' are incompatible.
+      Type 'string | undefined' is not assignable to type 'string'.
+        Type 'undefined' is not assignable to type 'string'.
+src/components/ui/checkbox.tsx(7,20): error TS2307: Cannot find module '../../lib/utils' or its corresponding type declarations.

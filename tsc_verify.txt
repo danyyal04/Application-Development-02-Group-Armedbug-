@@ -1,0 +1,136 @@
+node_modules/sonner/dist/index.d.ts(1,8): error TS1259: Module '"C:/Application Development/Application-Development-02-Group-Armedbug--1/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+src/components/profile/ProfileSettings.tsx(3,75): error TS6142: Module '../ui/card' was resolved to 'C:/Application Development/Application-Development-02-Group-Armedbug--1/src/components/ui/card.tsx', but '--jsx' is not set.
+src/components/profile/ProfileSettings.tsx(4,23): error TS6142: Module '../ui/input' was resolved to 'C:/Application Development/Application-Development-02-Group-Armedbug--1/src/components/ui/input.tsx', but '--jsx' is not set.
+src/components/profile/ProfileSettings.tsx(5,23): error TS6142: Module '../ui/label' was resolved to 'C:/Application Development/Application-Development-02-Group-Armedbug--1/src/components/ui/label.tsx', but '--jsx' is not set.
+src/components/profile/ProfileSettings.tsx(6,24): error TS6142: Module '../ui/button' was resolved to 'C:/Application Development/Application-Development-02-Group-Armedbug--1/src/components/ui/button.tsx', but '--jsx' is not set.
+src/components/profile/ProfileSettings.tsx(7,27): error TS6142: Module '../ui/separator' was resolved to 'C:/Application Development/Application-Development-02-Group-Armedbug--1/src/components/ui/separator.tsx', but '--jsx' is not set.
+src/components/profile/ProfileSettings.tsx(8,24): error TS6142: Module '../ui/switch' was resolved to 'C:/Application Development/Application-Development-02-Group-Armedbug--1/src/components/ui/switch.tsx', but '--jsx' is not set.
+src/components/profile/ProfileSettings.tsx(17,8): error TS6142: Module '../ui/select' was resolved to 'C:/Application Development/Application-Development-02-Group-Armedbug--1/src/components/ui/select.tsx', but '--jsx' is not set.
+src/components/profile/ProfileSettings.tsx(18,23): error TS6142: Module '../ui/badge' was resolved to 'C:/Application Development/Application-Development-02-Group-Armedbug--1/src/components/ui/badge.tsx', but '--jsx' is not set.
+src/components/profile/ProfileSettings.tsx(19,26): error TS6142: Module '../ui/checkbox' was resolved to 'C:/Application Development/Application-Development-02-Group-Armedbug--1/src/components/ui/checkbox.tsx', but '--jsx' is not set.
+src/components/profile/ProfileSettings.tsx(442,12): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(446,5): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(449,7): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(450,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(451,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(452,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(455,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(456,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(457,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(472,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(473,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(479,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(484,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(493,7): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(494,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(495,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(496,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(499,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(501,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(502,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(503,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(510,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(511,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(512,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(519,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(520,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(521,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(529,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(534,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(542,7): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(543,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(544,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(545,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(548,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(549,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(550,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(551,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(560,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(561,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(562,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(571,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(572,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(573,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(582,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(587,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(594,7): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(595,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(596,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(597,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(600,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(602,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(603,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(604,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(605,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(607,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(613,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(615,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(616,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(617,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(618,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(620,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(626,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(628,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(629,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(630,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(631,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(633,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(639,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(644,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(652,7): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(653,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(654,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(655,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(658,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(661,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(663,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(664,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(665,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(669,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(670,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(672,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(673,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(674,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(675,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(676,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(677,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(682,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(683,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(684,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(688,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(689,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(691,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(692,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(693,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(694,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(695,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(700,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(701,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(702,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(704,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(705,19): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(710,19): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(721,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(726,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(734,7): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(735,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(736,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(737,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(740,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(743,9): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(744,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(749,17): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(758,19): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(759,21): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(760,23): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(761,23): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(765,21): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(766,23): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(777,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(778,15): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(784,11): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/components/profile/ProfileSettings.tsx(815,13): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.
+src/lib/supabaseClient.ts(3,21): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', or 'nodenext'.
+src/lib/supabaseClient.ts(3,33): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/lib/supabaseClient.ts(4,21): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', or 'nodenext'.
+src/lib/supabaseClient.ts(4,33): error TS2339: Property 'env' does not exist on type 'ImportMeta'.

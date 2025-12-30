@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Star, MapPin, Clock, Filter } from 'lucide-react';
+import { Search, Star, MapPin, Clock, Filter, Heart } from 'lucide-react';
 import { Card, CardContent } from '../ui/card.js';
 import { Input } from '../ui/input.js';
 import { Button } from '../ui/button.js';
@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '../ui/select.js';
 import { supabase } from '../../lib/supabaseClient.js';
+import { toast } from 'sonner';
 
 interface Cafeteria {
   id: string;
@@ -88,6 +89,42 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
 
     fetchCafeterias();
   }, []);
+
+  // Use a Set for faster lookups, but store as array in state for easier JSON serialization
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('favouriteCafeterias');
+      if (saved) {
+        setFavorites(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Failed to load favorites", e);
+    }
+  }, []);
+
+  const toggleFavorite = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    
+    // Calculate new favorites based on current state (favorites is available in closure)
+    const newFavorites = favorites.includes(id) 
+      ? favorites.filter(fId => fId !== id) 
+      : [...favorites, id];
+    
+    // Update State
+    setFavorites(newFavorites);
+    
+    // Perform Side Effects
+    localStorage.setItem('favouriteCafeterias', JSON.stringify(newFavorites));
+    window.dispatchEvent(new Event('storage'));
+
+    if (newFavorites.includes(id)) {
+      toast.success("Cafeteria marked as favourite");
+    } else {
+      toast.info("Cafeteria removed from favourites");
+    }
+  };
 
   const filteredCafeterias = useMemo(() => {
     return cafeterias.filter(cafeteria => {
@@ -213,8 +250,8 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
                   alt={cafeteria.name}
                   className="w-full h-full object-cover"
                 />
-                <Badge 
-                  className={`absolute top-3 right-3 ${
+                 <Badge 
+                  className={`absolute top-3 left-3 ${
                     cafeteria.isOpen 
                       ? 'bg-green-600' 
                       : 'bg-slate-600'
@@ -222,6 +259,18 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
                 >
                   {cafeteria.isOpen ? 'Open Now' : 'Closed'}
                 </Badge>
+                <div 
+                  className="absolute top-3 right-3 p-2 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition-colors shadow-sm cursor-pointer z-10"
+                  onClick={(e) => toggleFavorite(e, cafeteria.id)}
+                >
+                  <Heart 
+                    className={`w-5 h-5 transition-colors ${
+                      favorites.includes(cafeteria.id) 
+                        ? 'fill-red-500 text-red-500' 
+                        : 'text-slate-400 hover:text-red-500'
+                    }`} 
+                  />
+                </div>
               </div>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
