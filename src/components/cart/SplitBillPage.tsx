@@ -719,7 +719,7 @@ export default function SplitBillPage({
                 user_id: user.id,
                 cafeteria_id: cafeId,
                 total_amount: totalAmount,
-                status: "Completed",
+                status: "Pending",
                 paid_at: new Date().toISOString(),
                 items: JSON.stringify(cartItems),
                 payment_method: paymentMethodString,
