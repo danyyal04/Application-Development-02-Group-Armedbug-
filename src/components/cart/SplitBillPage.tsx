@@ -336,7 +336,9 @@ export default function SplitBillPage({
       paid: row.status === "paid",
       paymentStatus: (row.status as Participant["paymentStatus"]) || "pending",
       invitationStatus:
-        (row.status as Participant["invitationStatus"]) || "pending",
+        row.status === "paid" || row.status === "accepted"
+          ? "accepted"
+          : (row.status as Participant["invitationStatus"]) || "pending",
     }));
 
     setParticipants(mapped);
@@ -408,6 +410,26 @@ export default function SplitBillPage({
     }
 
     setShowPaymentDialog(true);
+  };
+
+  const handleUpdateParticipantStatus = async (status: "accepted" | "rejected") => {
+    if (!currentParticipant?.id) {
+      toast.error("Participant not found");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("split_bill_participants")
+      .update({ status })
+      .eq("id", currentParticipant.id);
+
+    if (error) {
+      toast.error(error.message || `Failed to ${status} invitation`);
+      return;
+    }
+
+    toast.success(`Invitation ${status} successfully`);
+    refreshParticipants();
   };
 
   const handleConfirmPayment = () => {
@@ -935,15 +957,7 @@ export default function SplitBillPage({
                               <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 text-white"
-                                onClick={() =>
-                                  setParticipants((prev) =>
-                                    prev.map((p) =>
-                                      p.email === currentUserEmail
-                                        ? { ...p, invitationStatus: "accepted" }
-                                        : p
-                                    )
-                                  )
-                                }
+                                onClick={() => handleUpdateParticipantStatus("accepted")}
                               >
                                 Accept
                               </Button>
@@ -951,15 +965,7 @@ export default function SplitBillPage({
                                 size="sm"
                                 variant="outline"
                                 className="border-red-500 text-red-600"
-                                onClick={() =>
-                                  setParticipants((prev) =>
-                                    prev.map((p) =>
-                                      p.email === currentUserEmail
-                                        ? { ...p, invitationStatus: "rejected" }
-                                        : p
-                                    )
-                                  )
-                                }
+                                onClick={() => handleUpdateParticipantStatus("rejected")}
                               >
                                 Reject
                               </Button>
