@@ -41,6 +41,7 @@ import { Alert, AlertDescription } from "../ui/alert";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabaseClient";
 import { generateQueueNumber } from "../../utils/queueCalculations";
+import DigitalReceipt from "../transactions/DigitalReceipt";
 
 interface CartItem {
   id: string;
@@ -67,6 +68,32 @@ interface PaymentMethod {
   name: string;
   details: string;
   is_default?: boolean;
+}
+
+interface ReceiptItem {
+  name: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+}
+
+interface ReceiptData {
+  transactionId: string;
+  orderId: string;
+  cafeteriaName: string;
+  cafeteriaLocation: string;
+  date: string;
+  time: string;
+  queueNumber: string;
+  items: ReceiptItem[];
+  subtotal: number;
+  tax: number;
+  serviceFee: number;
+  total: number;
+  paymentMethod: string;
+  paymentStatus: "Completed" | "Pending" | "Failed" | "Split Bill In Progress";
+  customerName: string;
+  customerEmail: string;
 }
 
 interface SplitBillPageProps {
@@ -109,6 +136,9 @@ export default function SplitBillPage({
   const [sessionExpired, setSessionExpired] = useState(false);
   const [generatedQueueNum, setGeneratedQueueNum] = useState<string>("");
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const receiptShownRef = useRef(false);
 
   const normalizedEmail = (currentUserEmail || "").toLowerCase();
   const currentParticipant = participants.find(
@@ -120,8 +150,96 @@ export default function SplitBillPage({
     .reduce((sum, p) => sum + p.amount, 0);
   const unpaidAmount = totalAmount - totalPaid;
   const progressPercentage = (totalPaid / totalAmount) * 100;
-  const allPaid = participants.every((p) => p.paid);
+  const allPaid = participants.length > 0 && participants.every((p) => p.paid);
   const isInitiator = currentUserEmail === participants[0]?.email;
+
+  const parseReceiptItems = (rawItems: any) => {
+    if (!rawItems) return [];
+    if (Array.isArray(rawItems)) {
+      return rawItems.map((item: any) => ({
+        name: item.name,
+        quantity: Number(item.quantity) || 0,
+        price: Number(item.price) || 0,
+        subtotal: (Number(item.price) || 0) * (Number(item.quantity) || 0),
+      }));
+    }
+    if (typeof rawItems === "string") {
+      try {
+        const parsed = JSON.parse(rawItems);
+        return parseReceiptItems(parsed);
+      } catch (err) {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const buildReceiptData = async (order: any) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const items = parseReceiptItems(order?.items);
+    const fallbackItems = cartItems.map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      subtotal: item.price * item.quantity,
+    }));
+
+    const receiptItems = items.length > 0 ? items : fallbackItems;
+    const subtotal =
+      typeof order?.subtotal === "number"
+        ? order.subtotal
+        : receiptItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const serviceFee =
+      typeof order?.service_fee === "number" ? order.service_fee : 0;
+    const tax = typeof order?.tax === "number" ? order.tax : 0;
+    const total =
+      typeof order?.total_amount === "number" ? order.total_amount : totalAmount;
+
+    const createdAt = order?.created_at ? new Date(order.created_at) : new Date();
+    const date = createdAt.toISOString().split("T")[0] as string;
+    const time = createdAt.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    return {
+      transactionId: order?.id
+        ? `TXN-${order.id.slice(0, 8).toUpperCase()}`
+        : `TXN-${splitBillId.slice(0, 8).toUpperCase()}`,
+      orderId: order?.id
+        ? `ORD-${order.id.slice(-6).toUpperCase()}`
+        : "PENDING",
+      cafeteriaName: cafeteria.name || "Cafeteria",
+      cafeteriaLocation: cafeteria.location || "Unknown",
+      date,
+      time,
+      queueNumber: order?.queue_number || generatedQueueNum || "-",
+      items: receiptItems,
+      subtotal,
+      tax,
+      serviceFee,
+      total,
+      paymentMethod: order?.payment_method || "Split Bill",
+      paymentStatus: "Completed" as const,
+      customerName:
+        user?.user_metadata?.full_name ||
+        user?.email ||
+        initiatorName ||
+        "Customer",
+      customerEmail: user?.email || currentUserEmail || "",
+    } as ReceiptData;
+  };
+
+  const openReceipt = async (order: any) => {
+    if (receiptShownRef.current) return;
+    const data = await buildReceiptData(order);
+    setReceiptData(data);
+    setShowReceipt(true);
+    receiptShownRef.current = true;
+  };
 
   const getPickupTimeLabel = (value: string) => {
     switch (value) {
@@ -218,7 +336,9 @@ export default function SplitBillPage({
       paid: row.status === "paid",
       paymentStatus: (row.status as Participant["paymentStatus"]) || "pending",
       invitationStatus:
-        (row.status as Participant["invitationStatus"]) || "pending",
+        row.status === "paid" || row.status === "accepted"
+          ? "accepted"
+          : (row.status as Participant["invitationStatus"]) || "pending",
     }));
 
     setParticipants(mapped);
@@ -262,8 +382,9 @@ export default function SplitBillPage({
   // Pick default payment selection whenever methods load/change
   useEffect(() => {
     const defaultMethod = paymentMethods.find((m) => m.is_default);
-    if (!selectedPaymentId && (defaultMethod || paymentMethods[0])) {
-      setSelectedPaymentId((defaultMethod || paymentMethods[0]).id);
+    const methodToSelect = defaultMethod || paymentMethods[0];
+    if (!selectedPaymentId && methodToSelect) {
+      setSelectedPaymentId(methodToSelect.id);
     }
   }, [paymentMethods, selectedPaymentId]);
 
@@ -289,6 +410,26 @@ export default function SplitBillPage({
     }
 
     setShowPaymentDialog(true);
+  };
+
+  const handleUpdateParticipantStatus = async (status: "accepted" | "rejected") => {
+    if (!currentParticipant?.id) {
+      toast.error("Participant not found");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("split_bill_participants")
+      .update({ status })
+      .eq("id", currentParticipant.id);
+
+    if (error) {
+      toast.error(error.message || `Failed to ${status} invitation`);
+      return;
+    }
+
+    toast.success(`Invitation ${status} successfully`);
+    refreshParticipants();
   };
 
   const handleConfirmPayment = () => {
@@ -503,19 +644,6 @@ export default function SplitBillPage({
           } = await supabase.auth.getUser();
           if (!user) return;
 
-          // Check if I am the initiator (to prevent race conditions/duplicates from multiple users)
-          // We fetch the session to get the initiator_user_id
-          const { data: session } = await supabase
-            .from("split_bill_sessions")
-            .select("initiator_user_id")
-            .eq("id", splitBillId)
-            .single();
-
-          if (!session || session.initiator_user_id !== user.id) {
-            // Not the initiator, do not create the order
-            return;
-          }
-
           // Prevent double creation
           orderCreatedRef.current = true;
 
@@ -532,6 +660,7 @@ export default function SplitBillPage({
             if (existingOrder.queue_number) {
                setGeneratedQueueNum(existingOrder.queue_number);
             }
+            await openReceipt(existingOrder);
             return;
           }
 
@@ -573,7 +702,6 @@ export default function SplitBillPage({
           const { count } = await supabase
             .from("orders")
             .select("*", { count: "exact", head: true })
-            .eq("cafeteria_id", cafeId)
             .gte("created_at", startOfDay);
 
           // Use safe access for cafeteria name
@@ -584,21 +712,25 @@ export default function SplitBillPage({
           const qNum = generateQueueNumber(cafeName, count || 0);
 
           // Create the order
-          const { error: orderError } = await supabase.from("orders").insert([
-            {
-              user_id: user.id,
-              cafeteria_id: cafeId,
-              total_amount: totalAmount,
-              status: "Pending",
-              paid_at: new Date().toISOString(),
-              items: JSON.stringify(cartItems),
-              payment_method: paymentMethodString,
-              subtotal: totalAmount - 0.5,
-              tax: 0,
-              service_fee: 0.5,
-              queue_number: qNum,
-            },
-          ]);
+          const { data: createdOrder, error: orderError } = await supabase
+            .from("orders")
+            .insert([
+              {
+                user_id: user.id,
+                cafeteria_id: cafeId,
+                total_amount: totalAmount,
+                status: "Pending",
+                paid_at: new Date().toISOString(),
+                items: JSON.stringify(cartItems),
+                payment_method: paymentMethodString,
+                subtotal: totalAmount - 0.5,
+                tax: 0,
+                service_fee: 0.5,
+                queue_number: qNum,
+              },
+            ])
+            .select()
+            .single();
           setGeneratedQueueNum(qNum);
 
           if (orderError) {
@@ -607,6 +739,9 @@ export default function SplitBillPage({
           } else {
             // Show success dialog instead of just toast
             setShowSuccessDialog(true);
+            if (createdOrder) {
+              await openReceipt(createdOrder);
+            }
           }
         } catch (err) {
           console.error(err);
@@ -635,6 +770,41 @@ export default function SplitBillPage({
 
     return () => clearTimeout(timer);
   }, [allPaid]);
+
+  useEffect(() => {
+    if (!allPaid || receiptShownRef.current) return;
+    let isMounted = true;
+    const paymentMethodString = `Split Bill ${splitBillId}`;
+
+    const fetchOrderForReceipt = async () => {
+      const { data: existingOrder } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("payment_method", paymentMethodString)
+        .maybeSingle();
+
+      if (existingOrder && isMounted) {
+        await openReceipt(existingOrder);
+      }
+    };
+
+    const interval = setInterval(fetchOrderForReceipt, 1500);
+    fetchOrderForReceipt();
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [allPaid, splitBillId]);
+
+  if (showReceipt && receiptData) {
+    return (
+      <DigitalReceipt
+        receipt={receiptData}
+        onClose={() => setShowReceipt(false)}
+      />
+    );
+  }
 
   // UC020: Exception Flow - Session Expired
   if (sessionExpired) {
@@ -787,15 +957,7 @@ export default function SplitBillPage({
                               <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 text-white"
-                                onClick={() =>
-                                  setParticipants((prev) =>
-                                    prev.map((p) =>
-                                      p.email === currentUserEmail
-                                        ? { ...p, invitationStatus: "accepted" }
-                                        : p
-                                    )
-                                  )
-                                }
+                                onClick={() => handleUpdateParticipantStatus("accepted")}
                               >
                                 Accept
                               </Button>
@@ -803,15 +965,7 @@ export default function SplitBillPage({
                                 size="sm"
                                 variant="outline"
                                 className="border-red-500 text-red-600"
-                                onClick={() =>
-                                  setParticipants((prev) =>
-                                    prev.map((p) =>
-                                      p.email === currentUserEmail
-                                        ? { ...p, invitationStatus: "rejected" }
-                                        : p
-                                    )
-                                  )
-                                }
+                                onClick={() => handleUpdateParticipantStatus("rejected")}
                               >
                                 Reject
                               </Button>
@@ -1229,15 +1383,7 @@ export default function SplitBillPage({
             <DialogTitle>Payment Successful</DialogTitle>
             <DialogDescription>Your order has been placed.</DialogDescription>
           </DialogHeader>
-          <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-lg border border-emerald-100">
-            <CheckCircle className="w-5 h-5 text-emerald-600" />
-            <div>
-              <p className="text-slate-900 font-semibold">
-                RM {totalAmount.toFixed(2)}
-              </p>
-              <p className="text-sm text-slate-600">Split Bill Completed</p>
-            </div>
-          </div>
+
 
           <div className="mt-6 mb-6 text-center">
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">

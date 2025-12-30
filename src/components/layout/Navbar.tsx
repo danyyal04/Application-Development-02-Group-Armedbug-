@@ -25,6 +25,7 @@ import {
 } from "../ui/dropdown-menu.js";
 import { Avatar, AvatarFallback } from "../ui/avatar.js";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet.js";
+import { supabase } from "../../lib/supabaseClient";
 
 interface NavbarProps {
   user: {
@@ -50,6 +51,7 @@ export default function Navbar({
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
   const [hasActiveSplit, setHasActiveSplit] = useState(false);
+  const [invitationCount, setInvitationCount] = useState(0);
 
   const initials = user.name
     .split(" ")
@@ -62,7 +64,6 @@ export default function Navbar({
 
   // Track active split-bill session from localStorage
   const splitStorageKey = `utm-active-split-${user.id}`;
-  const invitationCount = 0; // TODO: replace with real invitations count when backend available
   useEffect(() => {
     const readActive = () => {
       try {
@@ -85,6 +86,95 @@ export default function Navbar({
       window.removeEventListener("utm-active-split-changed", handler as any);
     };
   }, [splitStorageKey]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadInvitationCount = async () => {
+      try {
+        const { data: resolvedEmail, error: resolvedError } =
+          await supabase.rpc("current_user_email_resolved");
+        if (resolvedError) {
+          console.warn("Failed to resolve email:", resolvedError.message);
+        }
+
+        const possibleIdentifiers = Array.from(
+          new Set(
+            [
+              resolvedEmail,
+              user.email,
+              user?.email,
+              user?.name,
+              user?.email?.toLowerCase(),
+            ]
+              .filter(Boolean)
+              .map((value) => String(value).trim().toLowerCase())
+          )
+        );
+
+        if (possibleIdentifiers.length === 0) {
+          if (isMounted) setInvitationCount(0);
+          return;
+        }
+
+        const { data: participantRows, error: participantError } =
+          await supabase
+            .from("split_bill_participants")
+            .select("session_id, status")
+            .in("identifier", possibleIdentifiers)
+            .eq("status", "pending");
+
+        if (participantError) {
+          console.warn(
+            "Failed to load invitation count:",
+            participantError.message
+          );
+          return;
+        }
+
+        const sessionIds = Array.from(
+          new Set(
+            (participantRows || [])
+              .map((row: any) => row.session_id)
+              .filter(Boolean)
+          )
+        );
+
+        if (sessionIds.length === 0) {
+          if (isMounted) setInvitationCount(0);
+          return;
+        }
+
+        const { data: sessions, error: sessionsError } = await supabase
+          .from("split_bill_sessions")
+          .select("id")
+          .in("id", sessionIds)
+          .eq("status", "active");
+
+        if (sessionsError) {
+          console.warn(
+            "Failed to load invitation sessions:",
+            sessionsError.message
+          );
+          return;
+        }
+
+        if (isMounted) {
+          setInvitationCount((sessions || []).length);
+        }
+      } catch (err) {
+        console.warn("Failed to load invitation count", err);
+      }
+    };
+
+    loadInvitationCount();
+    const interval = setInterval(loadInvitationCount, 10000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [user.email, user.name]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 shadow-sm">

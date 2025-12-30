@@ -747,6 +747,7 @@ export default function StudentDashboard({
         autoOpenDialog
         onInitiateSplitBill={({ sessionId, totalAmount }) => {
           setShowSplitDialog(false);
+          setCartItems([]); // Clear cart upon initiation
           persistActiveSplit({
             sessionId: sessionId || "new-session",
             cartItems: splitCartItems,

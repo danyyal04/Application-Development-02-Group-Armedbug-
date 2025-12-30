@@ -177,7 +177,7 @@ export default function DigitalReceipt({
           {onClose && (
             <Button
               onClick={onClose}
-              className="w-full bg-purple-800 hover:bg-purple-900"
+              className="w-full bg-[#800000] text-white hover:bg-[#6b0000] hover:text-white"
             >
               Close Receipt
             </Button>

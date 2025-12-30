@@ -646,6 +646,7 @@ export default function SplitBillInvitations({
                         <Button
                           variant="outline"
                           size="sm"
+                          className="bg-[#800000] text-white hover:bg-[#6b0000] hover:text-white"
                           onClick={() => handleTrackPayment(invitation)}
                         >
                           Track Payment

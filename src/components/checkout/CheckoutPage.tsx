@@ -98,6 +98,7 @@ export default function CheckoutPage({
     method: "",
   });
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
   const [checkoutMode, setCheckoutMode] = useState<"normal" | "split">(
     initialMode
   );
@@ -407,7 +408,6 @@ export default function CheckoutPage({
       const { count } = await supabase
         .from("orders")
         .select("*", { count: "exact", head: true })
-        .eq("cafeteria_id", safeCafeteriaId)
         .gte("created_at", startOfDay);
 
       const qNum = generateQueueNumber(cafeteria.name, count || 0);
@@ -494,7 +494,7 @@ export default function CheckoutPage({
       toast.success("Payment successful. Your order is being prepared.");
       setShowPaymentDialog(false);
       setPaymentCredentials("");
-      setShowSuccessDialog(true);
+      setShowReceipt(true);
     } catch {
       toast.error(
         "Unable to connect to payment service. Please try again later."
@@ -1130,39 +1130,33 @@ export default function CheckoutPage({
         </DialogContent>
       </Dialog>
 
-      {showSuccessDialog && receiptData && (
+      {showReceipt && receiptData && (
         <div className="fixed inset-0 z-50 bg-slate-100/90 backdrop-blur-sm overflow-y-auto pt-10">
           <DigitalReceipt
             receipt={receiptData}
             onClose={() => {
-              setShowSuccessDialog(false);
-              onSuccess();
+              setShowReceipt(false);
+              setShowSuccessDialog(true);
             }}
           />
         </div>
       )}
 
-      {/* Fallback dialog if something fails with receipt data, though unlikely if logic holds */}
       <Dialog
-        open={showSuccessDialog && !receiptData}
-        onOpenChange={handleSuccessDialogChange}
+        open={showSuccessDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowSuccessDialog(false);
+            onSuccess();
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Payment Successful</DialogTitle>
             <DialogDescription>Your order has been placed.</DialogDescription>
           </DialogHeader>
-          <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-lg border border-emerald-100">
-            <CheckCircle className="w-5 h-5 text-emerald-600" />
-            <div>
-              <p className="text-slate-900 font-semibold">
-                RM {paymentSummary.amount.toFixed(2)}
-              </p>
-              <p className="text-sm text-slate-600">
-                Paid with {paymentSummary.method || "your selected method"}
-              </p>
-            </div>
-          </div>
+
 
           <div className="mt-6 mb-6 text-center">
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">
@@ -1179,14 +1173,22 @@ export default function CheckoutPage({
             </div>
           </div>
 
-          <div className="flex gap-2 mt-4">
-            <Button
-              className="flex-1 text-white hover:opacity-90"
-              style={{ backgroundColor: "oklch(40.8% 0.153 2.432)" }}
-              onClick={() => handleSuccessDialogChange(false)}
-            >
-              View My Orders
-            </Button>
+          <div className="space-y-3">
+            <p className="text-sm text-center text-slate-600">
+              We will notify the cafeteria and update your order status shortly.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button
+                className="w-full text-white"
+                style={{ backgroundColor: "oklch(40.8% 0.153 2.432)" }}
+                onClick={() => {
+                  setShowSuccessDialog(false);
+                  onSuccess();
+                }}
+              >
+                View My Orders
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
