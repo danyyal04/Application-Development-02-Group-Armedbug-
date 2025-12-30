@@ -1383,15 +1383,7 @@ export default function SplitBillPage({
             <DialogTitle>Payment Successful</DialogTitle>
             <DialogDescription>Your order has been placed.</DialogDescription>
           </DialogHeader>
-          <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-lg border border-emerald-100">
-            <CheckCircle className="w-5 h-5 text-emerald-600" />
-            <div>
-              <p className="text-slate-900 font-semibold">
-                RM {totalAmount.toFixed(2)}
-              </p>
-              <p className="text-sm text-slate-600">Split Bill Completed</p>
-            </div>
-          </div>
+
 
           <div className="mt-6 mb-6 text-center">
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">
