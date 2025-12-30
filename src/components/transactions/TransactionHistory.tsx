@@ -278,12 +278,10 @@ export default function TransactionHistory() {
             total: order.total_amount,
             paymentMethod: order.payment_method || "Unknown",
             paymentStatus:
-              isSplitBillOrder && order.paid_at
+              order.paid_at || order.status === "Paid" || order.status === "Completed"
                 ? "Completed"
                 : order.status === "Pending"
                 ? "Pending"
-                : order.status === "Paid" || order.status === "Completed"
-                ? "Completed"
                 : "Failed",
             // Database might use 'Paid', component uses 'Completed'
             customerName: user.user_metadata?.full_name || user.email || "Me",
