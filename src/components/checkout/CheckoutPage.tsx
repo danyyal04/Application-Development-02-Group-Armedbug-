@@ -462,6 +462,33 @@ export default function CheckoutPage({
         return;
       }
 
+      if (newOrder?.id) {
+        const receiptInsert = {
+          order_id: newOrder.id,
+          user_id: user.id,
+          cafeteria_id: safeCafeteriaId,
+          cafeteria_name: cafeteria.name,
+          cafeteria_location: cafeteria.location || "UTM",
+          queue_number: qNum,
+          items: cartItems,
+          subtotal: subtotal,
+          tax: 0,
+          service_fee: serviceFee,
+          total_amount: total,
+          payment_method: payment.name || payment.type,
+          payment_status: "Completed",
+          customer_name: user.user_metadata?.full_name || user.email || "Me",
+          customer_email: user.email || "",
+        };
+
+        const { error: receiptError } = await supabase
+          .from("receipts")
+          .upsert([receiptInsert], { onConflict: "order_id" });
+        if (receiptError) {
+          console.warn("Failed to save receipt", receiptError);
+        }
+      }
+
       // Construct Receipt Data
       const receiptData: any = {
         transactionId: `TXN-${(newOrder?.id || "").slice(0, 8).toUpperCase()}`,

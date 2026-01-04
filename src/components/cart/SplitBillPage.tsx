@@ -233,6 +233,61 @@ export default function SplitBillPage({
     } as ReceiptData;
   };
 
+  const saveReceipt = async (order: any) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user || !order?.id) return;
+
+    const items = parseReceiptItems(order?.items);
+    const fallbackItems = cartItems.map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      subtotal: item.price * item.quantity,
+    }));
+    const receiptItems = items.length > 0 ? items : fallbackItems;
+
+    const subtotal =
+      typeof order?.subtotal === "number"
+        ? order.subtotal
+        : receiptItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const serviceFee =
+      typeof order?.service_fee === "number" ? order.service_fee : 0;
+    const tax = typeof order?.tax === "number" ? order.tax : 0;
+    const total =
+      typeof order?.total_amount === "number" ? order.total_amount : totalAmount;
+
+    const receiptInsert = {
+      order_id: order.id,
+      user_id: user.id,
+      cafeteria_id: order.cafeteria_id || (cafeteria as any).id || null,
+      cafeteria_name: cafeteria.name || "Cafeteria",
+      cafeteria_location: cafeteria.location || "Unknown",
+      queue_number: order.queue_number || generatedQueueNum || "-",
+      items: receiptItems,
+      subtotal: subtotal,
+      tax: tax,
+      service_fee: serviceFee,
+      total_amount: total,
+      payment_method: "Split Bill",
+      payment_status: "Completed",
+      customer_name:
+        user?.user_metadata?.full_name ||
+        user?.email ||
+        initiatorName ||
+        "Customer",
+      customer_email: user?.email || currentUserEmail || "",
+    };
+
+    const { error: receiptError } = await supabase
+      .from("receipts")
+      .upsert([receiptInsert], { onConflict: "order_id" });
+    if (receiptError) {
+      console.warn("Failed to save receipt", receiptError);
+    }
+  };
+
   const openReceipt = async (order: any) => {
     if (receiptShownRef.current) return;
     const data = await buildReceiptData(order);
@@ -740,6 +795,7 @@ export default function SplitBillPage({
             // Show success dialog instead of just toast
             setShowSuccessDialog(true);
             if (createdOrder) {
+              await saveReceipt(createdOrder);
               await openReceipt(createdOrder);
             }
           }
