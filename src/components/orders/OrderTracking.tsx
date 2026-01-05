@@ -195,7 +195,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                if (!queuePositionsMap[o.cafeteria_id]) {
                    queuePositionsMap[o.cafeteria_id] = [];
                }
-               queuePositionsMap[o.cafeteria_id].push(o.id);
+               queuePositionsMap[o.cafeteria_id]!.push(o.id);
            });
         }
       }
@@ -214,7 +214,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
         // Find position in global queue
         let qPos = 0;
         if (queuePositionsMap[row.cafeteria_id]) {
-            const idx = queuePositionsMap[row.cafeteria_id].indexOf(row.id);
+            const idx = queuePositionsMap[row.cafeteria_id]!.indexOf(row.id);
             if (idx !== -1) {
                 qPos = idx;
             } else {
