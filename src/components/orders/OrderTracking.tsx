@@ -61,7 +61,7 @@ const parseItems = (raw: any): OrderItem[] => {
   }
 };
 
-const mapRowToOrder = (row: any): Order => ({
+const mapRowToOrder = (row: any, queueLength: number = 0): Order => ({
   id: row.id,
   orderNumber: row.order_number,
   cafeteria: row.cafeteria_name || "Cafeteria",
@@ -78,7 +78,7 @@ const mapRowToOrder = (row: any): Order => ({
       status: row.status,
       createdAt: new Date(row.created_at),
     },
-    0
+    queueLength
   ),
 });
 
@@ -167,7 +167,10 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
 
       // Fetch cafeterias
       let cafeteriaMap: Record<string, string> = {};
+      let queuePositionsMap: Record<string, string[]> = {}; // cafId -> [orderId, orderId...] sorted by time
+
       if (cafeteriaIds.length > 0) {
+        // Fetch names
         const { data: cafData, error: cafError } = await supabase
           .from("cafeterias")
           .select("id, name")
@@ -177,8 +180,23 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
           cafData.forEach((c) => {
             cafeteriaMap[c.id] = c.name;
           });
-        } else {
-          console.warn("Failed to fetch cafeterias:", cafError);
+        }
+        
+        // Fetch ALL active orders for these cafeterias to determine position
+        const { data: activeOrdersData } = await supabase
+          .from("orders")
+            .select("id, cafeteria_id, created_at")
+            .in("cafeteria_id", cafeteriaIds)
+            .in("status", ["Pending", "Cooking"])
+            .order("created_at", { ascending: true });
+            
+        if (activeOrdersData) {
+           activeOrdersData.forEach(o => {
+               if (!queuePositionsMap[o.cafeteria_id]) {
+                   queuePositionsMap[o.cafeteria_id] = [];
+               }
+               queuePositionsMap[o.cafeteria_id].push(o.id);
+           });
         }
       }
 
@@ -192,8 +210,21 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
       const mappedOrders = uniqueOrders.map((row) => {
         // Use mapped name if available, fallback to existing logic
         const cafName = cafeteriaMap[row.cafeteria_id] || row.cafeteria_name || "Cafeteria";
+        
+        // Find position in global queue
+        let qPos = 0;
+        if (queuePositionsMap[row.cafeteria_id]) {
+            const idx = queuePositionsMap[row.cafeteria_id].indexOf(row.id);
+            if (idx !== -1) {
+                qPos = idx;
+            } else {
+                // If not found in active list (e.g. it's completed or not Pending/Cooking), 0 overhead
+                qPos = 0; 
+            }
+        }
+        
         return {
-           ...mapRowToOrder({ ...row, cafeteria_name: cafName }),
+           ...mapRowToOrder({ ...row, cafeteria_name: cafName }, qPos),
         };
       });
       
@@ -596,7 +627,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                                     })
                                   : ""}
                               </p>
-                              <p className="text-purple-700">
+                              <p className="text-purple-700 font-bold">
                                 RM {order.total.toFixed(2)}
                               </p>
                             </div>
@@ -701,38 +732,54 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
             <TabsContent value="history">
               <div className="space-y-4">
                 {completedOrders.map((order) => (
-                  <Card key={order.id}>
-                    <CardContent className="py-6">
-                      {/* Order Details */}
-                      <div className="flex items-center gap-2 mb-2">
-                        <p>{order.id}</p>
-                        <Badge variant="secondary">Completed</Badge>
-                        {order.feedbackSubmitted && (
-                          <Badge className="bg-purple-100 text-purple-700">
-                            <Star className="w-3 h-3 mr-1 fill-purple-700" />
-                            Feedback Submitted
-                          </Badge>
-                        )}
+                  <Card key={order.id} className="overflow-hidden border border-slate-200">
+                    <CardContent className="p-6">
+                      {/* Header: ID, Status, Total */}
+                      <div className="flex items-center justify-between mb-2">
+                         <div className="flex items-center gap-3">
+                            <span className="text-slate-900 font-medium">
+                                ORD-{order.orderNumber.toString().padStart(3, '0')}
+                            </span>
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-normal">
+                                Completed
+                            </Badge>
+                            {order.feedbackSubmitted && (
+                              <Badge className="bg-purple-100 text-purple-700 border-none shadow-none font-normal">
+                                <Star className="w-3 h-3 mr-1 fill-purple-700" />
+                                Feedback Submitted
+                              </Badge>
+                            )}
+                         </div>
+                         <span className="text-purple-700 font-semibold">
+                            RM {order.total.toFixed(2)}
+                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between mb-4">
-                         <div>
-                            <p className="text-sm text-slate-600">
-                              {order.cafeteria} • {order.items.length} items
-                            </p>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                                {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : ''}
-                            </p>
-                         </div>
-                         <p className="text-slate-900 font-medium">RM {order.total.toFixed(2)}</p>
+                      {/* Subheader: Cafeteria & Date */}
+                      <div className="text-xs text-slate-500 mb-6">
+                        {order.cafeteria} • {order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                      </div>
+
+                      {/* Items List */}
+                      <div className="space-y-2 mb-6">
+                        {order.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg text-sm">
+                                <span className="text-slate-700">
+                                    {item.quantity}x {item.name}
+                                </span>
+                                <span className="text-slate-500">
+                                    RM {(item.price * item.quantity).toFixed(2)}
+                                </span>
+                            </div>
+                        ))}
                       </div>
                       
-                      {/* UC033 - Submit Feedback Button */}
+                      {/* Feedback Button */}
                       {!order.feedbackSubmitted ? (
                         <Button
                           onClick={() => handleOpenFeedback(order)}
                           variant="outline"
-                          className="w-full border-purple-200 text-purple-700 hover:bg-purple-50"
+                          className="w-full border-purple-200 text-purple-700 hover:bg-purple-50 h-10"
                         >
                           <MessageSquare className="w-4 h-4 mr-2" />
                           Submit Feedback

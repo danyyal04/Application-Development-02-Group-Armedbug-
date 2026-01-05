@@ -19,6 +19,7 @@ import {
 
 interface Order {
   id: string;
+  orderNumber: number;
   customer: string;
   items: { name: string; quantity: number }[];
   total: number;
@@ -83,11 +84,30 @@ export default function LiveQueueDashboard({ cafeteriaId }: LiveQueueDashboardPr
 
       if (error) throw error;
 
+      // Fetch customer names from profiles table
+      let userMap: Record<string, string> = {};
+      if (data && data.length > 0) {
+          const userIds = Array.from(new Set(data.map((o: any) => o.user_id).filter(Boolean)));
+          if (userIds.length > 0) {
+              const { data: profiles, error: profilesError } = await supabase
+                  .from('profiles')
+                  .select('id, name')
+                  .in('id', userIds);
+              
+              if (!profilesError && profiles) {
+                  profiles.forEach((p: any) => {
+                      userMap[p.id] = p.name;
+                  });
+              }
+          }
+      }
+
       const mappedOrders: Order[] = (data || []).map((order: any) => {
         const items = parseItems(order.items);
         return {
           id: order.id,
-          customer: order.customer_name || order.user_id?.slice(0, 8) || "Customer",
+          orderNumber: order.order_number || 0,
+          customer: userMap[order.user_id] || order.customer_name || order.user_id?.slice(0, 8) || "Customer",
           items,
           total: Number(order.total_amount) || 0,
           status: normalizeStatus(order.status),
@@ -438,7 +458,7 @@ export default function LiveQueueDashboard({ cafeteriaId }: LiveQueueDashboardPr
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <p className="text-slate-900">{order.id}</p>
+                            <p className="text-slate-900 font-medium">ORD-{order.orderNumber.toString().padStart(3, '0')}</p>
                             <Badge className={getStatusColor(order.status)}>
                               {order.status}
                             </Badge>

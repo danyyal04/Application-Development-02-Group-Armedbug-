@@ -7,7 +7,6 @@ import {
   CardTitle,
 } from "../ui/card.js";
 import { Badge } from "../ui/badge.js";
-import { Button } from "../ui/button.js";
 import {
   Select,
   SelectContent,
@@ -15,20 +14,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select.js";
-import { Clock } from "lucide-react";
+import { Clock, Bell, Package, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabaseClient.js";
 import {
   calculateEstimatedPickupTime,
-  formatEstimatedPickupTime,
   calculateAverageWaitTime,
   getQueueLength,
-  isBulkOrder,
 } from "../../utils/queueCalculations";
 import FeedbackDashboard from '../feedback/FeedbackDashboard';
 
 interface Order {
-  id: string;
+  id: string; // UUID
+  orderNumber: number; // Global Sequence ID
   customer: string;
   items: { name: string; quantity: number }[];
   total: number;
@@ -67,6 +65,19 @@ const normalizeStatus = (value: string | null | undefined): Order["status"] => {
   return "Pending";
 };
 
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return "just now";
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours} hours ago`;
+  return date.toLocaleDateString();
+};
+
 interface OrderManagementProps {
   cafeteriaId?: string | null;
 }
@@ -95,49 +106,89 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
           .from("orders")
           .select("*")
           .eq("cafeteria_id", cafeteriaId)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: true });
 
         if (error) throw error;
         if (!isMounted) return;
 
-        const mapped: Order[] = (data || []).map((order: any) => {
-          const items = parseItems(order.items);
+        // Fetch customer names from profiles table
+        let userMap: Record<string, string> = {};
+        if (data && data.length > 0) {
+            const userIds = Array.from(new Set(data.map(o => o.user_id).filter(Boolean)));
+            if (userIds.length > 0) {
+                const { data: profiles, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, name')
+                    .in('id', userIds);
+                
+                if (!profilesError && profiles) {
+                    profiles.forEach(p => {
+                        userMap[p.id] = p.name;
+                    });
+                }
+            }
+        }
+
+        // Calculate queue position for each active order
+        const queueItems = data
+            .filter((o: any) => o.status === 'Pending' || o.status === 'Cooking')
+            .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        
+        const queueIndexMap = new Map<string, number>();
+        queueItems.forEach((item: any, index: number) => {
+            queueIndexMap.set(item.id, index);
+        });
+
+        const mapped: Order[] = data.map((order: any) => {
+          const queuePosition = queueIndexMap.has(order.id) ? queueIndexMap.get(order.id)! : 0;
+          
           return {
             id: order.id,
-            customer:
-              order.customer_name || order.user_id?.slice(0, 8) || "Customer",
-            items,
+            orderNumber: order.order_number || 0, // integer from DB
+            // Use name from profiles table, fallback to existing logic
+            customer: userMap[order.user_id] || order.customer_name || order.user_id?.slice(0, 8) || "Customer",
+            items: typeof order.items === 'string' 
+              ? JSON.parse(order.items) 
+              : order.items || [],
             total: Number(order.total_amount) || 0,
             status: normalizeStatus(order.status),
             createdAt: order.created_at,
             paidAt: order.paid_at,
             paymentMethod: order.payment_method,
-            queueNumber: order.queue_number || "—",
+            queueNumber: order.queue_number || "—", 
             estimatedTime: calculateEstimatedPickupTime(
               {
                 id: order.id,
                 status: normalizeStatus(order.status),
-                items,
+                items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [],
                 createdAt: new Date(order.created_at),
               } as any,
-              data.length
-            ),
+              queuePosition
+            ) // Estimate based on specific queue position
           };
         });
 
+        // Ensure orders with identical ORD numbers are visually distinguished by Queue Number in the list if needed,
+        // but order_number should likely be unique per database sequence.
+        // Create a compatibility layer for utility functions that expect Date objects
+        const utilsCompatibleOrders = mapped.map(o => ({
+           ...o,
+           createdAt: new Date(o.createdAt)
+        }));
+
         setOrders(mapped);
-        setQueueLen(getQueueLength(mapped));
-        setAvgWait(calculateAverageWaitTime(mapped));
+        setQueueLen(getQueueLength(utilsCompatibleOrders));
+        setAvgWait(calculateAverageWaitTime(utilsCompatibleOrders));
         setHasError(false);
 
         mapped.forEach((o) => {
           const key = `${o.id}-${o.status}`;
           if (!notifiedRef.current[key]) {
             if (o.status === "Cooking") {
-              toast.info(`Order ${o.id} is now being cooked!`, { icon: "🍳" });
+              toast.info(`Order #${o.queueNumber} is now being cooked!`, { icon: "🍳" });
             }
             if (o.status === "Ready for Pickup") {
-              toast.success(`Order ${o.id} is ready for pickup!`, {
+              toast.success(`Order #${o.queueNumber} is ready for pickup!`, {
                 icon: "📦",
               });
             }
@@ -193,19 +244,19 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
       return;
     }
 
-    toast.success(`Order ${orderId} status updated to ${newStatus}`);
+    toast.success(`Status updated to ${newStatus}`);
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Pending":
-        return "bg-orange-100 text-orange-700";
+        return "bg-orange-100 text-orange-700 border-orange-200";
       case "Cooking":
-        return "bg-blue-100 text-blue-700";
+        return "bg-blue-100 text-blue-700 border-blue-200";
       case "Ready for Pickup":
-        return "bg-green-100 text-green-700";
+        return "bg-green-100 text-green-700 border-green-200";
       case "Completed":
-        return "bg-slate-100 text-slate-700";
+        return "bg-slate-100 text-slate-700 border-slate-200";
       default:
         return "bg-slate-100 text-slate-700";
     }
@@ -215,13 +266,6 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
   const completedOrders = orders.filter(
     (order) => order.status === "Completed"
   );
-
-  const renderPaymentBadge = (order: Order) =>
-    order.paidAt ? (
-      <Badge className="bg-emerald-100 text-emerald-700">Paid</Badge>
-    ) : (
-      <Badge className="bg-red-100 text-red-700">Unpaid</Badge>
-    );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -252,26 +296,27 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
       {view === 'orders' ? (
         <>
 
-      <Card className="mb-6 border-2 border-purple-200">
+      <Card className="mb-6 border-2 border-purple-200 bg-purple-50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-purple-700">
             <Clock size={18} /> Smart Queue Overview
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-slate-700 mb-1">
-            Queue Length: <b>{queueLen}</b>
-          </p>
-          <p className="text-sm text-slate-700">
-            Average Wait Time: <b>{avgWait} mins</b>
-          </p>
+          <div className="flex gap-8">
+            <p className="text-sm text-slate-700">
+              Queue Length: <b className="text-lg">{queueLen}</b>
+            </p>
+            <p className="text-sm text-slate-700">
+              Average Wait Time: <b className="text-lg">{avgWait} mins</b>
+            </p>
+          </div>
         </CardContent>
       </Card>
 
       {!cafeteriaId && !isLoading && (
         <p className="text-center text-slate-500 mb-6">
-          No cafeteria assigned to your profile. Link your cafeteria to start
-          receiving orders here.
+          No cafeteria assigned. Link your cafeteria to view orders.
         </p>
       )}
       {isLoading && (
@@ -283,105 +328,101 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
         </p>
       )}
 
+      {/* Status Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">Pending</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-900">
-              {orders.filter((o) => o.status === "Pending").length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">Cooking</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-900">
-              {orders.filter((o) => o.status === "Cooking").length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">Ready</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-900">
-              {orders.filter((o) => o.status === "Ready for Pickup").length}
-            </p>
-          </CardContent>
-        </Card>
+        {[
+          { label: "Pending", count: orders.filter((o) => o.status === "Pending").length, color: "text-orange-600" },
+          { label: "Cooking", count: orders.filter((o) => o.status === "Cooking").length, color: "text-blue-600" },
+          { label: "Ready", count: orders.filter((o) => o.status === "Ready for Pickup").length, color: "text-green-600" }
+        ].map((stat) => (
+          <Card key={stat.label}>
+             <CardContent className="pt-6 pb-4 flex justify-between items-center">
+                <span className="text-sm font-medium text-slate-500">{stat.label}</span>
+                <span className={`text-2xl font-bold ${stat.color}`}>{stat.count}</span>
+             </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Active Orders</CardTitle>
-          <CardDescription>Orders that need attention</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+      <Card className="mb-8 border-none shadow-none bg-transparent">
+        <div className="mb-4">
+           <h2 className="text-lg font-semibold text-slate-900">Active Orders</h2>
+           <p className="text-sm text-slate-500">Orders that need attention</p>
+        </div>
+        
+        <div className="space-y-4">
             {activeOrders.length === 0 ? (
-              <p className="text-center text-slate-500 py-8">
-                No active orders
-              </p>
+              <div className="flex flex-col items-center justify-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-200 leading-none">
+                <div className="bg-white p-4 rounded-full mb-3 shadow-sm">
+                   <Package className="w-8 h-8 text-slate-300" />
+                </div>
+                <h3 className="text-slate-500 font-medium mb-1">No active orders</h3>
+              </div>
             ) : (
               activeOrders.map((order) => (
-                <Card key={order.id} className="border-2">
+                <Card key={order.id} className="border border-slate-200 shadow-sm">
                   <CardContent className="pt-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="text-slate-900">{order.id}</p>
-                          <Badge className={getStatusColor(order.status)}>
-                            {order.status}
-                          </Badge>
-                          <Badge variant="outline">#{order.queueNumber}</Badge>
-                          {renderPaymentBadge(order)}
-                        </div>
-                        <p className="text-sm text-slate-600 mb-1">
-                          {order.customer}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {order.items.length === 0
-                            ? "No items recorded"
-                            : order.items
-                                .map((item) => `${item.quantity}x ${item.name}`)
-                                .join(", ")}
-                        </p>
-                        <p className="text-sm text-purple-700 mt-1">
-                          RM {order.total.toFixed(2)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={order.status}
-                          onValueChange={(value: string) =>
-                            handleStatusUpdate(
-                              order.id,
-                              value as Order["status"]
-                            )
-                          }
-                        >
-                          <SelectTrigger className="w-48">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Pending">Pending</SelectItem>
-                            <SelectItem value="Cooking">Cooking</SelectItem>
-                            <SelectItem value="Ready for Pickup">
-                              Ready for Pickup
-                            </SelectItem>
+                    <div className="flex flex-col lg:flex-row justify-between gap-6">
+                      {/* Left: Order Info */}
+                      <div className="flex-1 space-y-2">
+                         {/* Header: ID + Badges */}
+                         <div className="flex items-center gap-3">
+                            <span className="text-slate-900 font-medium">
+                                ORD-{order.orderNumber.toString().padStart(3, '0')}
+                            </span>
+                            <Badge variant="outline" className={`${getStatusColor(order.status)} border`}>
+                               {order.status}
+                            </Badge>
+                            <Badge variant="outline" className="font-mono bg-slate-100 text-slate-700 border-slate-200">
+                               #{order.queueNumber}
+                            </Badge>
+                         </div>
 
-                          </SelectContent>
-                        </Select>
-                        <span className="text-xs text-slate-400 whitespace-nowrap">
-                          {order.createdAt
-                            ? new Date(order.createdAt).toLocaleTimeString()
-                            : ""}
-                        </span>
+                         {/* Customer & Items */}
+                         <div>
+                            <p className="text-slate-900 mb-1">{order.customer}</p>
+                            <p className="text-sm text-slate-500 leading-relaxed">
+                                {order.items.map(i => `${i.quantity}x ${i.name}`).join(", ")}
+                            </p>
+                         </div>
+
+                         {/* Footer: Price & Time */}
+                         <div className="flex items-center gap-4 text-sm mt-2">
+                             <span className="font-bold text-purple-700">RM {order.total.toFixed(2)}</span>
+                             <div className="flex items-center text-slate-500 gap-1">
+                                <Clock size={14} />
+                                <span>Est: {order.estimatedTime} min</span>
+                             </div>
+                         </div>
+                         
+                         {/* Ready Notification Banner */}
+                         {order.status === 'Ready for Pickup' && (
+                            <div className="flex items-center gap-2 text-xs bg-green-50 text-green-700 px-3 py-2 rounded-md border border-green-100 mt-2 w-fit">
+                               <Bell size={12} />
+                               <span>Customer notified - Order ready for pickup</span>
+                            </div>
+                         )}
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex flex-row lg:flex-col items-center lg:items-end gap-3 justify-between lg:justify-start min-w-[200px]">
+                         <Select
+                              value={order.status}
+                              onValueChange={(value: string) => handleStatusUpdate(order.id, value as Order["status"])}
+                         >
+                            <SelectTrigger className="w-[180px] bg-slate-50 border-slate-200">
+                               <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="Pending">Pending</SelectItem>
+                               <SelectItem value="Cooking">Cooking</SelectItem>
+                               <SelectItem value="Ready for Pickup">Ready for Pickup</SelectItem>
+                               <SelectItem value="Completed">Completed</SelectItem>
+                            </SelectContent>
+                         </Select>
+                         <span className="text-xs text-slate-400">
+                             {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                         </span>
                       </div>
                     </div>
                   </CardContent>
@@ -389,38 +430,38 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
               ))
             )}
           </div>
-        </CardContent>
       </Card>
 
       {completedOrders.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Completed Orders</CardTitle>
-            <CardDescription>Recently completed orders</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card className="border-none shadow-none bg-transparent mt-8">
+            <div className="mb-4">
+                <h2 className="text-lg font-semibold text-slate-900">Completed Orders</h2>
+            </div>
             <div className="space-y-3">
               {completedOrders.map((order) => (
                 <div
                   key={order.id}
-                  className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                  className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100"
                 >
                   <div>
-                    <p className="text-sm text-slate-900">
-                      {order.id} • {order.customer}
-                    </p>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-slate-700">
+                             ORD-{order.orderNumber.toString().padStart(3, '0')}
+                        </span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-sm text-slate-600">{order.customer}</span>
+                    </div>
                     <p className="text-xs text-slate-500">
-                      RM {order.total.toFixed(2)}
+                         {order.items.length} items • RM {order.total.toFixed(2)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {renderPaymentBadge(order)}
-                    <Badge variant="secondary">Completed</Badge>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-400">{formatTimeAgo(order.createdAt)}</span>
+                    <Badge variant="secondary" className="bg-slate-200 text-slate-600 font-normal">Completed</Badge>
                   </div>
                 </div>
               ))}
             </div>
-          </CardContent>
         </Card>
       )}
 
