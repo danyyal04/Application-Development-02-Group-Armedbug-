@@ -279,11 +279,15 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
       // Save URL in database
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', userId);
+        .upsert({ 
+          id: userId,
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString()
+        });
 
       if (updateError) {
-        toast.error("Failed to update profile picture in database.");
+        console.error('Supabase update error:', updateError);
+        toast.error(`Failed to save: ${updateError.message}`);
         return;
       }
 
@@ -301,7 +305,8 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
         setProfilePic(`${publicUrl}?t=${Date.now()}`);
       }, 100);
     } catch (err: any) {
-      toast.error("Error uploading picture. Using local preview.");
+      console.error('Upload error:', err);
+      toast.error(`Error: ${err.message || "Unknown error"}`);
       // Fallback to local preview
       const localUrl = URL.createObjectURL(selectedPic);
       setProfilePic(localUrl);
@@ -330,8 +335,11 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
       try {
         const { error } = await supabase
           .from('profiles')
-          .update(profileData)
-          .eq('id', userId);
+          .upsert({
+            id: userId,
+            ...profileData,
+            updated_at: new Date().toISOString()
+          });
 
         if (error) throw error;
       } catch (err) {
@@ -411,8 +419,11 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
       try {
         const { error } = await supabase
           .from('profiles')
-          .update(prefsData)
-          .eq('id', userId);
+          .upsert({
+            id: userId,
+            ...prefsData,
+            updated_at: new Date().toISOString()
+          });
 
         if (error) throw error;
       } catch (err) {
@@ -450,8 +461,11 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
       try {
         const { error } = await supabase
           .from('profiles')
-          .update(foodPrefsData)
-          .eq('id', userId);
+          .upsert({
+            id: userId,
+            ...foodPrefsData,
+            updated_at: new Date().toISOString()
+          });
 
         if (error) throw error;
       } catch (err) {
