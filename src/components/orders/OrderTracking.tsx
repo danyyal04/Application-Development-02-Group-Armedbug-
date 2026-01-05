@@ -150,33 +150,60 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
         ...(splitRes.data || []),
       ];
 
-      // Remove duplicates (in case I am the initiator, I might get it twice)
+      // Remove duplicates
       const uniqueOrders = Array.from(
         new Map(allRawOrders.map((o) => [o.id, o])).values()
       );
 
-      // Sort by created_at desc (newest first)
-      uniqueOrders.sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      // 5. Manual Join for Cafeteria Names
+      // Collect all cafeteria_ids
+      const cafeteriaIds = Array.from(
+        new Set(
+          uniqueOrders
+            .map((o) => o.cafeteria_id)
+            .filter((id) => id) // filter out null/undefined
+        )
       );
 
-      // Calculate order numbers
-      const mappedOrders = uniqueOrders.map(mapRowToOrder);
-      // We can just use the DB order number or re-index.
-      // Re-indexing might be confusing if they change position.
-      // Let's use the actual order number from DB if reasonable, or index.
-      // preserving existing logic:
+      // Fetch cafeterias
+      let cafeteriaMap: Record<string, string> = {};
+      if (cafeteriaIds.length > 0) {
+        const { data: cafData, error: cafError } = await supabase
+          .from("cafeterias")
+          .select("id, name")
+          .in("id", cafeteriaIds);
+
+        if (!cafError && cafData) {
+          cafData.forEach((c) => {
+            cafeteriaMap[c.id] = c.name;
+          });
+        } else {
+          console.warn("Failed to fetch cafeterias:", cafError);
+        }
+      }
+
+      // Sort by created_at ASC (oldest first)
+      uniqueOrders.sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+
+      // Calculate order numbers sequentially and map cafeteria name
+      const mappedOrders = uniqueOrders.map((row) => {
+        // Use mapped name if available, fallback to existing logic
+        const cafName = cafeteriaMap[row.cafeteria_id] || row.cafeteria_name || "Cafeteria";
+        return {
+           ...mapRowToOrder({ ...row, cafeteria_name: cafName }),
+        };
+      });
+      
+      // Override orderNumber with sequential index (1, 2, 3...)
       const ordersWithNumbers = mappedOrders.map((order, index) => ({
         ...order,
-        orderNumber: order.orderNumber || index + 1, // Fallback to index if 0
+        orderNumber: index + 1,
       }));
 
-      // Re-sort ascending if desired (original code was ascending)
-      // Original: .order("created_at", { ascending: true });
-      // Let's stick to original sort order: Oldest first?
-      // Typically history is Newest first. But original was Ascending.
-      // Let's reverse to match original "ascending" intent if that's what user had.
+      // Final display sort: Oldest first (1, 2, 3...)
       ordersWithNumbers.sort(
         (a, b) =>
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -556,7 +583,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                                   <span className="ml-1">{order.status}</span>
                                 </Badge>
                               </CardTitle>
-                              <CardDescription className="mt-1">
+                              <CardDescription className="mt-1 text-slate-500">
                                 {order.cafeteria} • Queue #{order.queueNumber}
                               </CardDescription>
                             </div>
