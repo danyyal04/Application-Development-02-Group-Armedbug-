@@ -35,5 +35,5 @@ Developer: Mustaqim
 |----------|-------------|----------|---------|
 | Sprint 1 | Real-time Order Tracking            |  [Order Management](src/components/orders/OrderManagement.tsx)</br>  [Order Tracking](src/components/orders/OrderTracking.tsx)</br>| [Supabase Connection](src/lib/supabaseClient.ts)        |         |         |
 | Sprint 2 | Smart Que Management            | [Live Que Dashboard](src/components/queue/LiveQueueDashboard.tsx)</br> | [Supabase Connection](src/lib/supabaseClient.ts)         |         |
-| Sprint 3 |             |          |         |
+| Sprint 3 | Customer Feedback and Vendor Control            | [Feedback](src/components/feedback/FeedbackDashboard.tsx)</br> | [Supabase Connection](src/lib/supabaseClient.ts)          |         |
 
