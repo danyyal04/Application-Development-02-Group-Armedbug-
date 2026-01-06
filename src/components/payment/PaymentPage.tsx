@@ -1,15 +1,7 @@
 import { useState } from "react";
-import { CreditCard, History, Users } from "lucide-react";
+import { CreditCard, History } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
 import PaymentMethods from "./PaymentMethods";
-import SplitBillInvitations from "../splitbill/SplitBillInvitations";
 import TransactionHistory from "../transactions/TransactionHistory";
 
 interface PaymentPageProps {
@@ -24,8 +16,6 @@ interface PaymentPageProps {
 export default function PaymentPage({
   onNavigateToSplitBillPayment,
 }: PaymentPageProps) {
-  const [pendingSplitBillCount, setPendingSplitBillCount] = useState(0);
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
@@ -49,20 +39,6 @@ export default function PaymentPage({
               Payment Methods
             </TabsTrigger>
             <TabsTrigger
-              value="split-bills"
-              className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg py-2.5"
-            >
-              <Users className="w-4 h-4 mr-2" />
-              <span className="flex items-center gap-2">
-                Split Bill
-                {pendingSplitBillCount > 0 && (
-                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#800000] text-white text-xs leading-5 text-center">
-                    {pendingSplitBillCount}
-                  </span>
-                )}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger
               value="history"
               className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg py-2.5"
             >
@@ -74,31 +50,6 @@ export default function PaymentPage({
 
         <TabsContent value="methods" className="mt-0">
           <PaymentMethods />
-        </TabsContent>
-
-        <TabsContent value="split-bills" className="mt-0 space-y-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-medium text-slate-900">
-                Split Bill
-              </h2>
-              {pendingSplitBillCount > 0 && (
-                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#800000] text-white text-xs leading-5 text-center">
-                  {pendingSplitBillCount}
-                </span>
-              )}
-            </div>
-            <p className="text-slate-600 mb-6">
-              Complete your payment for accepted split bill invitations
-            </p>
-            <SplitBillInvitations
-              onNavigateToPayment={onNavigateToSplitBillPayment}
-              viewMode="payment-only"
-              onCountsChange={(counts) =>
-                setPendingSplitBillCount(counts.pending)
-              }
-            />
-          </div>
         </TabsContent>
 
         <TabsContent value="history" className="mt-0">
