@@ -121,7 +121,19 @@ export default function App() {
   useEffect(() => {
     const loadSession = async () => {
       const { data } = await supabase.auth.getSession();
-      const normalized = await buildUserFromSession(data.session || null);
+      let session = data.session;
+
+      // Validate session with server if it exists locally
+      if (session) {
+        const { data: userVerification, error: verificationError } = await supabase.auth.getUser();
+        if (verificationError || !userVerification.user) {
+           console.warn("Session found but server rejected token. Logging out.");
+           await supabase.auth.signOut();
+           session = null;
+        }
+      }
+
+      const normalized = await buildUserFromSession(session || null);
       if (normalized) {
         setCurrentUser(normalized);
         const savedPage = localStorage.getItem('zenith_last_page') as Page | null;

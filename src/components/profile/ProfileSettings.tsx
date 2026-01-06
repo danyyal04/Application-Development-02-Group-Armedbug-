@@ -129,8 +129,20 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
     const loadProfile = async () => {
       setLoadingProfile(true);
 
+      // Get real auth user to ensure RLS compliance
+      let currentUserId = userId;
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user?.id) {
+          currentUserId = authData.user.id;
+          console.log("Using authenticated User ID:", currentUserId);
+        }
+      } catch (e) {
+        console.warn("Could not fetch auth user, using fallback:", userId);
+      }
+
       // Try to load from localStorage first (for demo purposes)
-      const storedProfile = localStorage.getItem(`profile_${userId}`);
+      const storedProfile = localStorage.getItem(`profile_${currentUserId}`);
       if (storedProfile) {
         try {
           const profile = JSON.parse(storedProfile);
@@ -171,7 +183,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
         const { data, error } = await supabase
           .from('profiles')
           .select('name, email, phone, avatar_url, email_notifications, order_updates, promotions, dietary_type, spice_level, favourite_categories, favourite_cafeterias')
-          .eq('id', userId)
+          .eq('id', currentUserId)
           .single();
 
         if (!isMounted) return;
@@ -203,7 +215,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
           }
 
           // Store in localStorage as backup
-          localStorage.setItem(`profile_${userId}`, JSON.stringify(data));
+          localStorage.setItem(`profile_${currentUserId}`, JSON.stringify(data));
         }
       } catch (err) {
         // Supabase not configured or error occurred - use localStorage data
@@ -232,6 +244,31 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
   }, [userId, defaultName, userEmail]);
 
   // -----------------------------------------------------------
+  // HELPER: Ensure Authentication with Refresh
+  // -----------------------------------------------------------
+  const ensureAuthenticated = async (): Promise<string | null> => {
+    // 1. Try to get current user
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user) return authData.user.id;
+
+    // 2. If failed, try to refresh session
+    console.log("Session invalid, attempting auto-refresh...");
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    
+    if (refreshError) {
+      console.error("Session refresh failed:", refreshError);
+      return null;
+    }
+
+    if (refreshData?.user) {
+      console.log("Session refreshed successfully");
+      return refreshData.user.id;
+    }
+
+    return null;
+  };
+
+  // -----------------------------------------------------------
   // UPLOAD PROFILE PICTURE
   // -----------------------------------------------------------
   const handleUploadProfilePic = async () => {
@@ -240,74 +277,96 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
       return;
     }
 
+    // Resolve current user ID and Auth status
+    let currentUserId = userId;
+    let isAuthenticated = false;
+    
+    const validatedUserId = await ensureAuthenticated();
+    if (validatedUserId) {
+       currentUserId = validatedUserId;
+       isAuthenticated = true;
+    }
+
     try {
       const fileExt = selectedPic.name.split('.').pop();
-      const fileName = `${userId}_${Date.now()}.${fileExt}`;
+      const fileName = `${currentUserId}_${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      // Upload to Supabase storage bucket "avatar"
-      const { error: uploadError } = await supabase.storage
-        .from('avatar')
-        .upload(filePath, selectedPic, {
-          cacheControl: '3600',
-          upsert: true,
-        });
+      let publicUrl = null;
 
-      if (uploadError) {
-        toast.error("Upload failed. Using local preview only.");
-        // Fallback to local preview
-        const localUrl = URL.createObjectURL(selectedPic);
-        setProfilePic(localUrl);
-        setSelectedPic(null);
-        
-        // Save to localStorage
-        const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
-        currentProfile.avatar_url = localUrl;
-        localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
-        
-        toast.success("Profile picture updated locally!");
-        return;
+      if (isAuthenticated) {
+        // Upload to Supabase storage bucket "avatar"
+        const { error: uploadError } = await supabase.storage
+          .from('avatar')
+          .upload(filePath, selectedPic, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          toast.error("Upload failed. Saving locally only.");
+          // Fallback handled below
+        } else {
+           // Get public URL
+          const { data: publicUrlData } = supabase.storage
+            .from('avatar')
+            .getPublicUrl(filePath);
+          publicUrl = publicUrlData.publicUrl;
+        }
       }
 
-      // Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('avatar')
-        .getPublicUrl(filePath);
+      // If we have a public URL (uploaded successfully), save to DB
+      if (isAuthenticated && publicUrl) {
+         const { error: updateError } = await supabase
+          .from('profiles')
+          .upsert({ 
+            id: currentUserId,
+            avatar_url: publicUrl,
+            updated_at: new Date().toISOString()
+          });
 
-      const publicUrl = publicUrlData.publicUrl;
-
-      // Save URL in database
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert({ 
-          id: userId,
-          avatar_url: publicUrl,
-          updated_at: new Date().toISOString()
-        });
-
-      if (updateError) {
-        console.error('Supabase update error:', updateError);
-        toast.error(`Failed to save: ${updateError.message}`);
-        return;
+        if (updateError) {
+          console.error('Supabase update error:', updateError);
+           // Don't return, just warn and fall back to local
+          toast.error(`Cloud save failed: ${updateError.message}`);
+        } else {
+           toast.success("Profile picture updated!");
+        }
+      } else {
+         toast.error("Cloud sync failed: Session expired.", {
+            description: "Please log in again to fix this.",
+            action: {
+              label: "Log Out",
+              onClick: async () => {
+                await supabase.auth.signOut();
+                window.location.reload();
+              }
+            },
+            duration: 8000,
+         });
       }
 
-      setProfilePic(publicUrl);
+      // Always update local state/storage for immediate feedback
+      const displayUrl = publicUrl || URL.createObjectURL(selectedPic);
+      setProfilePic(displayUrl);
       setSelectedPic(null);
 
-      // Save to localStorage
-      const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
-      currentProfile.avatar_url = publicUrl;
-      localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
+      const currentProfile = JSON.parse(localStorage.getItem(`profile_${currentUserId}`) || '{}');
+      currentProfile.avatar_url = displayUrl;
+      localStorage.setItem(`profile_${currentUserId}`, JSON.stringify(currentProfile));
 
-      toast.success("Profile picture updated!");
+      // Refresh image
+      if (publicUrl) {
+        setTimeout(() => {
+          setProfilePic(`${publicUrl}?t=${Date.now()}`);
+        }, 100);
+      }
 
-      setTimeout(() => {
-        setProfilePic(`${publicUrl}?t=${Date.now()}`);
-      }, 100);
     } catch (err: any) {
       console.error('Upload error:', err);
       toast.error(`Error: ${err.message || "Unknown error"}`);
-      // Fallback to local preview
+      // Fallback
       const localUrl = URL.createObjectURL(selectedPic);
       setProfilePic(localUrl);
       setSelectedPic(null);
@@ -325,6 +384,16 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
 
     setSavingProfile(true);
     try {
+      // Resolve current user ID and Auth status
+      let currentUserId = userId;
+      let isAuthenticated = false;
+
+      const validatedUserId = await ensureAuthenticated();
+      if (validatedUserId) {
+         currentUserId = validatedUserId;
+         isAuthenticated = true;
+      }
+
       const profileData = {
         name: formData.name.trim(),
         email: formData.email.trim(),
@@ -332,31 +401,73 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
       };
 
       // Try to save to Supabase
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .upsert({
-            id: userId,
-            ...profileData,
-            updated_at: new Date().toISOString()
-          });
+      if (isAuthenticated) {
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .upsert({
+              id: currentUserId,
+              ...profileData,
+              updated_at: new Date().toISOString()
+            });
 
-        if (error) throw error;
-      } catch (err) {
-        // Supabase not configured, save to localStorage
-        console.log('Saving to localStorage');
+          if (error) throw error;
+        } catch (err: any) {
+          console.error("Supabase Save Error:", err);
+          toast.error(`Cloud save failed: ${err.message}. Saved locally.`);
+        }
+      } else {
+         console.log('User not authenticated, skipping Supabase save');
       }
 
       // Always save to localStorage as backup
-      const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
+      const currentProfile = JSON.parse(localStorage.getItem(`profile_${currentUserId}`) || '{}');
       Object.assign(currentProfile, profileData);
-      localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
+      localStorage.setItem(`profile_${currentUserId}`, JSON.stringify(currentProfile));
 
-      toast.success('Profile updated successfully!');
+      if (isAuthenticated) {
+        toast.success("Profile updated successfully!");
+        await updateAuthEmailIfChanged(formData.email.trim());
+      } else {
+        toast.error("Cloud sync failed: Session expired. Saved locally.");
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to save profile');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  /**
+   * Helper to update the authentication email if it has changed.
+   * Supabase requires a separate call for this, and it may trigger a confirmation email.
+   */
+  const updateAuthEmailIfChanged = async (newEmail: string) => {
+    // Only proceed if email is actually different
+    if (newEmail === userEmail) return;
+
+    try {
+      const { data, error } = await supabase.auth.updateUser({ email: newEmail });
+      
+      if (error) {
+        toast.error(`Failed to update login email: ${error.message}`);
+        console.error('Auth update error:', error);
+        return;
+      }
+
+      // Check if email confirmation is required
+      // Supabase often returns a user object with the NEW email as 'email' if no confirmation is needed,
+      // or keeps the OLD one if confirmation is pending. 
+      // A common pattern is to check if data.user.email matches newEmail.
+      
+      if (data.user?.email !== newEmail) {
+        toast.info("Please check your new email to confirm the change.");
+      } else {
+        toast.success("Login email updated successfully.");
+      }
+      
+    } catch (err) {
+      console.error("Error updating auth email:", err);
     }
   };
 
@@ -415,28 +526,46 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
         promotions: preferences.promotions,
       };
 
-      // Try to save to Supabase
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .upsert({
-            id: userId,
-            ...prefsData,
-            updated_at: new Date().toISOString()
-          });
+       // Resolve current user ID
+      let currentUserId = userId;
+      let isAuthenticated = false;
 
-        if (error) throw error;
-      } catch (err) {
-        // Supabase not configured, save to localStorage
-        console.log('Saving preferences to localStorage');
+      const validatedUserId = await ensureAuthenticated();
+      if (validatedUserId) {
+         currentUserId = validatedUserId;
+         isAuthenticated = true;
+      }
+
+      // Try to save to Supabase
+      if (isAuthenticated) {
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .upsert({
+              id: currentUserId,
+              ...prefsData,
+              updated_at: new Date().toISOString()
+            });
+
+          if (error) throw error;
+        } catch (err: any) {
+           console.error('Saving preferences error:', err);
+           toast.error('Cloud save failed, saved locally.');
+        }
+      } else {
+         console.log('Skipping Supabase save (not authenticated)');
       }
 
       // Always save to localStorage as backup
-      const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
+      const currentProfile = JSON.parse(localStorage.getItem(`profile_${currentUserId}`) || '{}');
       Object.assign(currentProfile, prefsData);
-      localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
+      localStorage.setItem(`profile_${currentUserId}`, JSON.stringify(currentProfile));
 
-      toast.success('Preferences saved!');
+      if (isAuthenticated) {
+        toast.success('Preferences saved!');
+      } else {
+         toast.error("Cloud sync failed: Session expired. Saved locally.");
+      }
     } catch (err: any) {
       // toast.error(err.message || 'Failed to save preferences');
        toast.error('Update failed due to system error.'); // Requirement UC026 EF1
@@ -457,28 +586,46 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
         favourite_categories: foodPreferences.favouriteCategories,
       };
 
-      // Try to save to Supabase
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .upsert({
-            id: userId,
-            ...foodPrefsData,
-            updated_at: new Date().toISOString()
-          });
+      // Resolve current user ID
+      let currentUserId = userId;
+      let isAuthenticated = false;
 
-        if (error) throw error;
-      } catch (err) {
-        // Supabase not configured, save to localStorage
-        console.log('Saving food preferences to localStorage');
+      const validatedUserId = await ensureAuthenticated();
+      if (validatedUserId) {
+         currentUserId = validatedUserId;
+         isAuthenticated = true;
+      }
+
+      // Try to save to Supabase
+      if (isAuthenticated) {
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .upsert({
+              id: currentUserId,
+              ...foodPrefsData,
+              updated_at: new Date().toISOString()
+            });
+
+          if (error) throw error;
+        } catch (err: any) {
+           console.error('Saving food preferences error:', err);
+           toast.error('Cloud save failed, saved locally.');
+        }
+      } else {
+         console.log('Skipping Supabase save (not authenticated)');
       }
 
       // Always save to localStorage as backup
-      const currentProfile = JSON.parse(localStorage.getItem(`profile_${userId}`) || '{}');
+      const currentProfile = JSON.parse(localStorage.getItem(`profile_${currentUserId}`) || '{}');
       Object.assign(currentProfile, foodPrefsData);
-      localStorage.setItem(`profile_${userId}`, JSON.stringify(currentProfile));
+      localStorage.setItem(`profile_${currentUserId}`, JSON.stringify(currentProfile));
 
-      toast.success('Food preferences saved!');
+      if (isAuthenticated) {
+        toast.success('Food preferences saved!');
+      } else {
+         toast.error("Cloud sync failed: Session expired. Saved locally.");
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to save food preferences');
     } finally {
