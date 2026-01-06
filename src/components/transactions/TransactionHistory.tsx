@@ -65,8 +65,7 @@ export default function TransactionHistory() {
   // UC032 - NF: Filter state management
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterMethod, setFilterMethod] = useState<string>("all");
-  const [filterDateFrom, setFilterDateFrom] = useState<string>("");
-  const [filterDateTo, setFilterDateTo] = useState<string>("");
+  const [filterDate, setFilterDate] = useState<string>("");
   const [isFiltering, setIsFiltering] = useState(false);
 
   useEffect(() => {
@@ -478,15 +477,8 @@ export default function TransactionHistory() {
       }
 
       // Filter by date range
-      if (filterDateFrom) {
-        filtered = filtered.filter(
-          (t) => new Date(t.date) >= new Date(filterDateFrom)
-        );
-      }
-      if (filterDateTo) {
-        filtered = filtered.filter(
-          (t) => new Date(t.date) <= new Date(filterDateTo)
-        );
+      if (filterDate) {
+        filtered = filtered.filter((t) => t.date === filterDate);
       }
 
       return filtered;
@@ -501,8 +493,7 @@ export default function TransactionHistory() {
   const handleClearFilters = () => {
     setFilterStatus("all");
     setFilterMethod("all");
-    setFilterDateFrom("");
-    setFilterDateTo("");
+    setFilterDate("");
     setIsFiltering(false);
     toast.success("Filters cleared");
   };
@@ -527,10 +518,7 @@ export default function TransactionHistory() {
     ? getFilteredTransactions()
     : transactions;
   const hasActiveFilters =
-    filterStatus !== "all" ||
-    filterMethod !== "all" ||
-    filterDateFrom ||
-    filterDateTo;
+    filterStatus !== "all" || filterMethod !== "all" || filterDate;
 
   // If viewing a specific receipt
   if (selectedReceipt) {
@@ -585,24 +573,13 @@ export default function TransactionHistory() {
             </SelectContent>
           </Select>
 
-          {/* UC032 - NF: Filter by Date Range - From */}
+          {/* UC032 - NF: Filter by Date */}
           <Input
             type="date"
-            value={filterDateFrom}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-            max={filterDateTo || undefined}
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
             className="w-[160px]"
-            placeholder="Date From"
-          />
-
-          {/* UC032 - NF: Filter by Date Range - To */}
-          <Input
-            type="date"
-            value={filterDateTo}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-            min={filterDateFrom || undefined}
-            className="w-[160px]"
-            placeholder="Date To"
+            placeholder="Date"
           />
 
           {/* UC032 - NF: Filter Actions */}
@@ -644,21 +621,12 @@ export default function TransactionHistory() {
                 />
               </Badge>
             )}
-            {filterDateFrom && (
+            {filterDate && (
               <Badge variant="secondary" className="gap-1">
-                From: {filterDateFrom}
+                Date: {filterDate}
                 <X
                   className="w-3 h-3 cursor-pointer"
-                  onClick={() => setFilterDateFrom("")}
-                />
-              </Badge>
-            )}
-            {filterDateTo && (
-              <Badge variant="secondary" className="gap-1">
-                To: {filterDateTo}
-                <X
-                  className="w-3 h-3 cursor-pointer"
-                  onClick={() => setFilterDateTo("")}
+                  onClick={() => setFilterDate("")}
                 />
               </Badge>
             )}
