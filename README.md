@@ -5,7 +5,7 @@ Developer: Fathurrahman
 |----------|-------------|----------|---------|
 | Sprint 1 | User Authentication            |  [Login Form](src/components/auth/LoginForm.tsx) <br>[Register Form](src/components/auth/RegisterForm.tsx)</br> [Staff Dashboard](src/components/dashboard/StaffDashboard.tsx)</br> [Student Dashboard](src/components/dashboard/StudentDashboard.tsx)</br> [Profile Setting](src/components/profile/ProfileSettings.tsx)</br>     | [Supabase Connection](src/lib/supabaseClient.ts) <br>        |
 | Sprint 2 | User Roles            | [Admin Dashboard](src/components/admin/AdminDashboard.tsx)</br> [Registration](src/components/admin/PendingRegistration.tsx)</br> [User Management](src/components/admin/UserManagement.tsx)</br> | [Supabase Connection](src/lib/supabaseClient.ts)          |         |
-| Sprint 3 |Profile Management             |          |         |
+| Sprint 3 |Profile Management             | [Profile Settings](src/components/profile/ProfileSettings.tsx)         | [Supabase Connection](src/lib/supabaseClient.ts)        |
 
 
 **Subsystem 2: Dynamic Menu and Ordering Subsystem**
