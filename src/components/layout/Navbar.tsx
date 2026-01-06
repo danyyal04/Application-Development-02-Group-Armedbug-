@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   Menu,
-  User,
   ShoppingBag,
   ShoppingCart,
   CreditCard,
@@ -11,10 +10,9 @@ import {
   UtensilsCrossed,
   BarChart3,
   Building2,
-  Users,
+  Mail,
 } from "lucide-react";
 import { Button } from "../ui/button.js";
-import { Badge } from "../ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +23,7 @@ import {
 import { Avatar, AvatarFallback } from "../ui/avatar.js";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet.js";
 import { supabase } from "../../lib/supabaseClient";
+
 interface NavbarProps {
   user: {
     id: string;
@@ -39,6 +38,14 @@ interface NavbarProps {
   onCartClick?: () => void;
 }
 
+interface NavbarInvitation {
+  id: string;
+  session_id: string;
+  cafeteria_name: string;
+  initiator_name: string;
+  created_at: string;
+}
+
 export default function Navbar({
   user,
   onLogout,
@@ -48,7 +55,7 @@ export default function Navbar({
   onCartClick,
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
-  const [invitationCount, setInvitationCount] = useState(0);
+  const [invitations, setInvitations] = useState<NavbarInvitation[]>([]);
 
   const initials = user.name
     .split(" ")
@@ -63,7 +70,7 @@ export default function Navbar({
     if (isOwner || isAdmin) return;
     let isMounted = true;
 
-    const loadInvitationCount = async () => {
+    const loadInvitations = async () => {
       try {
         const { data: resolvedEmail, error: resolvedError } =
           await supabase.rpc("current_user_email_resolved");
@@ -86,62 +93,84 @@ export default function Navbar({
         );
 
         if (possibleIdentifiers.length === 0) {
-          if (isMounted) setInvitationCount(0);
+          if (isMounted) setInvitations([]);
           return;
         }
 
-        const { data: participantRows, error: participantError } =
-          await supabase
-            .from("split_bill_participants")
-            .select("session_id, status")
-            .in("identifier", possibleIdentifiers)
-            .eq("status", "pending");
+        const { data, error } = await supabase
+          .from("split_bill_participants")
+          .select(
+            `
+            id, session_id, identifier, status, created_at,
+            session:split_bill_sessions (
+              id, status, initiator_user_id,
+              cafeteria:cafeterias (name)
+            )
+          `
+          )
+          .in("identifier", possibleIdentifiers)
+          .eq("status", "pending");
 
-        if (participantError) {
-          console.warn(
-            "Failed to load invitation count:",
-            participantError.message
-          );
+        if (error) {
+          console.warn("Failed to load invitations:", error.message);
           return;
         }
 
-        const sessionIds = Array.from(
+        // Filter for active sessions only
+        const activeInvitations = (data || []).filter(
+          // @ts-ignore
+          (row: any) => row.session?.status === "active"
+        );
+
+        if (activeInvitations.length === 0) {
+          if (isMounted) setInvitations([]);
+          return;
+        }
+
+        // Fetch initiator names
+        const initiatorIds = Array.from(
           new Set(
-            (participantRows || [])
-              .map((row: any) => row.session_id)
+            activeInvitations
+              // @ts-ignore
+              .map((row: any) => row.session?.initiator_user_id)
               .filter(Boolean)
           )
         );
 
-        if (sessionIds.length === 0) {
-          if (isMounted) setInvitationCount(0);
-          return;
+        let initiatorMap: Record<string, string> = {};
+        if (initiatorIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, name")
+            .in("id", initiatorIds);
+
+          initiatorMap = (profiles || []).reduce((acc: any, p: any) => {
+            acc[p.id] = p.name;
+            return acc;
+          }, {});
         }
 
-        const { data: sessions, error: sessionsError } = await supabase
-          .from("split_bill_sessions")
-          .select("id")
-          .in("id", sessionIds)
-          .eq("status", "active");
-
-        if (sessionsError) {
-          console.warn(
-            "Failed to load invitation sessions:",
-            sessionsError.message
-          );
-          return;
-        }
+        const mapped: NavbarInvitation[] = activeInvitations.map(
+          (row: any) => ({
+            id: row.id,
+            session_id: row.session_id,
+            cafeteria_name: row.session?.cafeteria?.name || "Cafeteria",
+            initiator_name:
+              initiatorMap[row.session?.initiator_user_id] || "Someone",
+            created_at: row.created_at,
+          })
+        );
 
         if (isMounted) {
-          setInvitationCount((sessions || []).length);
+          setInvitations(mapped);
         }
       } catch (err) {
-        console.warn("Failed to load invitation count", err);
+        console.warn("Failed to load invitations", err);
       }
     };
 
-    loadInvitationCount();
-    const interval = setInterval(loadInvitationCount, 10000);
+    loadInvitations();
+    const interval = setInterval(loadInvitations, 10000);
 
     return () => {
       isMounted = false;
@@ -247,9 +276,7 @@ export default function Navbar({
                       </Button>
                     </>
                   ) : isAdmin ? (
-                    <>
-                      {/* Admin sees only dashboard here */}
-                    </>
+                    <>{/* Admin sees only dashboard here */}</>
                   ) : (
                     <>
                       <Button
@@ -282,16 +309,44 @@ export default function Navbar({
                           onNavigate("payment");
                           setOpen(false);
                         }}
-                        className="w-full justify-start relative"
+                        className="w-full justify-start"
                       >
                         <CreditCard className="w-4 h-4 mr-2" />
                         Payment
-                        {invitationCount > 0 && (
-                          <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#800000] text-white text-[11px] flex items-center justify-center">
-                            {invitationCount}
-                          </span>
-                        )}
                       </Button>
+                      {/* Mobile Inbox Item */}
+                      <div className="my-2 border-t pt-2">
+                        <p className="px-4 text-sm font-medium text-slate-500 mb-2">
+                          Inbox
+                        </p>
+                        {invitations.length === 0 ? (
+                          <p className="px-4 text-sm text-slate-400">
+                            No new notifications
+                          </p>
+                        ) : (
+                          invitations.map((inv) => (
+                            <Button
+                              key={inv.id}
+                              variant="ghost"
+                              onClick={() => {
+                                onNavigate("splitbill-invitations");
+                                setOpen(false);
+                              }}
+                              className="w-full justify-start h-auto py-2"
+                            >
+                              <Mail className="w-4 h-4 mr-2 text-primary" />
+                              <div className="flex flex-col items-start overflow-hidden">
+                                <span className="text-sm truncate w-full">
+                                  Split Bill: {inv.cafeteria_name}
+                                </span>
+                                <span className="text-xs text-slate-500 truncate w-full">
+                                  From {inv.initiator_name}
+                                </span>
+                              </div>
+                            </Button>
+                          ))
+                        )}
+                      </div>
                     </>
                   )}
 
@@ -396,9 +451,7 @@ export default function Navbar({
                 </Button>
               </>
             ) : isAdmin ? (
-              <>
-                {/* Admin sees only dashboard link here */}
-              </>
+              <>{/* Admin sees only dashboard link here */}</>
             ) : (
               <>
                 <Button
@@ -430,17 +483,12 @@ export default function Navbar({
                   onClick={() => onNavigate("payment")}
                   className={
                     currentPage === "payment"
-                      ? "bg-gradient-to-r from-amber-600 to-orange-600 relative"
-                      : "relative"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                      : ""
                   }
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
                   Payment
-                  {invitationCount > 0 && (
-                    <span className="ml-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#800000] text-white text-[11px] flex items-center justify-center">
-                      {invitationCount}
-                    </span>
-                  )}
                 </Button>
               </>
             )}
@@ -449,24 +497,40 @@ export default function Navbar({
           {/* User Menu - Desktop */}
           <div className="flex items-center gap-1">
             {!isAdmin && !isOwner && (
-              <Button
-                variant="ghost"
-                className="relative"
-                onClick={() => {
-                  if (onCartClick) {
-                    onCartClick();
-                  } else {
-                    onNavigate("cart-preview");
-                  }
-                }}
-              >
-                <ShoppingCart className="w-5 h-5" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[11px] flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
-              </Button>
+              <>
+                {/* Inbox Icon - Direct Link */}
+                <Button
+                  variant="ghost"
+                  className="relative"
+                  onClick={() => onNavigate("splitbill-invitations")}
+                >
+                  <Mail className="w-5 h-5" />
+                  {invitations.length > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-md bg-orange-600 text-white text-[11px] font-bold flex items-center justify-center border-2 border-white transform translate-x-1 -translate-y-1">
+                      {invitations.length}
+                    </span>
+                  )}
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  className="relative"
+                  onClick={() => {
+                    if (onCartClick) {
+                      onCartClick();
+                    } else {
+                      onNavigate("cart-preview");
+                    }
+                  }}
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[11px] flex items-center justify-center">
+                      {cartCount}
+                    </span>
+                  )}
+                </Button>
+              </>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -479,25 +543,31 @@ export default function Navbar({
                   <span className="hidden sm:inline">{user.name}</span>
                 </Button>
               </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5">
-                    <p className="font-medium">{user.name}</p>
-                    <p className="text-sm text-slate-500">{user.email}</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                    {user.role === "owner" ? "Cafeteria Owner" : user.role === "admin" ? "Admin" : "Customer"}
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-1.5">
+                  <p className="font-medium">{user.name}</p>
+                  <p className="text-sm text-slate-500">{user.email}</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {user.role === "owner"
+                      ? "Cafeteria Owner"
+                      : user.role === "admin"
+                      ? "Admin"
+                      : "Customer"}
                   </p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  {isOwner && (
-                    <DropdownMenuItem onClick={() => onNavigate("cafeteria-info")}>
-                      <Building2 className="w-4 h-4 mr-2" />
-                      Cafeteria Information
-                    </DropdownMenuItem>
-                  )}
-                  {isOwner && <DropdownMenuSeparator />}
-                  <DropdownMenuItem onClick={() => onNavigate("profile")}>
-                    <Settings className="w-4 h-4 mr-2" />
-                    Profile Settings
+                </div>
+                <DropdownMenuSeparator />
+                {isOwner && (
+                  <DropdownMenuItem
+                    onClick={() => onNavigate("cafeteria-info")}
+                  >
+                    <Building2 className="w-4 h-4 mr-2" />
+                    Cafeteria Information
+                  </DropdownMenuItem>
+                )}
+                {isOwner && <DropdownMenuSeparator />}
+                <DropdownMenuItem onClick={() => onNavigate("profile")}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Profile Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onLogout} className="text-red-600">

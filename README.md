@@ -5,7 +5,7 @@ Developer: Fathurrahman
 |----------|-------------|----------|---------|
 | Sprint 1 | User Authentication            |  [Login Form](src/components/auth/LoginForm.tsx) <br>[Register Form](src/components/auth/RegisterForm.tsx)</br> [Staff Dashboard](src/components/dashboard/StaffDashboard.tsx)</br> [Student Dashboard](src/components/dashboard/StudentDashboard.tsx)</br> [Profile Setting](src/components/profile/ProfileSettings.tsx)</br>     | [Supabase Connection](src/lib/supabaseClient.ts) <br>        |
 | Sprint 2 | User Roles            | [Admin Dashboard](src/components/admin/AdminDashboard.tsx)</br> [Registration](src/components/admin/PendingRegistration.tsx)</br> [User Management](src/components/admin/UserManagement.tsx)</br> | [Supabase Connection](src/lib/supabaseClient.ts)          |         |
-| Sprint 3 |             |          |         |
+| Sprint 3 |Profile Management             |          |         |
 
 
 **Subsystem 2: Dynamic Menu and Ordering Subsystem**
@@ -35,5 +35,5 @@ Developer: Mustaqim
 |----------|-------------|----------|---------|
 | Sprint 1 | Real-time Order Tracking            |  [Order Management](src/components/orders/OrderManagement.tsx)</br>  [Order Tracking](src/components/orders/OrderTracking.tsx)</br>| [Supabase Connection](src/lib/supabaseClient.ts)        |         |         |
 | Sprint 2 | Smart Que Management            | [Live Que Dashboard](src/components/queue/LiveQueueDashboard.tsx)</br> | [Supabase Connection](src/lib/supabaseClient.ts)         |         |
-| Sprint 3 |             |          |         |
+| Sprint 3 | Customer Feedback and Vendor Control            | [Feedback](src/components/feedback/FeedbackDashboard.tsx)</br> | [Supabase Connection](src/lib/supabaseClient.ts)          |         |
 

@@ -477,9 +477,9 @@ export default function SplitBillInvitations({
       {/* Header */}
       {viewMode === "full" && (
         <div className="mb-8">
-          <h1 className="text-slate-900 mb-2">Split Bill Invitations</h1>
+          <h1 className="text-slate-900 mb-2">Split Bill Inbox</h1>
           <p className="text-slate-600">
-            Manage your split bill invitations and join group orders
+            Manage your split bill invitations and active orders
           </p>
         </div>
       )}
@@ -525,96 +525,103 @@ export default function SplitBillInvitations({
       {/* Pending Invitations */}
       {(viewMode === "full" || viewMode === "payment-only") &&
         pendingInvitations.length > 0 && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Pending Invitations</CardTitle>
-            <CardDescription>
-              You have {pendingInvitations.length} pending split bill
-              invitation(s)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {pendingInvitations.map((invitation) => (
-                <Card
-                  key={invitation.id}
-                  className="border-2 border-orange-200 bg-orange-50/30"
-                >
-                  <CardContent className="pt-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="text-slate-900">{invitation.orderId}</p>
-                          {getStatusBadge(invitation.status)}
-                          <Badge variant="outline" className="bg-white">
-                            <Users className="w-3 h-3 mr-1" />
-                            {invitation.participants} people
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-slate-600 mb-1">
-                          From:{" "}
-                          <span className="text-slate-900">
-                            {invitation.initiatorName}
-                          </span>{" "}
-                          | {invitation.cafeteria}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {getSplitMethodLabel(invitation.splitMethod)} | Total:
-                          RM {invitation.totalAmount.toFixed(2)}
-                        </p>
-                        <div className="flex items-center gap-4 mt-2">
-                          <p className="text-purple-700">
-                            Your Share: RM {invitation.myShare.toFixed(2)}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Pending Invitations</CardTitle>
+              <CardDescription>
+                You have {pendingInvitations.length} pending split bill
+                invitation(s)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {pendingInvitations.map((invitation) => (
+                  <Card
+                    key={invitation.id}
+                    className="border-2 border-orange-200 bg-orange-50/30"
+                  >
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="text-slate-900">
+                              {invitation.orderId}
+                            </p>
+                            {getStatusBadge(invitation.status)}
+                            <Badge variant="outline" className="bg-white">
+                              <Users className="w-3 h-3 mr-1" />
+                              {invitation.participants} people
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-1">
+                            From:{" "}
+                            <span className="text-slate-900">
+                              {invitation.initiatorName}
+                            </span>{" "}
+                            | {invitation.cafeteria}
                           </p>
-                          <div className="flex items-center gap-1 text-xs text-slate-500">
-                            <Clock className="w-3 h-3" />
-                            <span>
-                              Invited {formatRelativeTime(invitation.invitedAt)}
-                            </span>
+                          <p className="text-sm text-slate-500">
+                            {getSplitMethodLabel(invitation.splitMethod)} |
+                            Total: RM {invitation.totalAmount.toFixed(2)}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2">
+                            <p className="text-purple-700">
+                              Your Share: RM {invitation.myShare.toFixed(2)}
+                            </p>
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                              <Clock className="w-3 h-3" />
+                              <span>
+                                Invited{" "}
+                                {formatRelativeTime(invitation.invitedAt)}
+                              </span>
+                            </div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => handleViewDetails(invitation)}
+                          >
+                            View Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() =>
+                              handleDeclineInvitation(invitation.id)
+                            }
+                          >
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Decline
+                          </Button>
+                          <Button
+                            onClick={() =>
+                              handleAcceptInvitation(invitation.id)
+                            }
+                            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Accept
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleViewDetails(invitation)}
-                        >
-                          View Details
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDeclineInvitation(invitation.id)}
-                        >
-                          <XCircle className="w-4 h-4 mr-2" />
-                          Decline
-                        </Button>
-                        <Button
-                          onClick={() => handleAcceptInvitation(invitation.id)}
-                          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                        >
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Accept
-                        </Button>
-                      </div>
-                    </div>
 
-                    {/* Expiration warning */}
-                    {invitation.expiresAt !== "N/A" && (
-                      <Alert className="mt-3 border-amber-200 bg-amber-50">
-                        <AlertCircle className="w-4 h-4 text-amber-600" />
-                        <AlertDescription className="text-amber-800 text-xs">
-                          This invitation expires {invitation.expiresAt}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                      {/* Expiration warning */}
+                      {invitation.expiresAt !== "N/A" && (
+                        <Alert className="mt-3 border-amber-200 bg-amber-50">
+                          <AlertCircle className="w-4 h-4 text-amber-600" />
+                          <AlertDescription className="text-amber-800 text-xs">
+                            This invitation expires {invitation.expiresAt}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
       {/* No Pending Invitations */}
       {viewMode === "full" && pendingInvitations.length === 0 && (
@@ -629,52 +636,53 @@ export default function SplitBillInvitations({
         </Card>
       )}
 
-      {/* Ongoing Payments - Show ONLY in payment-only mode */}
-      {viewMode === "payment-only" && ongoingInvitations.length > 0 && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Ongoing Payments</CardTitle>
-            <CardDescription>Split bills you're part of</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {ongoingInvitations.map((invitation) => (
-                <Card
-                  key={invitation.id}
-                  className="border-green-200 bg-green-50/30"
-                >
-                  <CardContent className="pt-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm text-slate-900">
-                            {invitation.orderId}
+      {/* Ongoing Payments - Show in both modes now */}
+      {(viewMode === "payment-only" || viewMode === "full") &&
+        ongoingInvitations.length > 0 && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Ongoing Payments</CardTitle>
+              <CardDescription>Split bills you're part of</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {ongoingInvitations.map((invitation) => (
+                  <Card
+                    key={invitation.id}
+                    className="border-green-200 bg-green-50/30"
+                  >
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-sm text-slate-900">
+                              {invitation.orderId}
+                            </p>
+                            {getStatusBadge(invitation.status)}
+                          </div>
+                          <p className="text-sm text-slate-600">
+                            {invitation.cafeteria} | Your Share: RM{" "}
+                            {invitation.myShare.toFixed(2)}
                           </p>
-                          {getStatusBadge(invitation.status)}
                         </div>
-                        <p className="text-sm text-slate-600">
-                          {invitation.cafeteria} | Your Share: RM{" "}
-                          {invitation.myShare.toFixed(2)}
-                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-[#800000] text-white hover:bg-[#6b0000] hover:text-white"
+                            onClick={() => handleTrackPayment(invitation)}
+                          >
+                            Track Payment
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-[#800000] text-white hover:bg-[#6b0000] hover:text-white"
-                          onClick={() => handleTrackPayment(invitation)}
-                        >
-                          Track Payment
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
       {viewMode === "payment-only" &&
         pendingInvitations.length === 0 &&
