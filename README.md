@@ -15,7 +15,7 @@ Developer: Thayaallan
 |----------|-------------|----------|---------|
 | Sprint 1 | Dynamic Menu Display            |  [Cafeteria](src/components/cafeteria/CafeteriaList.tsx)</br> [Menu List](src/components/menu/MenuList.tsx)</br> [Menu Management](src/components/menu/MenuManagement.tsx)</br>  | [Supabase Connection](src/lib/supabaseClient.ts)        |         |         |
 | Sprint 2 | Cart and Split Bill Option            | [Cart Page](src/components/cart/CartPage.tsx)</br> [Cart Side Bar](src/components/cart/CartSideBar.tsx)</br> [Split Bill Option](src/components/cart/SplitBill.tsx)</br>  | [Supabase Connection](src/lib/supabaseClient.ts)         |         |
-| Sprint 3 |             |          |         |
+| Sprint 3 | Smart Queue System            | [Queue Calculation](src/utils/queueCalculations.tsx)</br> [Queue Number Display Normal Checkout](src/components/checkout/CheckoutPage.tsx)</br> [Queue Number Display Split Bill](src/components/cart/SplitBillPage.tsx)</br> [Queue Pause](src/components/queue/LiveQueueDashboard.tsx)</br>  | [Supabase Connection](src/lib/supabaseClient.ts)         |         |
 
 
 **Subsystem 3: Payment and Transaction Subsystem**
