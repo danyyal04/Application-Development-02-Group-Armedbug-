@@ -12,7 +12,6 @@ import { Alert, AlertDescription } from "../ui/alert";
 import {
   Users,
   Clock,
-  Mail,
   CheckCircle,
   XCircle,
   ArrowRight,
@@ -50,6 +49,11 @@ interface SplitBillInvitationsProps {
     items?: any[]; // Allow passing items
   }) => void;
   viewMode?: "full" | "payment-only";
+  onCountsChange?: (counts: {
+    pending: number;
+    accepted: number;
+    declined: number;
+  }) => void;
 }
 
 const getSplitMethodLabel = (method: string) => {
@@ -82,6 +86,7 @@ const formatRelativeTime = (value: string) => {
 export default function SplitBillInvitations({
   onNavigateToPayment,
   viewMode = "full",
+  onCountsChange,
 }: SplitBillInvitationsProps) {
   const [invitations, setInvitations] = useState<SplitBillInvitation[]>([]);
   const [selectedInvitation, setSelectedInvitation] =
@@ -355,8 +360,21 @@ export default function SplitBillInvitations({
     (inv) => inv.status === "declined"
   );
   const ongoingInvitations = invitations.filter(
-    (inv) => inv.status !== "declined"
+    (inv) => inv.status === "accepted" && inv.sessionStatus === "active"
   );
+
+  useEffect(() => {
+    onCountsChange?.({
+      pending: pendingInvitations.length,
+      accepted: acceptedInvitations.length,
+      declined: declinedInvitations.length,
+    });
+  }, [
+    onCountsChange,
+    pendingInvitations.length,
+    acceptedInvitations.length,
+    declinedInvitations.length,
+  ]);
 
   const handleViewDetails = (invitation: SplitBillInvitation) => {
     setSelectedInvitation(invitation);
@@ -476,10 +494,7 @@ export default function SplitBillInvitations({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                <Mail className="w-5 h-5 text-orange-600" />
-                <p className="text-slate-900">{pendingInvitations.length}</p>
-              </div>
+              <p className="text-slate-900">{pendingInvitations.length}</p>
             </CardContent>
           </Card>
           <Card>
@@ -507,8 +522,9 @@ export default function SplitBillInvitations({
         </div>
       )}
 
-      {/* Pending Invitations - Show ONLY in full/notification mode */}
-      {viewMode === "full" && pendingInvitations.length > 0 && (
+      {/* Pending Invitations */}
+      {(viewMode === "full" || viewMode === "payment-only") &&
+        pendingInvitations.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Pending Invitations</CardTitle>
@@ -604,7 +620,6 @@ export default function SplitBillInvitations({
       {viewMode === "full" && pendingInvitations.length === 0 && (
         <Card className="mb-8">
           <CardContent className="py-12 text-center">
-            <Mail className="w-12 h-12 mx-auto mb-4 text-slate-300" />
             <p className="text-slate-500">No pending invitations</p>
             <p className="text-sm text-slate-400 mt-2">
               When someone invites you to join a split bill, it will appear
@@ -619,7 +634,7 @@ export default function SplitBillInvitations({
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Ongoing Payments</CardTitle>
-            <CardDescription>Split bills you’re part of</CardDescription>
+            <CardDescription>Split bills you're part of</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -660,6 +675,19 @@ export default function SplitBillInvitations({
           </CardContent>
         </Card>
       )}
+
+      {viewMode === "payment-only" &&
+        pendingInvitations.length === 0 &&
+        ongoingInvitations.length === 0 && (
+          <Card className="mb-8">
+            <CardContent className="py-12 text-center">
+              <p className="text-slate-500">No pending split bills</p>
+              <p className="text-sm text-slate-400 mt-2">
+                Invitations and accepted split bills will appear here.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
       {/* Declined Invitations */}
       {viewMode === "full" && declinedInvitations.length > 0 && (

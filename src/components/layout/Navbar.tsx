@@ -9,7 +9,6 @@ import {
   LogOut,
   Home,
   UtensilsCrossed,
-  Mail,
   BarChart3,
   Building2,
   Users,
@@ -26,7 +25,6 @@ import {
 import { Avatar, AvatarFallback } from "../ui/avatar.js";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet.js";
 import { supabase } from "../../lib/supabaseClient";
-
 interface NavbarProps {
   user: {
     id: string;
@@ -50,7 +48,6 @@ export default function Navbar({
   onCartClick,
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
-  const [hasActiveSplit, setHasActiveSplit] = useState(false);
   const [invitationCount, setInvitationCount] = useState(0);
 
   const initials = user.name
@@ -62,32 +59,8 @@ export default function Navbar({
   const isOwner = user.role === "owner";
   const isAdmin = user.role === "admin";
 
-  // Track active split-bill session from localStorage
-  const splitStorageKey = `utm-active-split-${user.id}`;
   useEffect(() => {
-    const readActive = () => {
-      try {
-        const raw = localStorage.getItem(splitStorageKey);
-        setHasActiveSplit(!!raw);
-      } catch {
-        setHasActiveSplit(false);
-      }
-    };
-    readActive();
-    const handler = (e: any) => {
-      if (!e || !("key" in e) || e.key === splitStorageKey) {
-        readActive();
-      }
-    };
-    window.addEventListener("storage", handler);
-    window.addEventListener("utm-active-split-changed", handler as any);
-    return () => {
-      window.removeEventListener("storage", handler);
-      window.removeEventListener("utm-active-split-changed", handler as any);
-    };
-  }, [splitStorageKey]);
-
-  useEffect(() => {
+    if (isOwner || isAdmin) return;
     let isMounted = true;
 
     const loadInvitationCount = async () => {
@@ -174,7 +147,7 @@ export default function Navbar({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [user.email, user.name]);
+  }, [isOwner, isAdmin, user.email, user.name]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 shadow-sm">
@@ -309,10 +282,15 @@ export default function Navbar({
                           onNavigate("payment");
                           setOpen(false);
                         }}
-                        className="w-full justify-start"
+                        className="w-full justify-start relative"
                       >
                         <CreditCard className="w-4 h-4 mr-2" />
                         Payment
+                        {invitationCount > 0 && (
+                          <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#800000] text-white text-[11px] flex items-center justify-center">
+                            {invitationCount}
+                          </span>
+                        )}
                       </Button>
                     </>
                   )}
@@ -452,12 +430,17 @@ export default function Navbar({
                   onClick={() => onNavigate("payment")}
                   className={
                     currentPage === "payment"
-                      ? "bg-gradient-to-r from-amber-600 to-orange-600"
-                      : ""
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600 relative"
+                      : "relative"
                   }
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
                   Payment
+                  {invitationCount > 0 && (
+                    <span className="ml-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#800000] text-white text-[11px] flex items-center justify-center">
+                      {invitationCount}
+                    </span>
+                  )}
                 </Button>
               </>
             )}
@@ -465,20 +448,6 @@ export default function Navbar({
 
           {/* User Menu - Desktop */}
           <div className="flex items-center gap-1">
-            {!isOwner && !isAdmin && (
-              <Button
-                variant="ghost"
-                className="relative"
-                onClick={() => onNavigate("splitbill-invitations")}
-              >
-                <Mail className="w-5 h-5" />
-                {invitationCount + (hasActiveSplit ? 1 : 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[11px] flex items-center justify-center">
-                    {invitationCount + (hasActiveSplit ? 1 : 0)}
-                  </span>
-                )}
-              </Button>
-            )}
             {!isAdmin && !isOwner && (
               <Button
                 variant="ghost"

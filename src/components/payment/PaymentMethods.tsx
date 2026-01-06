@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CreditCard, Plus, Trash2, Star, ShieldCheck, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card.js';
 import { Button } from '../ui/button.js';
@@ -31,6 +31,9 @@ interface PaymentMethod {
 export default function PaymentMethods() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isTopUpDialogOpen, setIsTopUpDialogOpen] = useState(false);
+  const [topUpMethodId, setTopUpMethodId] = useState<string>('');
+  const [topUpAmount, setTopUpAmount] = useState<string>('50');
   const [formData, setFormData] = useState({
     type: 'fpx' as 'fpx' | 'ewallet' | 'card',
     name: '',
@@ -73,6 +76,13 @@ export default function PaymentMethods() {
   const defaultMethod = paymentMethods.find(pm => pm.is_default);
   const preferredBalance = defaultMethod?.balance ?? 0;
   const hasPreferredBalance = typeof defaultMethod?.balance === 'number';
+  const topUpEligibleMethods = paymentMethods.filter(pm => pm.type !== 'card' && typeof pm.balance === 'number');
+  const selectedTopUpMethod = topUpEligibleMethods.find(pm => pm.id === topUpMethodId);
+  const parsedTopUpAmount = Number(topUpAmount);
+  const isValidTopUpAmount = Number.isFinite(parsedTopUpAmount) && parsedTopUpAmount > 0;
+  const topUpPreviewBalance = selectedTopUpMethod
+    ? (selectedTopUpMethod.balance ?? 0) + (isValidTopUpAmount ? parsedTopUpAmount : 0)
+    : 0;
   const recentMethod = paymentMethods[paymentMethods.length - 1];
   const supportedOptions = [
     {
@@ -106,21 +116,22 @@ export default function PaymentMethods() {
     }
   ];
 
+  const fetchPayments = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('payment')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true });
+
+    if (error) return toast.error('Failed to load payment methods');
+    setPaymentMethods(data as PaymentMethod[]);
+  }, []);
+
   // Fetch payment methods
   useEffect(() => {
-    async function fetchPayments() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('payment')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
-
-      if (error) return toast.error('Failed to load payment methods');
-      setPaymentMethods(data as PaymentMethod[]);
-    }
     fetchPayments();
 
     // Subscribe to real-time payment method changes
@@ -140,7 +151,7 @@ export default function PaymentMethods() {
         channel.unsubscribe();
       };
     })();
-  }, []);
+  }, [fetchPayments]);
 
   const handleAddPaymentMethod = async () => {
     const sanitizedCard = formData.cardNumber.replace(/\D/g, '');
@@ -261,6 +272,70 @@ export default function PaymentMethods() {
     toast.success('Payment method updated successfully.');
   };
 
+  const handleOpenTopUp = () => {
+    if (topUpEligibleMethods.length === 0) {
+      toast.error('No FPX or E-Wallet accounts available for top up.');
+      return;
+    }
+    const preferred = topUpEligibleMethods.find(pm => pm.is_default) || topUpEligibleMethods[0];
+    setTopUpMethodId(preferred?.id || '');
+    setTopUpAmount('50');
+    setIsTopUpDialogOpen(true);
+  };
+
+  const handleConfirmTopUp = async () => {
+    if (!selectedTopUpMethod) {
+      toast.error('Please select an account to top up.');
+      return;
+    }
+    if (!isValidTopUpAmount) {
+      toast.error('Please enter a valid top up amount.');
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error('User not logged in');
+      return;
+    }
+
+    const newBalance = (selectedTopUpMethod.balance ?? 0) + parsedTopUpAmount;
+    const { error: updateError } = await supabase
+      .from('payment')
+      .update({ balance: newBalance })
+      .eq('id', selectedTopUpMethod.id);
+
+    if (updateError) {
+      toast.error('Unable to top up at the moment. Please try again later.');
+      return;
+    }
+
+    setPaymentMethods(prev =>
+      prev.map(pm => (
+        pm.id === selectedTopUpMethod.id
+          ? { ...pm, balance: newBalance }
+          : pm
+      ))
+    );
+
+    const { error: topUpError } = await supabase
+      .from('payment_topups')
+      .insert([{
+        user_id: user.id,
+        payment_id: selectedTopUpMethod.id,
+        amount: parsedTopUpAmount,
+        balance_before: selectedTopUpMethod.balance ?? 0,
+        balance_after: newBalance
+      }]);
+
+    if (topUpError) {
+      console.warn('Failed to log top up', topUpError);
+    }
+
+    toast.success('Top up successful.');
+    setIsTopUpDialogOpen(false);
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-8 flex items-center justify-between">
@@ -268,17 +343,25 @@ export default function PaymentMethods() {
           <h1 className="text-slate-900 mb-2">Payment Methods</h1>
           <p className="text-slate-600">Manage every saved option for faster checkout</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>
-              <Plus className="w-4 h-4 mr-2" /> Add Payment Method
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Payment Method</DialogTitle>
-              <DialogDescription>Add a payment method to use for your orders</DialogDescription>
-            </DialogHeader>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleOpenTopUp}
+            className="text-white hover:opacity-90"
+            style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
+          >
+            <Plus className="w-4 h-4 mr-2" /> Top Up Balance
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>
+                <Plus className="w-4 h-4 mr-2" /> Add Payment Method
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Payment Method</DialogTitle>
+                <DialogDescription>Add a payment method to use for your orders</DialogDescription>
+              </DialogHeader>
 
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -429,8 +512,9 @@ export default function PaymentMethods() {
                 Add Method
               </Button>
             </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -568,6 +652,92 @@ export default function PaymentMethods() {
           ))}
         </div>
       </div>
+
+      <Dialog open={isTopUpDialogOpen} onOpenChange={setIsTopUpDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Top Up Balance</DialogTitle>
+            <DialogDescription>Add money to your FPX or E-Wallet account</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Select Account to Top Up</Label>
+              <Select value={topUpMethodId} onValueChange={setTopUpMethodId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {topUpEligibleMethods.map(pm => (
+                    <SelectItem key={pm.id} value={pm.id}>
+                      {pm.name} ({getPaymentTypeLabel(pm.type)}) - RM {(pm.balance ?? 0).toFixed(2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedTopUpMethod && (
+              <Card className="border-purple-200 bg-purple-50">
+                <CardContent className="pt-4">
+                  <p className="text-xs text-purple-700 mb-1">Current Balance</p>
+                  <p className="text-2xl text-purple-900">RM {(selectedTopUpMethod.balance ?? 0).toFixed(2)}</p>
+                  <p className="text-xs text-purple-700 mt-1">{selectedTopUpMethod.name}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="space-y-2">
+              <Label>Top Up Amount (RM)</Label>
+              <Input
+                type="number"
+                min="1"
+                inputMode="decimal"
+                value={topUpAmount}
+                onChange={e => setTopUpAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Quick Amounts</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {[10, 20, 50, 100].map(amount => (
+                  <Button
+                    key={amount}
+                    variant="outline"
+                    onClick={() => setTopUpAmount(String(amount))}
+                  >
+                    RM {amount}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {selectedTopUpMethod && isValidTopUpAmount && (
+              <Card className="border-emerald-200 bg-emerald-50">
+                <CardContent className="pt-4">
+                  <p className="text-xs text-emerald-700 mb-1">New Balance After Top Up</p>
+                  <p className="text-2xl text-emerald-900">RM {topUpPreviewBalance.toFixed(2)}</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsTopUpDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="text-white hover:opacity-90"
+              style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}
+              onClick={handleConfirmTopUp}
+              disabled={!selectedTopUpMethod || !isValidTopUpAmount}
+            >
+              <Plus className="w-4 h-4 mr-2" /> Top Up Now
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
