@@ -184,7 +184,7 @@ export default function MenuList({
         </Button>
         
         {/* Cafeteria Info */}
-        <Card className="mb-6 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
+        <Card className="mb-6 border-[oklch(40.8%_0.153_2.432)]/20 bg-gradient-to-r from-[#fbf4fa] to-[#f6eef7]">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -240,20 +240,20 @@ export default function MenuList({
 
       {/* Cart Summary banner */}
       {totalItems > 0 && (
-        <Card className="mb-8 border-purple-200 bg-purple-50">
+        <Card className="mb-8 border-[oklch(40.8%_0.153_2.432)]/20 bg-[#fbf4fa]">
           <CardContent className="py-4 space-y-4">
-            <div className="flex items-center justify-between text-purple-900">
+            <div className="flex items-center justify-between text-[oklch(40.8%_0.153_2.432)]">
               <div className="flex items-center gap-3">
                 <ShoppingCart className="w-5 h-5" />
                 <div>
                   <p className="font-semibold">{totalItems} {totalItems === 1 ? 'item' : 'items'} in cart</p>
-                  <p className="text-sm text-purple-700">Total: RM {totalPrice.toFixed(2)}</p>
+                  <p className="text-sm text-[oklch(40.8%_0.153_2.432)]">Total: RM {totalPrice.toFixed(2)}</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="pickupTimeBanner" className="text-purple-900">Pickup Time</Label>
+              <Label htmlFor="pickupTimeBanner" className="text-[oklch(40.8%_0.153_2.432)]">Pickup Time</Label>
               <Select value={pickupTime} onValueChange={onPickupTimeChange}>
                 <SelectTrigger id="pickupTimeBanner" className="bg-white">
                   <SelectValue />
@@ -270,7 +270,10 @@ export default function MenuList({
 
             <Button
               className="w-full text-white hover:opacity-90"
-              style={{ background: 'linear-gradient(90deg, #7e22ce, #ec4899)' }}
+              style={{
+                background:
+                  "linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))",
+              }}
               onClick={handleViewCart}
             >
               View Cart & Checkout
@@ -309,7 +312,7 @@ export default function MenuList({
                       {item.category}
                     </Badge>
                   </div>
-                  <p className="text-purple-700">RM {item.price.toFixed(2)}</p>
+                  <p className="text-[oklch(40.8%_0.153_2.432)]">RM {item.price.toFixed(2)}</p>
                 </div>
                 <p className="text-sm text-slate-600 mb-4">{item.description}</p>
 

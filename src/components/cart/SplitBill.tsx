@@ -268,7 +268,7 @@ export default function SplitBillInitiation({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-purple-700" />
+                <Sparkles className="w-4 h-4 text-[#b0125b]" />
                 Pickup Details
               </CardTitle>
             </CardHeader>
@@ -287,7 +287,7 @@ export default function SplitBillInitiation({
               </div>
               <div className="flex justify-between text-slate-600 items-center">
                 <span>Pickup Time</span>
-                <Badge className="bg-purple-600">
+                <Badge className="bg-[#b0125b] text-white">
                   <Clock className="w-3 h-3 mr-1" />
                   {getPickupTimeLabel(pickupTime)}
                 </Badge>
@@ -341,17 +341,17 @@ export default function SplitBillInitiation({
                 <div className="px-3 py-2 text-center text-slate-500">
                   Normal Checkout
                 </div>
-                <div className="px-3 py-2 text-center rounded-full bg-white shadow text-purple-700 font-medium flex items-center justify-center gap-2">
+                <div className="px-3 py-2 text-center rounded-full bg-white shadow text-[#b0125b] font-medium flex items-center justify-center gap-2">
                   <Users className="w-4 h-4" />
                   Split Bill
                 </div>
               </div>
 
-              <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
-                <p className="text-purple-900 font-medium">
+              <div className="p-4 rounded-lg bg-[#f9eef2] border border-[#e8c7d6]">
+                <p className="text-[#7a0c3b] font-medium">
                   Split the bill with friends!
                 </p>
-                <p className="text-sm text-purple-800">
+                <p className="text-sm text-[#8a0f46]">
                   Share the cost with your dining companions. Each person pays
                   their portion.
                 </p>
@@ -390,7 +390,7 @@ export default function SplitBillInitiation({
                 <span>RM {totalToSplit.toFixed(2)}</span>
               </div>
               <Button
-                className="w-full bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"
+                className="w-full bg-gradient-to-r from-[#b0125b] to-[#c11b6b] text-white hover:from-[#99104f] hover:to-[#aa155c]"
                 onClick={() => setIsDialogOpen(true)}
               >
                 <Users className="w-4 h-4 mr-2" />
@@ -417,7 +417,7 @@ export default function SplitBillInitiation({
       >
         <DialogContent className="sm:max-w-xl lg:max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-purple-900">
+            <DialogTitle className="flex items-center gap-2 text-[oklch(40.8%_0.153_2.432)]">
               <UserPlus className="w-5 h-5" />
               Add Participants
             </DialogTitle>
@@ -427,16 +427,18 @@ export default function SplitBillInitiation({
           </DialogHeader>
 
           <div className="space-y-4">
-            <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
+            <Card className="border-[oklch(40.8%_0.153_2.432)]/20 bg-gradient-to-r from-[#fbf4fa] to-[#f6eef7]">
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-purple-700">Order Summary</p>
-                    <p className="text-2xl text-purple-900">
+                    <p className="text-sm text-[oklch(40.8%_0.153_2.432)]">
+                      Order Summary
+                    </p>
+                    <p className="text-2xl text-[oklch(40.8%_0.153_2.432)]">
                       RM {totalToSplit.toFixed(2)}
                     </p>
                   </div>
-                  <Badge className="bg-purple-600">
+                  <Badge className="bg-[oklch(40.8%_0.153_2.432)] text-white">
                     {cartItems.length} items
                   </Badge>
                 </div>
@@ -467,7 +469,7 @@ export default function SplitBillInitiation({
                   />
                   <Button
                     onClick={handleAddParticipant}
-                    className="bg-purple-700 hover:bg-purple-800"
+                    className="bg-[oklch(40.8%_0.153_2.432)] text-white hover:bg-[oklch(36%_0.153_2.432)]"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add
@@ -537,7 +539,7 @@ export default function SplitBillInitiation({
             </Button>
             <Button
               onClick={handleInitiate}
-              className="flex-1 bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"
+              className="flex-1 bg-gradient-to-r from-[oklch(40.8%_0.153_2.432)] to-[oklch(40.8%_0.153_2.432)] text-white hover:from-[oklch(36%_0.153_2.432)] hover:to-[oklch(36%_0.153_2.432)]"
               disabled={isSubmitting}
             >
               <CreditCard className="w-4 h-4 mr-2" />

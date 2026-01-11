@@ -47,11 +47,11 @@ export default function PaymentMethods() {
   const getPaymentTypeLabel = (type: PaymentMethod['type']) => {
     switch (type) {
       case 'fpx':
-        return 'FPX Banking';
+        return 'FPX';
       case 'ewallet':
-        return 'E-Wallet';
+        return 'E-WALLET';
       case 'card':
-        return 'Debit / Credit Card';
+        return 'CREDIT/DEBIT CARD';
       default:
         return type;
     }
@@ -87,17 +87,17 @@ export default function PaymentMethods() {
   const supportedOptions = [
     {
       id: 'fpx',
-      title: 'FPX Banking',
+      title: 'FPX',
       description: 'Link Maybank, CIMB, Public Bank, RHB and more for instant transfers.'
     },
     {
       id: 'ewallet',
-      title: 'E-Wallets',
+      title: 'E-WALLETS',
       description: 'Connect Touch \'n Go, GrabPay or Boost for faster repeat checkouts.'
     },
     {
       id: 'card',
-      title: 'Debit/Credit Cards',
+      title: 'CREDIT/DEBIT CARDS',
       description: 'Use Visa or Mastercard with secure OTP verification and a RM500 instant limit.'
     }
   ];
@@ -274,7 +274,7 @@ export default function PaymentMethods() {
 
   const handleOpenTopUp = () => {
     if (topUpEligibleMethods.length === 0) {
-      toast.error('No FPX or E-Wallet accounts available for top up.');
+      toast.error('No FPX or E-WALLET accounts available for top up.');
       return;
     }
     const preferred = topUpEligibleMethods.find(pm => pm.is_default) || topUpEligibleMethods[0];
@@ -381,9 +381,9 @@ export default function PaymentMethods() {
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="fpx">FPX Online Banking</SelectItem>
-                    <SelectItem value="ewallet">E-Wallet</SelectItem>
-                    <SelectItem value="card">Debit/Credit Card</SelectItem>
+                    <SelectItem value="fpx">FPX</SelectItem>
+                    <SelectItem value="ewallet">E-WALLET</SelectItem>
+                    <SelectItem value="card">CREDIT/DEBIT CARD</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -428,7 +428,7 @@ export default function PaymentMethods() {
               {formData.type === 'ewallet' && (
                 <>
                   <div className="space-y-2">
-                    <Label>E-Wallet</Label>
+                    <Label>E-WALLET</Label>
                     <Select value={formData.name} onValueChange={(val: string) => setFormData({ ...formData, name: val })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -462,16 +462,6 @@ export default function PaymentMethods() {
 
               {formData.type === 'card' && (
                 <>
-                  <div className="space-y-2">
-                    <Label>Card Type</Label>
-                    <Select value={formData.name} onValueChange={(val: string) => setFormData({ ...formData, name: val })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Visa">Visa</SelectItem>
-                        <SelectItem value="Mastercard">Mastercard</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div className="space-y-2">
                     <Label>Card Number</Label>
                     <Input
@@ -657,7 +647,9 @@ export default function PaymentMethods() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Top Up Balance</DialogTitle>
-            <DialogDescription>Add money to your FPX or E-Wallet account</DialogDescription>
+            <DialogDescription>
+              Add money to your FPX or E-WALLET account
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

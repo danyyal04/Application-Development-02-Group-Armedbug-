@@ -242,7 +242,7 @@ export default function CartPage({
                 {/* Checkout Button */}
                 <Button
                   onClick={handleProceedToCheckout}
-                  className="w-full bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"
+                  className="w-full bg-gradient-to-r from-[oklch(40.8%_0.153_2.432)] to-[oklch(40.8%_0.153_2.432)] text-white hover:from-[oklch(36%_0.153_2.432)] hover:to-[oklch(36%_0.153_2.432)]"
                 >
                   Proceed to Checkout
                 </Button>

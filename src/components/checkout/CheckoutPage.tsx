@@ -190,11 +190,11 @@ export default function CheckoutPage({
   const getPaymentTypeLabel = (type: string) => {
     switch (type) {
       case "fpx":
-        return "FPX Banking";
+        return "FPX";
       case "ewallet":
-        return "E-Wallet";
+        return "E-WALLET";
       case "card":
-        return "Debit/Credit Card";
+        return "CREDIT/DEBIT CARD";
       default:
         return type;
     }
@@ -562,22 +562,22 @@ export default function CheckoutPage({
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-600">Pickup Time</span>
-                <Badge className="bg-purple-600">
+                <Badge className="bg-[oklch(40.8%_0.153_2.432)] text-white">
                   <Clock className="w-3 h-3 mr-1" />
                   {getPickupTimeLabel(pickupTime)}
                 </Badge>
               </div>
-              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-                <div className="flex items-center gap-2 text-blue-800">
+              <div className="p-3 rounded-lg bg-[#fbf4fa] border border-[#e8c7d6]">
+                <div className="flex items-center gap-2 text-[oklch(40.8%_0.153_2.432)]">
                   <Clock className="w-4 h-4" />
                   <p className="text-sm font-medium">
                     Estimated Preparation Time
                   </p>
                 </div>
-                <p className="text-sm text-blue-800 mt-1">
+                <p className="text-sm text-[oklch(40.8%_0.153_2.432)] mt-1">
                   Ready in approximately 24 minutes
                 </p>
-                <p className="text-xs text-blue-700">
+                <p className="text-xs text-[oklch(40.8%_0.153_2.432)]">
                   Based on current queue and order volume
                 </p>
               </div>
@@ -628,7 +628,7 @@ export default function CheckoutPage({
                   type="button"
                   className={`flex-1 text-sm py-2 rounded-full transition ${
                     checkoutMode === "split"
-                      ? "bg-white shadow-sm font-semibold text-purple-700"
+                      ? "bg-white shadow-sm font-semibold text-[oklch(40.8%_0.153_2.432)]"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                   onClick={() => {
@@ -686,7 +686,7 @@ export default function CheckoutPage({
                         key={pm.id}
                         className={`flex items-center space-x-3 p-4 border rounded-lg cursor-pointer ${
                           selectedPaymentId === pm.id
-                            ? "border-purple-600 bg-purple-50"
+                            ? "border-[oklch(40.8%_0.153_2.432)] bg-[#fbf4fa]"
                             : "border-slate-200 hover:border-slate-300"
                         }`}
                         onClick={() => setSelectedPaymentId(pm.id)}
@@ -729,11 +729,11 @@ export default function CheckoutPage({
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
-                  <p className="text-purple-900 font-medium">
+                <div className="p-4 rounded-lg bg-[#f9eef2] border border-[#e8c7d6]">
+                  <p className="text-[#7a0c3b] font-medium">
                     Split the bill with friends!
                   </p>
-                  <p className="text-sm text-purple-800">
+                  <p className="text-sm text-[#8a0f46]">
                     Share the cost with your dining companions. Each person pays
                     their portion.
                   </p>
@@ -806,7 +806,7 @@ export default function CheckoutPage({
                 style={{
                   backgroundColor:
                     checkoutMode === "normal"
-                      ? "oklch(44% 0.25 355)"
+                      ? "oklch(40.8% 0.153 2.432)"
                       : "oklch(40.8% 0.153 2.432)",
                 }}
                 onClick={
@@ -834,11 +834,11 @@ export default function CheckoutPage({
                   <div className="flex items-start gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                     <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5" />
                     <p className="text-xs text-emerald-800">
-                      Credit/debit cards are auto-charged when you place your
-                      order.
-                    </p>
-                  </div>
-                )}
+                    CREDIT/DEBIT CARDS are auto-charged when you place your
+                    order.
+                  </p>
+                </div>
+              )}
               <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
                 <p className="text-xs text-blue-800">
@@ -964,9 +964,9 @@ export default function CheckoutPage({
                   })
                 }
               >
-                <option value="fpx">FPX Online Banking</option>
-                <option value="ewallet">E-Wallet</option>
-                <option value="card">Debit/Credit Card</option>
+                <option value="fpx">FPX</option>
+                <option value="ewallet">E-WALLET</option>
+                <option value="card">CREDIT/DEBIT CARD</option>
               </select>
             </div>
 
@@ -1027,7 +1027,7 @@ export default function CheckoutPage({
             {newPaymentData.type === "ewallet" && (
               <>
                 <div className="space-y-2">
-                  <Label>E-Wallet</Label>
+                  <Label>E-WALLET</Label>
                   <select
                     className="w-full rounded-md border bg-input-background px-3 py-2 text-sm"
                     value={newPaymentData.name}
@@ -1077,19 +1077,6 @@ export default function CheckoutPage({
 
             {newPaymentData.type === "card" && (
               <>
-                <div className="space-y-2">
-                  <Label>Card Name</Label>
-                  <Input
-                    placeholder="Visa / Mastercard"
-                    value={newPaymentData.name}
-                    onChange={(e) =>
-                      setNewPaymentData({
-                        ...newPaymentData,
-                        name: e.target.value,
-                      })
-                    }
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label>Card Number</Label>
                   <Input
@@ -1186,7 +1173,7 @@ export default function CheckoutPage({
 
 
           <div className="mt-6 mb-6 text-center">
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">
+            <div className="bg-gradient-to-r from-[oklch(40.8%_0.153_2.432)] to-[oklch(40.8%_0.153_2.432)] rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">
               <div className="flex items-center justify-center gap-2 mb-2 opacity-90">
                 <CreditCard className="w-4 h-4" />
                 <span className="text-sm font-medium">Your Queue Number</span>

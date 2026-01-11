@@ -46,6 +46,17 @@ export default function DigitalReceipt({
   onClose,
 }: DigitalReceiptProps) {
   // UC031 - NF: Display digital receipt with all order and payment details
+  const normalizedMethod = receipt.paymentMethod.trim().toLowerCase();
+  const formattedPaymentMethod = normalizedMethod.startsWith("split bill")
+    ? "SPLIT BILL"
+    : normalizedMethod === "e-wallet" || normalizedMethod === "ewallet"
+    ? "E-WALLET"
+    : normalizedMethod === "fpx" || normalizedMethod === "fpx banking"
+    ? "FPX"
+    : normalizedMethod === "debit/credit card" ||
+      normalizedMethod === "credit/debit card"
+    ? "CREDIT/DEBIT CARD"
+    : receipt.paymentMethod;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -90,7 +101,13 @@ export default function DigitalReceipt({
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Payment Method:</span>
-                <span className="text-slate-900">{receipt.paymentMethod}</span>
+                <span className="text-slate-900">{formattedPaymentMethod}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Queue Number:</span>
+                <span className="text-slate-900 font-mono">
+                  {receipt.queueNumber}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Status:</span>

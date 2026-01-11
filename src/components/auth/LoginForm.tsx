@@ -256,7 +256,8 @@ export default function LoginForm({
                 type="submit"
                 className="w-full text-white font-semibold"
                 style={{
-                  background: "linear-gradient(90deg, #7e22ce, #ec4899)",
+                  background:
+                    "linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))",
                 }}
                 disabled={loading}
               >

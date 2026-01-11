@@ -2,6 +2,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
   type ChangeEvent,
 } from "react";
@@ -135,6 +136,11 @@ export default function SplitBillPage({
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [generatedQueueNum, setGeneratedQueueNum] = useState<string>("");
+  const selectedPayment = useMemo(
+    () => paymentMethods.find((method) => method.id === selectedPaymentId),
+    [paymentMethods, selectedPaymentId]
+  );
+  const requiresManualCredentials = selectedPayment?.type !== "card";
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -151,7 +157,8 @@ export default function SplitBillPage({
   const unpaidAmount = totalAmount - totalPaid;
   const progressPercentage = (totalPaid / totalAmount) * 100;
   const allPaid = participants.length > 0 && participants.every((p) => p.paid);
-  const isInitiator = currentUserEmail === participants[0]?.email;
+  const initiatorEmail = (participants[0]?.email || "").toLowerCase();
+  const isInitiator = normalizedEmail !== "" && normalizedEmail === initiatorEmail;
 
   const parseReceiptItems = (rawItems: any) => {
     if (!rawItems) return [];
@@ -569,6 +576,10 @@ export default function SplitBillPage({
   };
 
   const handleCancelSession = async () => {
+    if (!isInitiator) {
+      toast.error("Only the initiator can cancel this split bill.");
+      return;
+    }
     if (allPaid) {
       toast.error(
         "Cannot cancel split bill because all participants have paid."
@@ -601,15 +612,30 @@ export default function SplitBillPage({
   };
 
   const handleCoverRemainingAmount = () => {
+    if (!isInitiator) {
+      toast.error("Only the initiator can cover the remaining balance.");
+      return;
+    }
     if (unpaidAmount <= 0) {
       toast.info("All payments have been completed");
       return;
     }
 
+    setPaymentCredentials("");
     setShowCompleteDialog(true);
   };
 
   const handleCompletePayment = () => {
+    if (!selectedPaymentId) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
+    if (requiresManualCredentials && !paymentCredentials) {
+      toast.error("Invalid payment details. Please check and try again.");
+      return;
+    }
+
     setIsProcessing(true);
 
     // Simulate payment processing for remaining amount
@@ -636,7 +662,7 @@ export default function SplitBillPage({
           .from("split_bill_participants")
           .update({ status: "paid" })
           .eq("session_id", splitBillId)
-          .eq("status", "pending");
+          .neq("status", "paid");
 
         if (error) {
           console.warn("Failed to persist complete payment", error);
@@ -644,14 +670,9 @@ export default function SplitBillPage({
           await refreshParticipants();
         }
 
-        toast.success("Split bill payment completed successfully! ??");
+        toast.success("Split bill payment completed successfully!");
         setShowCompleteDialog(false);
 
-        if (onCompleteSplitBill) {
-          setTimeout(() => {
-            onCompleteSplitBill();
-          }, 1500);
-        }
       } else {
         toast.error("Payment failed. Please try again.");
       }
@@ -706,7 +727,7 @@ export default function SplitBillPage({
           const paymentMethodString = `Split Bill ${splitBillId}`;
           const { data: existingOrder } = await supabase
             .from("orders")
-            .select("id, queue_number")
+            .select("*")
             .eq("payment_method", paymentMethodString)
             .maybeSingle();
 
@@ -792,8 +813,6 @@ export default function SplitBillPage({
             console.error("Failed to create order from split bill", orderError);
             toast.error("Payment complete, but failed to create order record.");
           } else {
-            // Show success dialog instead of just toast
-            setShowSuccessDialog(true);
             if (createdOrder) {
               await saveReceipt(createdOrder);
               await openReceipt(createdOrder);
@@ -828,36 +847,22 @@ export default function SplitBillPage({
   }, [allPaid]);
 
   useEffect(() => {
-    if (!allPaid || receiptShownRef.current) return;
-    let isMounted = true;
-    const paymentMethodString = `Split Bill ${splitBillId}`;
+    if (!showSuccessDialog) return;
+    const timer = setTimeout(() => {
+      if (onCompleteSplitBill) onCompleteSplitBill();
+    }, 1500);
 
-    const fetchOrderForReceipt = async () => {
-      const { data: existingOrder } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("payment_method", paymentMethodString)
-        .maybeSingle();
-
-      if (existingOrder && isMounted) {
-        await openReceipt(existingOrder);
-      }
-    };
-
-    const interval = setInterval(fetchOrderForReceipt, 1500);
-    fetchOrderForReceipt();
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [allPaid, splitBillId]);
+    return () => clearTimeout(timer);
+  }, [showSuccessDialog, onCompleteSplitBill]);
 
   if (showReceipt && receiptData) {
     return (
       <DigitalReceipt
         receipt={receiptData}
-        onClose={() => setShowReceipt(false)}
+        onClose={() => {
+          setShowReceipt(false);
+          setShowSuccessDialog(true);
+        }}
       />
     );
   }
@@ -888,7 +893,7 @@ export default function SplitBillPage({
       {/* Header - UC020 */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-4">
-          <Users className="w-6 h-6 text-purple-700" />
+          <Users className="w-6 h-6 text-[oklch(40.8%_0.153_2.432)]" />
           <h1 className="text-slate-900">Split Bill Payment Tracking</h1>
         </div>
         <p className="text-slate-600">
@@ -900,13 +905,15 @@ export default function SplitBillPage({
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* UC020: Payment Progress */}
-          <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
+          <Card className="border-[oklch(40.8%_0.153_2.432)]/20 bg-gradient-to-r from-[#fbf4fa] to-[#f6eef7]">
             <CardContent className="pt-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-purple-700">Payment Progress</p>
-                    <p className="text-2xl text-purple-900">
+                    <p className="text-sm text-[oklch(40.8%_0.153_2.432)]">
+                      Payment Progress
+                    </p>
+                    <p className="text-2xl text-[oklch(40.8%_0.153_2.432)]">
                       RM {totalPaid.toFixed(2)} / RM {totalAmount.toFixed(2)}
                     </p>
                   </div>
@@ -939,7 +946,7 @@ export default function SplitBillPage({
 
                 {/* UC020: Unpaid Balance Alert */}
                 {!allPaid && unpaidAmount > 0 && (
-                  <Alert className="border-amber-200 bg-amber-50">
+                  <Alert className="border-amber-200 bg-amber-50 pl-11">
                     <AlertCircle className="w-4 h-4 text-amber-600" />
                     <AlertDescription className="text-amber-800">
                       Remaining unpaid balance: RM {unpaidAmount.toFixed(2)}
@@ -988,7 +995,10 @@ export default function SplitBillPage({
                           <p className="text-slate-900">
                             {participant.name}
                             {participant.email === currentUserEmail && (
-                              <span className="text-purple-700"> (You)</span>
+                              <span className="text-[oklch(40.8%_0.153_2.432)]">
+                                {" "}
+                                (You)
+                              </span>
                             )}
                           </p>
                           {participant.id === "1" && (
@@ -1077,13 +1087,13 @@ export default function SplitBillPage({
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Pickup Details */}
-              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                <p className="text-sm text-purple-900 mb-2">Pickup Details</p>
+              <div className="p-3 bg-[#f9eef2] rounded-lg border border-[#e8c7d6]">
+                <p className="text-sm text-[#7a0c3b] mb-2">Pickup Details</p>
                 <p className="text-slate-900">{cafeteria.name}</p>
                 <p className="text-sm text-slate-600 mb-2">
                   {cafeteria.location}
                 </p>
-                <Badge className="bg-purple-600">
+                <Badge className="bg-[oklch(40.8%_0.153_2.432)] text-white">
                   <Clock className="w-3 h-3 mr-1" />
                   {getPickupTimeLabel(pickupTime)}
                 </Badge>
@@ -1138,7 +1148,7 @@ export default function SplitBillPage({
                   currentParticipant.invitationStatus === "accepted" && (
                     <Button
                       onClick={handlePayMyPortion}
-                      className="w-full bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"
+                      className="w-full bg-gradient-to-r from-[oklch(40.8%_0.153_2.432)] to-[oklch(40.8%_0.153_2.432)] text-white hover:from-[oklch(36%_0.153_2.432)] hover:to-[oklch(36%_0.153_2.432)]"
                     >
                       <Wallet className="w-4 h-4 mr-2" />
                       Pay My Portion
@@ -1153,31 +1163,33 @@ export default function SplitBillPage({
                 )}
 
                 {/* UC021: Complete Split Bill Payment */}
-                {!allPaid && unpaidAmount > 0 && (
+                {isInitiator && !allPaid && unpaidAmount > 0 && (
                   <Button
                     onClick={handleCoverRemainingAmount}
                     variant="outline"
-                    className="w-full border-purple-600 text-purple-700 hover:bg-purple-50"
+                    className="w-full border-[oklch(40.8%_0.153_2.432)] text-[oklch(40.8%_0.153_2.432)] hover:bg-[#fbf4fa]"
                   >
                     <CreditCard className="w-4 h-4 mr-2" />
                     Cover Remaining Balance
                   </Button>
                 )}
 
-                <Button
-                  variant="outline"
-                  onClick={handleCancelSession}
-                  className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                  disabled={isProcessing || allPaid}
-                >
-                  Cancel Split Bill (End Session)
-                </Button>
+                {isInitiator && (
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelSession}
+                    className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                    disabled={isProcessing || allPaid}
+                  >
+                    Cancel Split Bill (End Session)
+                  </Button>
+                )}
               </div>
 
               {/* Info */}
-              <Alert className="border-blue-200 bg-blue-50">
-                <AlertCircle className="w-4 h-4 text-blue-600" />
-                <AlertDescription className="text-xs text-blue-800">
+              <Alert className="border-[oklch(40.8%_0.153_2.432)]/25 bg-[#fbf4fa] pl-11">
+                <AlertCircle className="w-4 h-4 text-[oklch(40.8%_0.153_2.432)]" />
+                <AlertDescription className="text-xs text-[oklch(40.8%_0.153_2.432)]">
                   {allPaid
                     ? "All participants have paid. The order will be sent to the cafeteria."
                     : "Waiting for all participants to complete payment. The initiator can cover the remaining balance."}
@@ -1237,7 +1249,7 @@ export default function SplitBillPage({
                         key={method.id}
                         className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
                           selectedPaymentId === method.id
-                            ? "border-purple-600 bg-purple-50"
+                            ? "border-[oklch(40.8%_0.153_2.432)] bg-[#fbf4fa]"
                             : "border-slate-200 hover:border-slate-300"
                         }`}
                         onClick={() => setSelectedPaymentId(method.id)}
@@ -1263,8 +1275,7 @@ export default function SplitBillPage({
             {/* Payment Credentials */}
             <div className="space-y-2">
               <Label htmlFor="credentials">
-                {paymentMethods.find((m) => m.id === selectedPaymentId)
-                  ?.type === "card"
+                {selectedPayment?.type === "card"
                   ? "Card CVV"
                   : "PIN"}
               </Label>
@@ -1279,7 +1290,7 @@ export default function SplitBillPage({
               />
             </div>
 
-            <Alert className="border-amber-200 bg-amber-50">
+            <Alert className="border-amber-200 bg-amber-50 pl-11">
               <AlertCircle className="w-4 h-4 text-amber-600" />
               <AlertDescription className="text-xs text-amber-800">
                 Demo mode: Enter any credentials to simulate payment
@@ -1298,7 +1309,7 @@ export default function SplitBillPage({
             <Button
               onClick={handleConfirmPayment}
               disabled={isProcessing || !selectedPaymentId}
-              className="flex-1 bg-gradient-to-r from-purple-700 to-pink-700"
+              className="flex-1 bg-gradient-to-r from-[oklch(40.8%_0.153_2.432)] to-[oklch(40.8%_0.153_2.432)] text-white"
             >
               {isProcessing ? "Processing..." : "Confirm Payment"}
             </Button>
@@ -1307,7 +1318,13 @@ export default function SplitBillPage({
       </Dialog>
 
       {/* UC021: Complete Split Bill Dialog */}
-      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+      <Dialog
+        open={showCompleteDialog}
+        onOpenChange={(open) => {
+          setShowCompleteDialog(open);
+          if (!open) setPaymentCredentials("");
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Complete Split Bill Payment</DialogTitle>
@@ -1372,7 +1389,7 @@ export default function SplitBillPage({
                         key={method.id}
                         className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
                           selectedPaymentId === method.id
-                            ? "border-purple-600 bg-purple-50"
+                            ? "border-[oklch(40.8%_0.153_2.432)] bg-[#fbf4fa]"
                             : "border-slate-200 hover:border-slate-300"
                         }`}
                         onClick={() => setSelectedPaymentId(method.id)}
@@ -1395,6 +1412,31 @@ export default function SplitBillPage({
               )}
             </div>
 
+            {requiresManualCredentials ? (
+              <div className="space-y-2">
+                <Label htmlFor="complete-credentials">
+                  {selectedPayment?.type === "card" ? "Card CVV" : "PIN"}
+                </Label>
+                <Input
+                  id="complete-credentials"
+                  type="password"
+                  placeholder="Enter credentials"
+                  value={paymentCredentials}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setPaymentCredentials(e.target.value)
+                  }
+                />
+              </div>
+            ) : (
+              <Alert className="border-emerald-200 bg-emerald-50">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                <AlertDescription className="text-xs text-emerald-800">
+                  This card supports auto-pay. It will be charged once you
+                  confirm.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Alert className="border-blue-200 bg-blue-50">
               <AlertCircle className="w-4 h-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-800">
@@ -1416,7 +1458,7 @@ export default function SplitBillPage({
             <Button
               onClick={handleCompletePayment}
               disabled={isProcessing || !selectedPaymentId}
-              className="flex-1 bg-gradient-to-r from-purple-700 to-pink-700"
+              className="flex-1 bg-gradient-to-r from-[oklch(40.8%_0.153_2.432)] to-[oklch(40.8%_0.153_2.432)] text-white"
             >
               {isProcessing ? "Processing..." : "Complete Payment"}
             </Button>
@@ -1428,7 +1470,6 @@ export default function SplitBillPage({
         onOpenChange={(open) => {
           if (!open) {
             setShowSuccessDialog(false);
-            if (onCompleteSplitBill) onCompleteSplitBill();
           } else {
             setShowSuccessDialog(true);
           }
@@ -1442,7 +1483,7 @@ export default function SplitBillPage({
 
 
           <div className="mt-6 mb-6 text-center">
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">
+            <div className="bg-gradient-to-r from-[oklch(40.8%_0.153_2.432)] to-[oklch(40.8%_0.153_2.432)] rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">
               <div className="flex items-center justify-center gap-2 mb-2 opacity-90">
                 <CreditCard className="w-4 h-4" />
                 <span className="text-sm font-medium">Your Queue Number</span>

@@ -444,6 +444,16 @@ export default function TransactionHistory() {
     setSelectedReceipt(transaction);
   };
 
+  const formatPaymentMethodLabel = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    if (normalized.startsWith("split bill")) return "SPLIT BILL";
+    if (normalized === "e-wallet" || normalized === "ewallet") return "E-WALLET";
+    if (normalized === "fpx" || normalized === "fpx banking") return "FPX";
+    if (normalized === "debit/credit card" || normalized === "credit/debit card")
+      return "CREDIT/DEBIT CARD";
+    return value;
+  };
+
   const getStatusBadge = (status: string) => {
     const s = status.toLowerCase();
     if (s === "completed")
@@ -455,7 +465,7 @@ export default function TransactionHistory() {
     if (status === "Split Bill In Progress")
       return (
         <Badge className="bg-blue-100 text-blue-700">
-          Split Bill In Progress
+          SPLIT BILL IN PROGRESS
         </Badge>
       );
     return <Badge variant="outline">{status}</Badge>;
@@ -552,8 +562,8 @@ export default function TransactionHistory() {
               <SelectItem value="all">All Categories</SelectItem>
               <SelectItem value="Credit Card">Credit Card</SelectItem>
               <SelectItem value="Debit Card">Debit Card</SelectItem>
-              <SelectItem value="E-Wallet">E-Wallet</SelectItem>
-              <SelectItem value="Split Bill">Split Bill</SelectItem>
+              <SelectItem value="E-Wallet">E-WALLET</SelectItem>
+              <SelectItem value="Split Bill">SPLIT BILL</SelectItem>
             </SelectContent>
           </Select>
 
@@ -568,7 +578,7 @@ export default function TransactionHistory() {
               <SelectItem value="Pending">Pending</SelectItem>
               <SelectItem value="Failed">Failed</SelectItem>
               <SelectItem value="Split Bill In Progress">
-                Split Bill In Progress
+                SPLIT BILL IN PROGRESS
               </SelectItem>
             </SelectContent>
           </Select>
@@ -707,14 +717,10 @@ export default function TransactionHistory() {
                     </div>
                     <div className="flex items-center gap-1">
                       <CreditCard className="w-4 h-4" />
-                      <span>{transaction.paymentMethod}</span>
+                      <span>
+                        {formatPaymentMethodLabel(transaction.paymentMethod)}
+                      </span>
                     </div>
-                    {transaction.isSplitBill && (
-                      <div className="flex items-center gap-1">
-                        <Users className="w-4 h-4" />
-                        <span>Split Bill Group</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex gap-2">
