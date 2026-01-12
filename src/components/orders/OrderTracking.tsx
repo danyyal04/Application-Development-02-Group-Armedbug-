@@ -23,6 +23,7 @@ import {
 
 interface OrderTrackingProps {
   userId: string;
+  initialTab?: "active" | "history";
 }
 
 interface OrderItem {
@@ -82,7 +83,7 @@ const mapRowToOrder = (row: any, queueLength: number = 0): Order => ({
   ),
 });
 
-export default function OrderTracking({ userId }: OrderTrackingProps) {
+export default function OrderTracking({ userId, initialTab = "active" }: OrderTrackingProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -200,25 +201,19 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
         }
       }
 
-      // Sort by created_at ASC (oldest first)
       uniqueOrders.sort(
         (a, b) =>
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
 
-      // Calculate order numbers sequentially and map cafeteria name
       const mappedOrders = uniqueOrders.map((row) => {
-        // Use mapped name if available, fallback to existing logic
         const cafName = cafeteriaMap[row.cafeteria_id] || row.cafeteria_name || "Cafeteria";
-        
-        // Find position in global queue
         let qPos = 0;
         if (queuePositionsMap[row.cafeteria_id]) {
             const idx = queuePositionsMap[row.cafeteria_id]!.indexOf(row.id);
             if (idx !== -1) {
                 qPos = idx;
             } else {
-                // If not found in active list (e.g. it's completed or not Pending/Cooking), 0 overhead
                 qPos = 0; 
             }
         }
@@ -228,13 +223,11 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
         };
       });
       
-      // Override orderNumber with sequential index (1, 2, 3...)
       const ordersWithNumbers = mappedOrders.map((order, index) => ({
         ...order,
         orderNumber: index + 1,
       }));
 
-      // Final display sort: Oldest first (1, 2, 3...)
       ordersWithNumbers.sort(
         (a, b) =>
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -350,9 +343,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
     "Completed",
   ];
 
-  // UC033 - NF: Open feedback dialog
   const handleOpenFeedback = (order: Order) => {
-    // UC033 - AF1: Check if feedback already submitted
     if (order.feedbackSubmitted) {
       toast.error('You have already submitted feedback for this order.');
       return;
@@ -365,7 +356,6 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
     setPhotoPreview(null);
   };
 
-  // UC033 - NF: Handle photo upload
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -387,11 +377,9 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
     setPhotoPreview(null);
   };
 
-  // UC033 - NF: Submit feedback
   const handleSubmitFeedback = async () => {
     if (!selectedOrder) return;
     
-    // Validation
     if (rating === 0) {
       toast.error('Please select a star rating');
       return;
@@ -402,14 +390,12 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
     }
     
     try {
-      // Get current user info
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error('You must be logged in to submit feedback');
         return;
       }
 
-      // Handle photo upload if exists
       let photoUrl = null;
       if (photoFile) {
         const fileExt = photoFile.name.split('.').pop();
@@ -424,7 +410,6 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
           toast.error('Photo upload failed', {
             description: 'Storage bucket may not exist. Feedback will be saved without photo.',
           });
-          // Continue without photo if upload fails
         } else if (uploadData) {
           const { data: { publicUrl } } = supabase.storage
             .from('feedback-photos')
@@ -433,7 +418,6 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
         }
       }
 
-      // Insert feedback into database
       const { error: feedbackError } = await supabase
         .from('feedback')
         .insert({
@@ -451,7 +435,6 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
 
       if (feedbackError) throw feedbackError;
 
-      // Update order with feedback submitted flag
       const { error: orderError } = await supabase
         .from('orders')
         .update({ feedback_submitted: true })
@@ -459,19 +442,16 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
 
       if (orderError) throw orderError;
 
-      // Update local state
       setOrders(orders.map(order =>
         order.id === selectedOrder.id
           ? { ...order, feedbackSubmitted: true }
           : order
       ));
       
-      // UC033 - NF: Confirmation message
       toast.success('Thank you for your feedback!', {
         description: 'Your review helps us improve our service',
       });
       
-      // Close dialog and reset form
       setFeedbackDialogOpen(false);
       setSelectedOrder(null);
       setRating(0);
@@ -486,10 +466,8 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
     }
   };
 
-  // Handle notification toggle
   const handleToggleNotifications = async () => {
     if (!notificationsEnabled) {
-      // Request permission to enable notifications
       if ('Notification' in window) {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
@@ -508,7 +486,6 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
         });
       }
     } else {
-      // Disable notifications
       setNotificationsEnabled(false);
       toast.info('Notifications disabled', {
         description: 'You can re-enable them anytime',
@@ -516,7 +493,6 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
     }
   };
 
-  // Render star rating
   const renderStars = (interactive: boolean = false) => {
     return (
       <div className="flex gap-1">
@@ -577,7 +553,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
         </Card>
       ) : (
         <>
-          <Tabs defaultValue="active" className="w-full">
+          <Tabs defaultValue={initialTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="active">
                 Active Orders ({activeOrders.length})

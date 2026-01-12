@@ -87,6 +87,8 @@ export default function StudentDashboard({
   
   // Dashboard stats state
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
+  const [paymentMethodsCount, setPaymentMethodsCount] = useState(0);
+  const [favoriteCafesCount, setFavoriteCafesCount] = useState(0);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
   // Persist active split bill across refreshes
@@ -136,17 +138,59 @@ export default function StudentDashboard({
     const loadDashboardStats = async () => {
       if (!user?.id) return;
       
+      // Only load stats if we are on the main dashboard view
+      // The main view is rendered when currentPage is NOT one of the sub-pages handled in renderContent
+      const isDashboardView = !['cart-preview', 'splitbill-invitations', 'split-bill-tracking', 'menu', 'orders', 'history', 'payment', 'profile'].includes(currentPage);
+      
+      if (!isDashboardView) return;
+
       try {
         // Fetch active orders count
-        const { count } = await supabase
+        const { count: activeCount } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .in('status', ['Pending', 'Cooking', 'Ready for Pickup']);
         
-        setActiveOrdersCount(count || 0);
+        setActiveOrdersCount(activeCount || 0);
+
+        // Fetch payment methods count
+        const { count: paymentCount } = await supabase
+          .from('payment')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        setPaymentMethodsCount(paymentCount || 0);
+
+        // Fetch favorite cafeterias count
+        // First try to get from profiles table
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('favourite_cafeterias')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileData?.favourite_cafeterias) {
+          setFavoriteCafesCount(profileData.favourite_cafeterias.length);
+        } else {
+           // Fallback to localStorage if not in DB (or DB is empty/null)
+           try {
+             const localFavs = localStorage.getItem('favouriteCafeterias');
+             if (localFavs) {
+               setFavoriteCafesCount(JSON.parse(localFavs).length);
+             }
+           } catch (e) {
+             console.error("Error reading local favorites", e);
+           }
+        }
         
         // Fetch recent orders with cafeteria names
+        // First get total count to calculate sequential IDs (matching OrderTracking logic)
+        const { count: totalOrderCount } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
         const { data: ordersData } = await supabase
           .from('orders')
           .select('*')
@@ -169,10 +213,13 @@ export default function StudentDashboard({
           const cafMap = new Map(cafData?.map(c => [c.id, c.name]) || []);
           
           // Map orders with cafeteria names
-          const ordersWithCafeterias = ordersData.map(order => ({
+          const currentTotal = totalOrderCount || ordersData.length;
+          const ordersWithCafeterias = ordersData.map((order, index) => ({
             ...order,
             cafeteria_name: cafMap.get(order.cafeteria_id) || 'Cafeteria',
-            items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items || []
+            items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [],
+            // Calculate sequential ID: Newest is #Total, previous is #Total-1
+            calculatedOrderNumber: Math.max(1, currentTotal - index)
           }));
           
           setRecentOrders(ordersWithCafeterias);
@@ -183,7 +230,7 @@ export default function StudentDashboard({
     };
     
     loadDashboardStats();
-  }, [user?.id]);
+  }, [user?.id, currentPage]);
 
   useEffect(() => {
     if (cartItems.length === 0) {
@@ -436,6 +483,10 @@ export default function StudentDashboard({
       );
     }
 
+    if (currentPage === "order-history") {
+      return <OrderTracking userId={user.id} initialTab="history" />;
+    }
+
     if (currentPage === "menu") {
       if (checkoutData) {
         return (
@@ -610,7 +661,7 @@ export default function StudentDashboard({
               <CreditCard className="w-4 h-4 text-amber-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-slate-900">3</div>
+              <div className="text-slate-900">{paymentMethodsCount}</div>
               <p className="text-xs text-slate-500 mt-1">Saved methods</p>
             </CardContent>
           </Card>
@@ -623,7 +674,7 @@ export default function StudentDashboard({
               <Star className="w-4 h-4 text-pink-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-slate-900">3</div>
+              <div className="text-slate-900">{favoriteCafesCount}</div>
               <p className="text-xs text-slate-500 mt-1">Your top picks</p>
             </CardContent>
           </Card>
@@ -638,7 +689,7 @@ export default function StudentDashboard({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onNavigate("history")}
+              onClick={() => onNavigate("order-history")}
             >
               View History
             </Button>
@@ -660,7 +711,7 @@ export default function StudentDashboard({
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-slate-900">ORD-{order.order_number?.toString().padStart(3, '0') || '000'}</p>
+                          <p className="text-slate-900">ORD-{order.calculatedOrderNumber?.toString().padStart(3, '0') || '000'}</p>
                           <Badge
                             variant={
                               order.status === "Ready for Pickup"
