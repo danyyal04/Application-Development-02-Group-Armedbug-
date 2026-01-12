@@ -84,6 +84,7 @@ export default function LoginForm({
           .from("registration_request")
           .select("status")
           .eq("user_id", data.user.id)
+          .order('submitted_at', { ascending: false })
           .maybeSingle();
 
         const regStatus = regData?.status

@@ -669,7 +669,8 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
 
-      {/* ---------------- Profile Picture Section ---------------- */}
+      {/* ---------------- Profile Picture Section (Hidden for Owners) ---------------- */}
+      {user?.role !== 'owner' && (
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Profile Picture</CardTitle>
@@ -713,6 +714,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* ---------------- Personal Information ---------------- */}
       <Card className="mb-6">
@@ -875,7 +877,8 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
         </CardContent>
       </Card>
 
-      {/* ---------------- Food Preferences ---------------- */}
+      {/* ---------------- Food Preferences (Hidden for Owners) ---------------- */}
+      {user?.role !== 'owner' && (
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -894,7 +897,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
               onValueChange={(v) => setFoodPreferences({ ...foodPreferences, dietaryType: v })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select dietary type" />
+              <SelectValue placeholder="Select dietary type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="no-preference">No Preference</SelectItem>
@@ -913,7 +916,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
               onValueChange={(v) => setFoodPreferences({ ...foodPreferences, spiceLevel: v })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select spice level" />
+              <SelectValue placeholder="Select spice level" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="mild">Mild</SelectItem>
@@ -959,8 +962,10 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
 
         </CardContent>
       </Card>
+      )}
 
-      {/* ---------------- Favourite Cafeterias ---------------- */}
+      {/* ---------------- Favourite Cafeterias (Hidden for Owners) ---------------- */}
+      {user?.role !== 'owner' && (
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1074,6 +1079,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
 
         </CardContent>
       </Card>
+      )}
 
     </div>
   );
