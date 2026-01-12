@@ -351,17 +351,19 @@ export default function Navbar({
                   )}
 
                   <div className="border-t pt-4 mt-4">
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        onNavigate("profile");
-                        setOpen(false);
-                      }}
-                      className="w-full justify-start"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Profile Settings
-                    </Button>
+                    {!isAdmin && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          onNavigate("profile");
+                          setOpen(false);
+                        }}
+                        className="w-full justify-start"
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        Profile Settings
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       onClick={() => {
@@ -535,8 +537,8 @@ export default function Navbar({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
-                  <Avatar className="h-8 w-8 bg-gradient-to-br from-purple-600 to-pink-600">
-                    <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-white">
+                  <Avatar className="h-8 w-8" style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}>
+                    <AvatarFallback className="text-white bg-transparent">
                       {initials}
                     </AvatarFallback>
                   </Avatar>
@@ -565,10 +567,12 @@ export default function Navbar({
                   </DropdownMenuItem>
                 )}
                 {isOwner && <DropdownMenuSeparator />}
-                <DropdownMenuItem onClick={() => onNavigate("profile")}>
-                  <Settings className="w-4 h-4 mr-2" />
-                  Profile Settings
-                </DropdownMenuItem>
+                {!isAdmin && (
+                  <DropdownMenuItem onClick={() => onNavigate("profile")}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Profile Settings
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onLogout} className="text-red-600">
                   <LogOut className="w-4 h-4 mr-2" />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { Toaster } from './components/ui/sonner.js';
 import LoginForm from './components/auth/LoginForm.js';
@@ -80,23 +80,17 @@ export default function App() {
       (user.user_metadata?.status as string) ||
       'active';
 
-    // Map auth user -> app user id
-    const { data: appUser } = await supabase
-      .from('user')
-      .select('id')
-      .eq('auth_id', user.id)
+    // Pull latest registration_request status directly using auth ID
+    console.log("Checking status for User ID:", user.id);
+    // Note: In new schema, registration_request.user_id IS the auth user id.
+    const { data: regRow, error: regErr } = await supabase
+      .from('registration_request')
+      .select('status, user_id')
+      .eq('user_id', user.id)
+      .order('submitted_at', { ascending: false })
       .maybeSingle();
 
-    // Pull latest registration_request to avoid stale metadata (e.g., after admin approves)
-    const { data: regRow, error: regErr } = appUser?.id
-      ? await supabase
-          .from('registration_request')
-          .select('status')
-          .eq('user_id', appUser.id)
-          .order('submitted_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      : { data: null, error: null };
+    console.log("Registration Look Result:", { regRow, regErr });
 
     if (regRow?.status) {
       role = role === 'admin' ? 'admin' : 'owner';
@@ -116,6 +110,12 @@ export default function App() {
       status,
     } as User;
   };
+
+  // Sync currentPage to ref for use in auth listener
+  const currentPageRef = useRef(currentPage);
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
 
   // Load Supabase session on mount
   useEffect(() => {
@@ -154,6 +154,15 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
         (async () => {
+          // Immediate check: If we are on the register page and a sign-in event occurs (auto-login),
+          // we force sign-out and ignore the session to allow RegisterForm to handle the redirect.
+          if (currentPageRef.current === 'register' && (event === 'SIGNED_IN' || session)) {
+            if (session) {
+                await supabase.auth.signOut();
+            }
+            return;
+          }
+
           const normalized = await buildUserFromSession(session);
           if (normalized) {
             setCurrentUser(normalized);
@@ -162,7 +171,7 @@ export default function App() {
             // This prevents redirection if an unexpected SIGNED_IN fires while the user is browsing
             if (event === 'SIGNED_IN') {
               setCurrentPage((prev) => {
-                  if (prev === 'login' || prev === 'register') {
+                  if (prev === 'login') {
                       return 'dashboard';
                   }
                   return prev;

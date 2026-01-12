@@ -703,7 +703,8 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
               <Button
                 onClick={handleUploadProfilePic}
                 disabled={!selectedPic}
-                className="bg-purple-600 text-white hover:bg-purple-700"
+                className="text-white hover:opacity-90"
+                style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
               >
                 <ImagePlus className="w-4 h-4 mr-2" />
                 Upload Picture
@@ -753,7 +754,8 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
           <Button
             onClick={handleSaveProfile}
             disabled={savingProfile}
-            className="bg-purple-600 text-white hover:bg-purple-700"
+            className="text-white hover:opacity-90"
+            style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
           >
             <Save className="w-4 h-4 mr-2" />
             {savingProfile ? "Saving..." : "Save Profile"}
@@ -863,7 +865,8 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
           <Button
             onClick={handleSavePreferences}
             disabled={savingPreferences}
-            className="bg-purple-600 text-white hover:bg-purple-700"
+            className="text-white hover:opacity-90"
+            style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
           >
             <Save className="w-4 h-4 mr-2" />
             {savingPreferences ? "Saving..." : "Save Preferences"}
@@ -947,7 +950,8 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
           <Button
             onClick={handleSaveFoodPreferences}
             disabled={savingFoodPrefs}
-            className="bg-purple-600 text-white hover:bg-purple-700"
+            className="text-white hover:opacity-90"
+            style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
           >
             <Save className="w-4 h-4 mr-2" />
             {savingFoodPrefs ? "Saving..." : "Save Food Preferences"}
@@ -1061,7 +1065,8 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
                 toast.error(err.message || 'Failed to save favourite cafeterias');
               }
             }}
-            className="bg-purple-600 text-white hover:bg-purple-700"
+            className="text-white hover:opacity-90"
+            style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
           >
             <Save className="w-4 h-4 mr-2" />
             Save Favourite Cafeterias
