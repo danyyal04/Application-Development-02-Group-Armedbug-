@@ -153,9 +153,12 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
         (async () => {
+          console.log('🔐 AUTH STATE CHANGE:', event, 'Session exists:', !!session);
+          
           // Immediate check: If we are on the register page and a sign-in event occurs (auto-login),
           // we force sign-out and ignore the session to allow RegisterForm to handle the redirect.
           if (currentPageRef.current === 'register' && (event === 'SIGNED_IN' || session)) {
+            console.log('⚠️ Auto-login on register page - signing out');
             if (session) {
                 await supabase.auth.signOut();
             }
@@ -163,6 +166,8 @@ export default function App() {
           }
 
           const normalized = await buildUserFromSession(session);
+          console.log('👤 Normalized user:', normalized);
+          
           if (normalized) {
             setCurrentUser(normalized);
             
@@ -177,6 +182,7 @@ export default function App() {
               });
             }
           } else {
+            console.log('❌ buildUserFromSession returned null - logging out');
             setCurrentUser(null);
             setCurrentPage('login');
           }
@@ -239,11 +245,7 @@ export default function App() {
         ) : currentUser.role === 'admin' ? (
           <AdminDashboard user={currentUser} onLogout={handleLogout} />
         ) : currentUser.role === 'owner' ? (
-          currentUser.status === 'pending' ? (
-            <PendingApproval onLogout={handleLogout} />
-          ) : (
-            <StaffDashboard user={currentUser} currentPage={currentPage} onNavigate={setCurrentPage} />
-          )
+          <StaffDashboard user={currentUser} currentPage={currentPage} onNavigate={setCurrentPage} />
         ) : (
           <StudentDashboard
             user={currentUser}
