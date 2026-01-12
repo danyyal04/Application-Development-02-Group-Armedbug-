@@ -236,7 +236,7 @@ export default function FeedbackDashboard() {
       <div className="py-8">
         <Card className="text-center py-16">
           <CardContent>
-            <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <div className="w-16 h-16 border-4 border-[#800000] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <h3 className="text-slate-900 mb-2">Loading feedback...</h3>
             <p className="text-slate-600">Please wait while we fetch customer reviews</p>
           </CardContent>
@@ -287,7 +287,7 @@ export default function FeedbackDashboard() {
         <Card className="border-slate-200 hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm text-slate-600">Total Feedback</CardTitle>
-            <MessageSquare className="w-4 h-4 text-purple-600" />
+            <MessageSquare className="w-4 h-4 text-[#800000]" />
           </CardHeader>
           <CardContent>
             <div className="text-slate-900">{feedbackList.length}</div>
@@ -431,12 +431,12 @@ export default function FeedbackDashboard() {
 
                 {/* Owner Reply (if exists) */}
                 {feedback.hasReply && feedback.reply && (
-                  <div className="bg-purple-50 border-l-4 border-purple-600 rounded-lg p-4 mb-4">
+                  <div className="bg-[#800000]/5 border-l-4 border-[#800000] rounded-lg p-4 mb-4">
                     {editingReply === feedback.id ? (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2 mb-2">
-                          <MessageSquare className="w-4 h-4 text-purple-600" />
-                          <span className="text-sm text-purple-900">Edit Your Reply</span>
+                          <MessageSquare className="w-4 h-4 text-[#800000]" />
+                          <span className="text-sm text-[#800000]">Edit Your Reply</span>
                         </div>
                         <Textarea
                           placeholder="Update your response..."
@@ -447,7 +447,7 @@ export default function FeedbackDashboard() {
                         <div className="flex gap-2">
                           <Button
                             onClick={() => handlePostReply(feedback.id)}
-                            className="bg-purple-800 hover:bg-purple-900"
+                            className="bg-[#800000] hover:bg-[#600000] text-white"
                             size="sm"
                           >
                             <Send className="w-4 h-4 mr-2" />
@@ -467,9 +467,9 @@ export default function FeedbackDashboard() {
                       <>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <MessageSquare className="w-4 h-4 text-purple-600" />
-                            <span className="text-sm text-purple-900">Your Reply</span>
-                            <span className="text-xs text-purple-600">
+                            <MessageSquare className="w-4 h-4 text-[#800000]" />
+                            <span className="text-sm text-[#800000]">Your Reply</span>
+                            <span className="text-xs text-[#800000]/70">
                               {feedback.reply.date} at {feedback.reply.time}
                             </span>
                           </div>
@@ -477,7 +477,7 @@ export default function FeedbackDashboard() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditReply(feedback.id, feedback.reply?.text || '')}
-                            className="h-8 w-8 p-0 text-purple-600 hover:text-purple-800 hover:bg-purple-100"
+                            className="h-8 w-8 p-0 text-[#800000] hover:text-[#600000] hover:bg-[#800000]/10"
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -502,7 +502,7 @@ export default function FeedbackDashboard() {
                         <div className="flex gap-2">
                           <Button
                             onClick={() => handlePostReply(feedback.id)}
-                            className="bg-purple-800 hover:bg-purple-900"
+                            className="bg-[#800000] hover:bg-[#600000] text-white"
                           >
                             <Send className="w-4 h-4 mr-2" />
                             Post Reply

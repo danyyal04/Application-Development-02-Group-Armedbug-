@@ -474,7 +474,7 @@ export default function LiveQueueDashboard({ cafeteriaId }: LiveQueueDashboardPr
                             {order.items.map(item => `${item.quantity}x ${item.name}`).join(', ')}
                           </p>
                           <div className="flex items-center gap-4 text-sm">
-                            <div className="flex items-center gap-1 text-purple-700">
+                            <div className="flex items-center gap-1 text-[#800000]">
                               <TrendingUp className="w-3 h-3" />
                               <span>RM {order.total.toFixed(2)}</span>
                             </div>

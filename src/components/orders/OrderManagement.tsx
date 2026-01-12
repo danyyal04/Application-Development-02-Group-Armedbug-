@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select.js";
-import { Clock, Bell, Package, Sparkles } from "lucide-react";
+import { Clock, Bell, Package, Sparkles, Layout, Check, ClipboardList, MessageSquare, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabaseClient.js";
 import {
@@ -282,12 +282,29 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
         </div>
         <div className="w-full md:w-auto">
           <Select value={view} onValueChange={(v: any) => setView(v)}>
-            <SelectTrigger className="w-full md:w-[200px]">
+            <SelectTrigger className="group w-full md:w-[220px] bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 text-slate-700 font-medium flex items-center justify-between [&>svg:last-of-type]:hidden focus:ring-0 focus:ring-offset-0">
               <SelectValue placeholder="Select View" />
+              <ChevronDown size={16} className="text-slate-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="orders">Manage Orders</SelectItem>
-              <SelectItem value="feedback">Customer Feedback</SelectItem>
+            <SelectContent className="rounded-xl border border-slate-100 shadow-xl p-1">
+              <SelectItem 
+                value="orders" 
+                className="rounded-lg focus:bg-[#800000]/5 focus:text-[#800000] data-[state=checked]:bg-[#800000]/5 data-[state=checked]:text-[#800000] cursor-pointer py-2.5 px-3"
+              >
+                <div className="flex items-center gap-2">
+                   <ClipboardList size={16} className="text-[#800000] opacity-70" />
+                   <span className="font-sans">Manage Orders</span>
+                </div>
+              </SelectItem>
+              <SelectItem 
+                value="feedback"
+                className="rounded-lg focus:bg-[#800000]/5 focus:text-[#800000] data-[state=checked]:bg-[#800000]/5 data-[state=checked]:text-[#800000] cursor-pointer py-2.5 px-3"
+              >
+                <div className="flex items-center gap-2">
+                   <MessageSquare size={16} className="text-[#800000] opacity-70" />
+                   <span className="font-sans">Customer Feedback</span>
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -296,9 +313,9 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
       {view === 'orders' ? (
         <>
 
-      <Card className="mb-6 border-2 border-purple-200 bg-purple-50">
+      <Card className="mb-6 border border-[#800000]/10 bg-[#FFF5F5] shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-purple-700">
+          <CardTitle className="flex items-center gap-2 text-[#800000]">
             <Clock size={18} /> Smart Queue Overview
           </CardTitle>
         </CardHeader>
@@ -388,7 +405,7 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
 
                          {/* Footer: Price & Time */}
                          <div className="flex items-center gap-4 text-sm mt-2">
-                             <span className="font-bold text-purple-700">RM {order.total.toFixed(2)}</span>
+                             <span className="font-bold text-[#800000]">RM {order.total.toFixed(2)}</span>
                              <div className="flex items-center text-slate-500 gap-1">
                                 <Clock size={14} />
                                 <span>Est: {order.estimatedTime} min</span>
