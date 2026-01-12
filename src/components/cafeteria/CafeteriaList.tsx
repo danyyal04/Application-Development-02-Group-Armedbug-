@@ -129,9 +129,7 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
   const filteredCafeterias = useMemo(() => {
     return cafeterias.filter(cafeteria => {
       const matchesSearch = 
-        cafeteria.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cafeteria.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cafeteria.description.toLowerCase().includes(searchQuery.toLowerCase());
+        cafeteria.name.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesCategory = filterCategory === 'all' || cafeteria.category === filterCategory;
       const matchesStatus = filterStatus === 'all' || 
@@ -156,7 +154,7 @@ export default function CafeteriaList({ onSelectCafeteria }: CafeteriaListProps)
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
             type="text"
-            placeholder="Search cafeterias, locations, or food..."
+            placeholder="Search cafeterias by name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"

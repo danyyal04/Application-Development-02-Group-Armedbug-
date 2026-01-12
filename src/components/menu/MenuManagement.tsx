@@ -58,7 +58,7 @@ const resolveCafeteriaContext = async (cafeteriaId?: string | null) => {
     });
 
     if (!resolvedCafeteriaId && ownerCafeIds.length > 0) {
-      resolvedCafeteriaId = ownerCafeIds[0];
+      resolvedCafeteriaId = ownerCafeIds[0] ?? null;
     }
 
     if (!resolvedCafeteriaId) {
@@ -149,9 +149,7 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
   }, [loadMenuItems]);
 
   const filteredItems = menuItems.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchQuery.toLowerCase())
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const validateForm = () => {

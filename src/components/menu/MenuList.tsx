@@ -112,11 +112,8 @@ export default function MenuList({
     loadMenu();
   }, [cafeteria.id]);
 
-  const filteredItems = menuItems.filter(
-    item =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredItems = menuItems.filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSearchSubmit = () => {
