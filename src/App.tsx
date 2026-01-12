@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { Toaster } from './components/ui/sonner.js';
 import LoginForm from './components/auth/LoginForm.js';
+import PendingApproval from './components/auth/PendingApproval.js';
 import RegisterForm from './components/auth/RegisterForm.js';
 import StudentDashboard from './components/dashboard/StudentDashboard.js';
 import StaffDashboard from './components/dashboard/StaffDashboard.js';
@@ -90,17 +91,15 @@ export default function App() {
       .order('submitted_at', { ascending: false })
       .maybeSingle();
 
-    console.log("Registration Look Result:", { regRow, regErr });
+    console.log("Registration Look Result:", { regRow, regErr, role, status });
 
     if (regRow?.status) {
       role = role === 'admin' ? 'admin' : 'owner';
       status = regRow.status;
     }
 
-    if (role === 'owner' && status === 'pending' && !regErr) {
-      await supabase.auth.signOut();
-      return null;
-    }
+    // REMOVED: Forced logout for pending owners
+    // Now we allow pending owners to stay logged in and show them a PendingApproval screen
 
     return {
       id: user.id,
@@ -240,7 +239,11 @@ export default function App() {
         ) : currentUser.role === 'admin' ? (
           <AdminDashboard user={currentUser} onLogout={handleLogout} />
         ) : currentUser.role === 'owner' ? (
-          <StaffDashboard user={currentUser} currentPage={currentPage} onNavigate={setCurrentPage} />
+          currentUser.status === 'pending' ? (
+            <PendingApproval onLogout={handleLogout} />
+          ) : (
+            <StaffDashboard user={currentUser} currentPage={currentPage} onNavigate={setCurrentPage} />
+          )
         ) : (
           <StudentDashboard
             user={currentUser}
