@@ -45,6 +45,9 @@ interface Order {
   queueNumber: string;
   estimatedTime?: number;
   feedbackSubmitted?: boolean;
+  feedbackRating?: number;
+  feedbackReply?: string;
+  feedbackReplyDate?: string;
 }
 
 const parseItems = (raw: any): OrderItem[] => {
@@ -201,6 +204,22 @@ export default function OrderTracking({ userId, initialTab = "active" }: OrderTr
         }
       }
 
+      // 6. Fetch Feedback Logic
+      // Fetch feedback for these orders to check for replies
+      let feedbackMap: Record<string, any> = {};
+      if (uniqueOrders.length > 0) {
+        const { data: feedbackData } = await supabase
+          .from("feedback")
+          .select("order_id, rating, has_reply, reply_text, reply_date")
+          .in("order_id", uniqueOrders.map(o => o.id));
+
+        if (feedbackData) {
+          feedbackData.forEach(f => {
+            feedbackMap[f.order_id] = f;
+          });
+        }
+      }
+
       uniqueOrders.sort(
         (a, b) =>
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -218,8 +237,14 @@ export default function OrderTracking({ userId, initialTab = "active" }: OrderTr
             }
         }
         
+        const feedback = feedbackMap[row.id];
+
         return {
            ...mapRowToOrder({ ...row, cafeteria_name: cafName }, qPos),
+           feedbackRating: feedback?.rating,
+           feedbackReply: feedback?.reply_text,
+           feedbackReplyDate: feedback?.reply_date,
+           feedbackSubmitted: !!feedback || row.feedback_submitted, // prefer fetch result if available
         };
       });
       
@@ -761,8 +786,36 @@ export default function OrderTracking({ userId, initialTab = "active" }: OrderTr
                           Submit Feedback
                         </Button>
                       ) : (
-                        <div className="text-center py-2 text-sm text-slate-500">
-                          Thank you for your feedback!
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-center gap-2 text-sm text-slate-500 bg-slate-50 p-2 rounded">
+                            <CheckCircle className="w-4 h-4 text-[#800000]" />
+                            <span>Feedback submitted</span>
+                            {order.feedbackRating && (
+                                <div className="flex gap-0.5 ml-2">
+                                    {[...Array(5)].map((_, i) => (
+                                        <Star key={i} className={`w-3 h-3 ${i < order.feedbackRating! ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                                    ))}
+                                </div>
+                            )}
+                          </div>
+                          
+                          {/* Owner Reply Display */}
+                          {order.feedbackReply && (
+                            <div className="bg-[#800000]/5 border-l-4 border-[#800000] rounded-r-lg p-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <MessageSquare className="w-4 h-4 text-[#800000]" />
+                                    <span className="text-xs font-bold text-[#800000] uppercase tracking-wider">Owner's Reply</span>
+                                    {order.feedbackReplyDate && (
+                                        <span className="text-[10px] text-slate-400 ml-auto">
+                                            {new Date(order.feedbackReplyDate).toLocaleDateString()}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-sm text-slate-700 italic">
+                                    "{order.feedbackReply}"
+                                </p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </CardContent>
