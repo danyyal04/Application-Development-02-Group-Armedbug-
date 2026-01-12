@@ -487,104 +487,10 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
                     </div>
                   </div>
                   <div className="flex gap-2 mt-4">
-                    <Dialog open={editingItem?.id === item.id} onOpenChange={(open) => !open && setEditingItem(null)}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Edit Menu Item</DialogTitle>
-                          <DialogDescription>Update the details of this menu item</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-name">Item Name *</Label>
-                            <Input
-                              id="edit-name"
-                              value={formData.name}
-                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-description">Description</Label>
-                            <textarea
-                              id="edit-description"
-                              value={formData.description}
-                              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
-                              rows={3}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-md"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-price">Price (RM) *</Label>
-                              <Input
-                                id="edit-price"
-                                type="number"
-                                step="0.01"
-                                value={formData.price}
-                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-category">Category</Label>
-                              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Main Course">Main Course</SelectItem>
-                                  <SelectItem value="Beverages">Beverages</SelectItem>
-                                  <SelectItem value="Snacks">Snacks</SelectItem>
-                                  <SelectItem value="Desserts">Desserts</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-image">Item Image</Label>
-                            {formData.imageUrl && (
-                              <img src={formData.imageUrl} alt="Preview" className="w-full h-40 object-cover rounded-md border" />
-                            )}
-                            <Input
-                              id="edit-image"
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                  setFormData({ ...formData, imageUrl: reader.result as string });
-                                };
-                                reader.readAsDataURL(file);
-                              }}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="edit-available">Available</Label>
-                            <input
-                              id="edit-available"
-                              type="checkbox"
-                              checked={formData.available}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, available: e.target.checked })}
-                              className="h-4 w-4"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" onClick={() => { setEditingItem(null); resetForm(); }}>
-                            Cancel
-                          </Button>
-                          <Button onClick={handleEditItem} className="text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>
-                            Save Changes
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                    <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -601,6 +507,99 @@ export default function MenuManagement({ cafeteriaId, cafeteriaName }: MenuManag
           </Card>
         ))}
       </div>
+
+      <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Menu Item</DialogTitle>
+            <DialogDescription>Update the details of this menu item</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Item Name *</Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <textarea
+                id="edit-description"
+                value={formData.description}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-price">Price (RM) *</Label>
+                <Input
+                  id="edit-price"
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">Category</Label>
+                <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Main Course">Main Course</SelectItem>
+                    <SelectItem value="Beverages">Beverages</SelectItem>
+                    <SelectItem value="Snacks">Snacks</SelectItem>
+                    <SelectItem value="Desserts">Desserts</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-image">Item Image</Label>
+              {formData.imageUrl && (
+                <img src={formData.imageUrl} alt="Preview" className="w-full h-40 object-cover rounded-md border" />
+              )}
+              <Input
+                id="edit-image"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setFormData({ ...formData, imageUrl: reader.result as string });
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-available">Available</Label>
+              <input
+                id="edit-available"
+                type="checkbox"
+                checked={formData.available}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, available: e.target.checked })}
+                className="h-4 w-4"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setEditingItem(null); resetForm(); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditItem} className="text-white hover:opacity-90" style={{ backgroundColor: 'oklch(40.8% 0.153 2.432)' }}>
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
