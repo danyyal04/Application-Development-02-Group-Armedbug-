@@ -604,7 +604,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                         key={order.id}
                         className="overflow-hidden border border-slate-200 bg-white shadow-sm"
                       >
-                        <CardHeader className="bg-[#FFF5F5] border-b border-[#800000]/10">
+                        <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
                           <div className="flex items-center justify-between">
                             <div>
                               <CardTitle className="flex items-center gap-2">
@@ -627,7 +627,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                                     })
                                   : ""}
                               </p>
-                              <p className="text-[#800000] font-bold">
+                              <p className="text-purple-700 font-bold">
                                 RM {order.total.toFixed(2)}
                               </p>
                             </div>
@@ -744,13 +744,13 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                                 Completed
                             </Badge>
                             {order.feedbackSubmitted && (
-                              <Badge className="bg-[#800000]/10 text-[#800000] border-none shadow-none font-normal">
-                                <Star className="w-3 h-3 mr-1 fill-[#800000]" />
+                              <Badge className="bg-purple-100 text-purple-700 border-none shadow-none font-normal">
+                                <Star className="w-3 h-3 mr-1 fill-purple-700" />
                                 Feedback Submitted
                               </Badge>
                             )}
                          </div>
-                         <span className="text-[#800000] font-semibold">
+                         <span className="text-purple-700 font-semibold">
                             RM {order.total.toFixed(2)}
                          </span>
                       </div>
@@ -779,7 +779,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                         <Button
                           onClick={() => handleOpenFeedback(order)}
                           variant="outline"
-                          className="w-full border-[#800000]/20 text-[#800000] hover:bg-[#800000]/5 h-10"
+                          className="w-full border-purple-200 text-purple-700 hover:bg-purple-50 h-10"
                         >
                           <MessageSquare className="w-4 h-4 mr-2" />
                           Submit Feedback
@@ -892,7 +892,7 @@ export default function OrderTracking({ userId }: OrderTrackingProps) {
                 <div className="flex gap-3 pt-4">
                   <Button
                     onClick={handleSubmitFeedback}
-                    className="flex-1 bg-[#800000] hover:bg-[#600000] text-white"
+                    className="flex-1 bg-purple-800 hover:bg-purple-900"
                   >
                     Submit Feedback
                   </Button>
