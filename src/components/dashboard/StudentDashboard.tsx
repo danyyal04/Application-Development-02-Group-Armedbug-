@@ -84,6 +84,10 @@ export default function StudentDashboard({
     useState<number>(2);
   const cartStorageKey = user?.id ? `utm-cart-${user.id}` : null;
   const splitStorageKey = user?.id ? `utm-active-split-${user.id}` : null;
+  
+  // Dashboard stats state
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
   // Persist active split bill across refreshes
   useEffect(() => {
@@ -126,6 +130,60 @@ export default function StudentDashboard({
     };
     loadFeatured();
   }, []);
+
+  // Load dashboard stats
+  useEffect(() => {
+    const loadDashboardStats = async () => {
+      if (!user?.id) return;
+      
+      try {
+        // Fetch active orders count
+        const { count } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .in('status', ['Pending', 'Cooking', 'Ready for Pickup']);
+        
+        setActiveOrdersCount(count || 0);
+        
+        // Fetch recent orders with cafeteria names
+        const { data: ordersData } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(2);
+        
+        if (ordersData && ordersData.length > 0) {
+          // Get cafeteria IDs
+          const cafeteriaIds = ordersData
+            .map(o => o.cafeteria_id)
+            .filter(id => id);
+          
+          // Fetch cafeteria names
+          const { data: cafData } = await supabase
+            .from('cafeterias')
+            .select('id, name')
+            .in('id', cafeteriaIds);
+          
+          const cafMap = new Map(cafData?.map(c => [c.id, c.name]) || []);
+          
+          // Map orders with cafeteria names
+          const ordersWithCafeterias = ordersData.map(order => ({
+            ...order,
+            cafeteria_name: cafMap.get(order.cafeteria_id) || 'Cafeteria',
+            items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items || []
+          }));
+          
+          setRecentOrders(ordersWithCafeterias);
+        }
+      } catch (error) {
+        console.error('Error loading dashboard stats:', error);
+      }
+    };
+    
+    loadDashboardStats();
+  }, [user?.id]);
 
   useEffect(() => {
     if (cartItems.length === 0) {
@@ -536,7 +594,7 @@ export default function StudentDashboard({
               <ShoppingBag className="w-4 h-4 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-slate-900">2</div>
+              <div className="text-slate-900">{activeOrdersCount}</div>
               <p className="text-xs text-slate-500 mt-1">In progress</p>
             </CardContent>
           </Card>
@@ -587,54 +645,61 @@ export default function StudentDashboard({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                {
-                  id: "ORD-001",
-                  cafeteria: "Cafe Angkasa",
-                  items: "Nasi Lemak, Teh Tarik",
-                  status: "Ready for Pickup",
-                  time: "10:30 AM",
-                  pickup: "11:00 AM",
-                },
-                {
-                  id: "ORD-002",
-                  cafeteria: "Cafe Siswa",
-                  items: "Chicken Rice, Ice Lemon Tea",
-                  status: "Cooking",
-                  time: "11:00 AM",
-                  pickup: "11:45 AM",
-                },
-              ].map((order) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-slate-900">{order.id}</p>
-                      <Badge
-                        variant={
-                          order.status === "Ready for Pickup"
-                            ? "default"
-                            : "secondary"
-                        }
-                      >
-                        {order.status}
-                      </Badge>
+              {recentOrders.length > 0 ? (
+                recentOrders.map((order) => {
+                  const items = Array.isArray(order.items) ? order.items : [];
+                  const itemsText = items.length > 0
+                    ? items.map((item: any) => `${item.quantity || 1}x ${item.name}`).join(', ')
+                    : 'No items';
+                  
+                  return (
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                      onClick={() => onNavigate('orders')}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-slate-900">ORD-{order.order_number?.toString().padStart(3, '0') || '000'}</p>
+                          <Badge
+                            variant={
+                              order.status === "Ready for Pickup"
+                                ? "default"
+                                : "secondary"
+                            }
+                            className={
+                              order.status === "Pending" ? "bg-orange-100 text-orange-700" :
+                              order.status === "Cooking" ? "bg-blue-100 text-blue-700" :
+                              order.status === "Ready for Pickup" ? "bg-green-100 text-green-700" :
+                              "bg-slate-100 text-slate-700"
+                            }
+                          >
+                            {order.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-slate-600">
+                          {order.cafeteria_name} - {itemsText}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Placed: {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <Clock className="w-4 h-4" />
+                        <span className="text-sm">
+                          {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-sm text-slate-600">
-                      {order.cafeteria} - {order.items}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Pickup: {order.pickup}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-sm">{order.time}</span>
-                  </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <ShoppingBag className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                  <p>No recent orders</p>
+                  <p className="text-sm mt-1">Start by browsing cafeterias</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
