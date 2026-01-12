@@ -80,6 +80,8 @@ export default function StudentDashboard({
     pickupTime: string;
     totalAmount?: number;
   } | null>(null);
+  const [splitBillParticipantCount, setSplitBillParticipantCount] =
+    useState<number>(2);
   const cartStorageKey = user?.id ? `utm-cart-${user.id}` : null;
   const splitStorageKey = user?.id ? `utm-active-split-${user.id}` : null;
 
@@ -392,7 +394,10 @@ export default function StudentDashboard({
               toast.success("Order placed successfully!");
               onNavigate("orders");
             }}
-            onSplitBill={() => setShowSplitDialog(true)}
+            onSplitBill={(participantCount) => {
+              setSplitBillParticipantCount(participantCount);
+              setShowSplitDialog(true);
+            }}
           />
         );
       }
@@ -744,6 +749,7 @@ export default function StudentDashboard({
           id: splitCafeteria?.id,
         }}
         pickupTime={checkoutData.pickupTime}
+        totalParticipants={splitBillParticipantCount}
         autoOpenDialog
         onInitiateSplitBill={({ sessionId, totalAmount }) => {
           setShowSplitDialog(false);

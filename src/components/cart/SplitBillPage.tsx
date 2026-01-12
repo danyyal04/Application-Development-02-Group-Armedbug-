@@ -69,6 +69,8 @@ interface PaymentMethod {
   name: string;
   details: string;
   is_default?: boolean;
+  balance?: number | null;
+  credit_limit?: number | null;
 }
 
 interface ReceiptItem {
@@ -136,6 +138,8 @@ export default function SplitBillPage({
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [generatedQueueNum, setGeneratedQueueNum] = useState<string>("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [initiatorUserId, setInitiatorUserId] = useState<string | null>(null);
   const selectedPayment = useMemo(
     () => paymentMethods.find((method) => method.id === selectedPaymentId),
     [paymentMethods, selectedPaymentId]
@@ -158,7 +162,10 @@ export default function SplitBillPage({
   const progressPercentage = (totalPaid / totalAmount) * 100;
   const allPaid = participants.length > 0 && participants.every((p) => p.paid);
   const initiatorEmail = (participants[0]?.email || "").toLowerCase();
-  const isInitiator = normalizedEmail !== "" && normalizedEmail === initiatorEmail;
+  const isInitiator =
+    currentUserId && initiatorUserId
+      ? currentUserId === initiatorUserId
+      : normalizedEmail !== "" && normalizedEmail === initiatorEmail;
 
   const parseReceiptItems = (rawItems: any) => {
     if (!rawItems) return [];
@@ -203,9 +210,13 @@ export default function SplitBillPage({
       typeof order?.service_fee === "number" ? order.service_fee : 0;
     const tax = typeof order?.tax === "number" ? order.tax : 0;
     const total =
-      typeof order?.total_amount === "number" ? order.total_amount : totalAmount;
+      typeof order?.total_amount === "number"
+        ? order.total_amount
+        : totalAmount;
 
-    const createdAt = order?.created_at ? new Date(order.created_at) : new Date();
+    const createdAt = order?.created_at
+      ? new Date(order.created_at)
+      : new Date();
     const date = createdAt.toISOString().split("T")[0] as string;
     const time = createdAt.toLocaleTimeString([], {
       hour: "2-digit",
@@ -263,7 +274,9 @@ export default function SplitBillPage({
       typeof order?.service_fee === "number" ? order.service_fee : 0;
     const tax = typeof order?.tax === "number" ? order.tax : 0;
     const total =
-      typeof order?.total_amount === "number" ? order.total_amount : totalAmount;
+      typeof order?.total_amount === "number"
+        ? order.total_amount
+        : totalAmount;
 
     const receiptInsert = {
       order_id: order.id,
@@ -414,6 +427,26 @@ export default function SplitBillPage({
     return () => clearInterval(interval);
   }, [refreshParticipants]);
 
+  useEffect(() => {
+    const loadInitiator = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+
+      const { data, error } = await supabase
+        .from("split_bill_sessions")
+        .select("initiator_user_id")
+        .eq("id", splitBillId)
+        .maybeSingle();
+      if (!error) {
+        setInitiatorUserId(data?.initiator_user_id || null);
+      }
+    };
+
+    loadInitiator();
+  }, [splitBillId]);
+
   // Load saved payment methods for current user
   useEffect(() => {
     const loadPaymentMethods = async () => {
@@ -474,7 +507,9 @@ export default function SplitBillPage({
     setShowPaymentDialog(true);
   };
 
-  const handleUpdateParticipantStatus = async (status: "accepted" | "rejected") => {
+  const handleUpdateParticipantStatus = async (
+    status: "accepted" | "rejected"
+  ) => {
     if (!currentParticipant?.id) {
       toast.error("Participant not found");
       return;
@@ -520,6 +555,27 @@ export default function SplitBillPage({
       const isSuccess = Math.random() > 0.1; // 90% success rate
 
       if (isSuccess) {
+        const amountToCharge = currentParticipant.amount;
+        const { error: updateError } = await supabase
+          .from("payment")
+          .update({
+            balance:
+              typeof selectedMethod.balance === "number"
+                ? selectedMethod.balance - amountToCharge
+                : selectedMethod.balance,
+            credit_limit:
+              typeof selectedMethod.credit_limit === "number"
+                ? selectedMethod.credit_limit - amountToCharge
+                : selectedMethod.credit_limit,
+          })
+          .eq("id", selectedMethod.id);
+
+        if (updateError) {
+          toast.error(updateError.message || "Payment failed or cancelled");
+          setIsProcessing(false);
+          return;
+        }
+
         // Update participant payment status
         setParticipants((prev) =>
           prev.map((p) =>
@@ -589,20 +645,52 @@ export default function SplitBillPage({
 
     try {
       setIsProcessing(true);
-      // Update session status to cancelled in Supabase
-      const { error } = await supabase
+      const { data: sessionData, error: sessionError } = await supabase
         .from("split_bill_sessions")
-        .update({ status: "cancelled" })
-        .eq("id", splitBillId);
+        .select("status")
+        .eq("id", splitBillId)
+        .maybeSingle();
 
-      if (error) {
-        console.error("Failed to cancel session:", error);
-        toast.error(`Failed to cancel split bill: ${error.message}`);
+      if (sessionError) {
+        toast.error(sessionError.message || "Unable to cancel split bill.");
         setIsProcessing(false);
         return;
       }
 
-      toast.success("Split bill cancelled.");
+      if (sessionData?.status === "cancelled") {
+        toast.info("This split bill has already been cancelled.");
+        setIsProcessing(false);
+        return;
+      }
+
+      // Call standard RPC to handle secure server-side refunding
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "cancel_split_bill_session",
+        { session_id_input: splitBillId }
+      );
+
+      if (rpcError) {
+        console.error("RPC Error:", rpcError);
+        toast.error(rpcError.message || "Failed to cancel split bill.");
+        setIsProcessing(false);
+        return;
+      }
+
+      if (!rpcData.success) {
+        toast.error(rpcData.message || "Cancellation failed.");
+        setIsProcessing(false);
+        return;
+      }
+
+      const failedList = rpcData.failed_participants || [];
+      if (failedList.length > 0) {
+        toast.warning(
+          `Session cancelled, but refunds failed for: ${failedList.join(", ")}`
+        );
+      } else {
+        toast.success("Split bill cancelled. Refunds have been issued.");
+      }
+
       onCancel(); // Navigate away
     } catch (err) {
       console.error("Error cancelling session:", err);
@@ -643,6 +731,35 @@ export default function SplitBillPage({
       const isSuccess = Math.random() > 0.1;
 
       if (isSuccess) {
+        const payment = paymentMethods.find(
+          (method) => method.id === selectedPaymentId
+        );
+        if (!payment) {
+          toast.error("Invalid payment method. Please choose another.");
+          setIsProcessing(false);
+          return;
+        }
+
+        const { error: updateError } = await supabase
+          .from("payment")
+          .update({
+            balance:
+              typeof payment.balance === "number"
+                ? payment.balance - unpaidAmount
+                : payment.balance,
+            credit_limit:
+              typeof payment.credit_limit === "number"
+                ? payment.credit_limit - unpaidAmount
+                : payment.credit_limit,
+          })
+          .eq("id", payment.id);
+
+        if (updateError) {
+          toast.error(updateError.message || "Payment failed or cancelled");
+          setIsProcessing(false);
+          return;
+        }
+
         // Mark all unpaid participants as paid (covered by initiator)
         setParticipants((prev) =>
           prev.map((p) => ({
@@ -672,7 +789,6 @@ export default function SplitBillPage({
 
         toast.success("Split bill payment completed successfully!");
         setShowCompleteDialog(false);
-
       } else {
         toast.error("Payment failed. Please try again.");
       }
@@ -697,7 +813,7 @@ export default function SplitBillPage({
         }
       };
 
-      // Poll slightly or just run once? 
+      // Poll slightly or just run once?
       // Running it inside an interval might be safer to catch it after creation
       const interval = setInterval(fetchQueueNumber, 2000);
       fetchQueueNumber();
@@ -734,7 +850,7 @@ export default function SplitBillPage({
           if (existingOrder) {
             console.log("Order already exists for this split bill");
             if (existingOrder.queue_number) {
-               setGeneratedQueueNum(existingOrder.queue_number);
+              setGeneratedQueueNum(existingOrder.queue_number);
             }
             await openReceipt(existingOrder);
             return;
@@ -845,15 +961,6 @@ export default function SplitBillPage({
 
     return () => clearTimeout(timer);
   }, [allPaid]);
-
-  useEffect(() => {
-    if (!showSuccessDialog) return;
-    const timer = setTimeout(() => {
-      if (onCompleteSplitBill) onCompleteSplitBill();
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [showSuccessDialog, onCompleteSplitBill]);
 
   if (showReceipt && receiptData) {
     return (
@@ -1023,7 +1130,9 @@ export default function SplitBillPage({
                               <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 text-white"
-                                onClick={() => handleUpdateParticipantStatus("accepted")}
+                                onClick={() =>
+                                  handleUpdateParticipantStatus("accepted")
+                                }
                               >
                                 Accept
                               </Button>
@@ -1031,7 +1140,9 @@ export default function SplitBillPage({
                                 size="sm"
                                 variant="outline"
                                 className="border-red-500 text-red-600"
-                                onClick={() => handleUpdateParticipantStatus("rejected")}
+                                onClick={() =>
+                                  handleUpdateParticipantStatus("rejected")
+                                }
                               >
                                 Reject
                               </Button>
@@ -1275,9 +1386,7 @@ export default function SplitBillPage({
             {/* Payment Credentials */}
             <div className="space-y-2">
               <Label htmlFor="credentials">
-                {selectedPayment?.type === "card"
-                  ? "Card CVV"
-                  : "PIN"}
+                {selectedPayment?.type === "card" ? "Card CVV" : "PIN"}
               </Label>
               <Input
                 id="credentials"
@@ -1437,7 +1546,7 @@ export default function SplitBillPage({
               </Alert>
             )}
 
-            <Alert className="border-blue-200 bg-blue-50">
+            <Alert className="border-blue-200 bg-blue-50 pl-11">
               <AlertCircle className="w-4 h-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-800">
                 By covering the remaining balance, you agree to pay for the
@@ -1480,7 +1589,6 @@ export default function SplitBillPage({
             <DialogTitle>Payment Successful</DialogTitle>
             <DialogDescription>Your order has been placed.</DialogDescription>
           </DialogHeader>
-
 
           <div className="mt-6 mb-6 text-center">
             <div className="bg-gradient-to-r from-[oklch(40.8%_0.153_2.432)] to-[oklch(40.8%_0.153_2.432)] rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">

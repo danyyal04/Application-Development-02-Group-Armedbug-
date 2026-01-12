@@ -55,6 +55,7 @@ interface Participant {
 interface SplitBillInitiationProps {
   cartItems: CartItem[];
   totalAmount: number;
+  totalParticipants?: number;
   cafeteria?: {
     id?: string;
     name?: string;
@@ -93,6 +94,7 @@ const getPickupTimeLabel = (value?: string) => {
 export default function SplitBillInitiation({
   cartItems,
   totalAmount,
+  totalParticipants,
   cafeteria,
   pickupTime,
   onInitiateSplitBill,
@@ -104,6 +106,13 @@ export default function SplitBillInitiation({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const splitMethod: "equal" = "equal";
+  const maxAdditionalParticipants =
+    typeof totalParticipants === "number" && totalParticipants > 0
+      ? Math.max(0, totalParticipants - 1)
+      : null;
+  const isParticipantLimitReached =
+    maxAdditionalParticipants !== null &&
+    participants.length >= maxAdditionalParticipants;
 
   const subtotal = useMemo(
     () =>
@@ -113,8 +122,8 @@ export default function SplitBillInitiation({
   );
   const totalToSplit = useMemo(() => subtotal + SERVICE_FEE, [subtotal]);
   const amountPerPerson = useMemo(
-    () => totalToSplit / (participants.length + 1),
-    [participants.length, totalToSplit]
+    () => totalToSplit / (totalParticipants || participants.length + 1),
+    [participants.length, totalParticipants, totalToSplit]
   );
 
   useEffect(() => {
@@ -127,6 +136,15 @@ export default function SplitBillInitiation({
     const trimmedParticipant = newParticipant.trim();
     if (!trimmedParticipant) {
       toast.error("Please enter a valid identifier");
+      return;
+    }
+
+    if (isParticipantLimitReached) {
+      toast.error(
+        `You selected ${totalParticipants} people including you. You can add up to ${maxAdditionalParticipants} participant${
+          maxAdditionalParticipants === 1 ? "" : "s"
+        }.`
+      );
       return;
     }
 
@@ -174,6 +192,18 @@ export default function SplitBillInitiation({
       return;
     }
 
+    if (
+      typeof totalParticipants === "number" &&
+      participants.length !== totalParticipants - 1
+    ) {
+      toast.error(
+        `Please add ${Math.max(totalParticipants - 1, 0)} participant${
+          totalParticipants - 1 === 1 ? "" : "s"
+        } to match the selected number of people.`
+      );
+      return;
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -206,7 +236,10 @@ export default function SplitBillInitiation({
       }
 
       // Include the initiator in the split calculation
-      const participantCount = participants.length + 1; // +1 for initiator
+      const participantCount =
+        typeof totalParticipants === "number" && totalParticipants > 0
+          ? totalParticipants
+          : participants.length + 1; // +1 for initiator
       const perPerson =
         participantCount > 0 ? totalToSplit / participantCount : totalToSplit;
 
@@ -460,6 +493,7 @@ export default function SplitBillInitiation({
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
                       setNewParticipant(e.target.value)
                     }
+                    disabled={isParticipantLimitReached}
                     onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -469,6 +503,7 @@ export default function SplitBillInitiation({
                   />
                   <Button
                     onClick={handleAddParticipant}
+                    disabled={isParticipantLimitReached}
                     className="bg-[oklch(40.8%_0.153_2.432)] text-white hover:bg-[oklch(36%_0.153_2.432)]"
                   >
                     <Plus className="w-4 h-4 mr-2" />
@@ -488,7 +523,13 @@ export default function SplitBillInitiation({
                 {participants.length > 0 && (
                   <div className="space-y-2">
                     <Separator />
-                    <Label>Participants ({participants.length})</Label>
+                    <Label>
+                      Participants (
+                      {totalParticipants
+                        ? `${participants.length}/${totalParticipants - 1}`
+                        : participants.length}
+                      )
+                    </Label>
                     <div className="space-y-2">
                       {participants.map((participant) => (
                         <div

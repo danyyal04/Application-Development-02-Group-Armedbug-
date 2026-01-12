@@ -168,12 +168,6 @@ export default function DigitalReceipt({
                 RM {receipt.serviceFee.toFixed(2)}
               </span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-600">Tax (6%):</span>
-              <span className="text-slate-900">
-                RM {receipt.tax.toFixed(2)}
-              </span>
-            </div>
             <Separator className="my-3" />
             <div className="flex justify-between">
               <span className="text-slate-900">Total Paid:</span>

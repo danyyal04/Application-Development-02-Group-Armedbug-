@@ -64,7 +64,7 @@ interface CheckoutPageProps {
   pickupTime: string;
   onBack: () => void;
   onSuccess: () => void;
-  onSplitBill?: () => void;
+  onSplitBill?: (participantCount: number) => void;
   initialMode?: "normal" | "split";
 }
 
@@ -322,7 +322,7 @@ export default function CheckoutPage({
   const handlePlaceOrderClick = () => {
     if (isProcessing) return;
     if (checkoutMode === "split") {
-      onSplitBill?.();
+      onSplitBill?.(participantCount);
       return;
     }
     if (!selectedPaymentId) {
@@ -812,7 +812,7 @@ export default function CheckoutPage({
                 onClick={
                   checkoutMode === "normal"
                     ? handlePlaceOrderClick
-                    : () => onSplitBill?.()
+                    : () => onSplitBill?.(participantCount)
                 }
                 disabled={
                   checkoutMode === "normal"

@@ -375,7 +375,7 @@ export default function TransactionHistory() {
           return {
             id: session.id,
             transactionId: `SB-${session.id.slice(0, 8).toUpperCase()}`,
-            orderId: "PENDING",
+            orderId: `ORD-${session.id.slice(-6).toUpperCase()}`,
             cafeteriaName:
               cafeteriasMap[session.cafeteria_id]?.name ||
               "Split Bill Group",
@@ -669,7 +669,7 @@ export default function TransactionHistory() {
               Loading transactions...
             </div>
           ) : filteredTransactions.length === 0 ? (
-            <Alert>
+            <Alert className="pl-11">
               <AlertCircle className="w-4 h-4" />
               <AlertDescription>
                 {isFiltering && hasActiveFilters
@@ -796,3 +796,5 @@ export default function TransactionHistory() {
     </div>
   );
 }
+
+

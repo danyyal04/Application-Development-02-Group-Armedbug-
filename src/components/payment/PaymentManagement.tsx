@@ -78,6 +78,20 @@ export default function PaymentManagement({ cafeteriaId }: PaymentManagementProp
 
   const recentPayments = payments.slice(0, 5);
 
+  const formatPaymentMethodLabel = (value: string | null) => {
+    const normalized = (value || "Payment").trim().toLowerCase();
+    if (normalized.startsWith("split bill")) return "SPLIT BILL";
+    if (normalized === "e-wallet" || normalized === "ewallet") return "E-WALLET";
+    if (normalized === "fpx" || normalized === "fpx banking") return "FPX";
+    if (
+      normalized === "debit/credit card" ||
+      normalized === "credit/debit card"
+    ) {
+      return "CREDIT/DEBIT CARD";
+    }
+    return normalized.toUpperCase();
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8 flex items-center justify-between">
@@ -160,15 +174,15 @@ export default function PaymentManagement({ cafeteriaId }: PaymentManagementProp
                   className="flex items-center justify-between py-3 border-b last:border-0 border-slate-100"
                 >
                   <div>
-                    <p className="text-sm text-slate-900">{payment.id}</p>
+                    <p className="text-sm text-slate-900">{`ORD-${payment.id.slice(-6).toUpperCase()}`}</p>
                     <p className="text-xs text-slate-500">
                       {payment.paidAt ? new Date(payment.paidAt).toLocaleString() : '—'}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium text-slate-900">RM {payment.amount.toFixed(2)}</p>
-                    <Badge variant="secondary" className="mt-1 capitalize">
-                      {payment.paymentMethod || 'Payment'}
+                    <Badge variant="secondary" className="mt-1">
+                      {formatPaymentMethodLabel(payment.paymentMethod)}
                     </Badge>
                   </div>
                 </div>
@@ -204,10 +218,10 @@ export default function PaymentManagement({ cafeteriaId }: PaymentManagementProp
                 <tbody>
                   {payments.map(payment => (
                     <tr key={payment.id} className="border-t border-slate-100">
-                      <td className="py-2 text-slate-900">{payment.id}</td>
+                      <td className="py-2 text-slate-900">{`ORD-${payment.id.slice(-6).toUpperCase()}`}</td>
                       <td className="py-2 text-slate-900">RM {payment.amount.toFixed(2)}</td>
-                      <td className="py-2 text-slate-600">{payment.paidAt ? new Date(payment.paidAt).toLocaleString() : '—'}</td>
-                      <td className="py-2 text-slate-600 capitalize">{payment.paymentMethod || 'Payment'}</td>
+                      <td className="py-2 text-slate-600">{payment.paidAt ? new Date(payment.paidAt).toLocaleString() : '-'}</td>
+                      <td className="py-2 text-slate-600">{formatPaymentMethodLabel(payment.paymentMethod)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -219,3 +233,7 @@ export default function PaymentManagement({ cafeteriaId }: PaymentManagementProp
     </div>
   );
 }
+
+
+
+

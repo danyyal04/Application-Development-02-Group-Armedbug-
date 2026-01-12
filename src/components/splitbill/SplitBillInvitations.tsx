@@ -25,6 +25,7 @@ interface SplitBillInvitation {
   id: string;
   splitBillId: string;
   orderId: string;
+  orderStatus?: string;
   cafeteria: string;
   initiatorName: string;
   initiatorEmail: string;
@@ -33,7 +34,7 @@ interface SplitBillInvitation {
   splitMethod: "evenly" | "byItems" | "custom";
   participants: number;
   items: { name: string; quantity: number; price: number }[];
-  status: "pending" | "accepted" | "declined";
+  status: "pending" | "accepted" | "declined" | "paid";
   sessionStatus: "active" | "expired" | "cancelled" | "completed";
   invitedAt: string;
   expiresAt: string;
@@ -183,7 +184,7 @@ export default function SplitBillInvitations({
           sessionIds.length
             ? supabase
                 .from("orders")
-                .select("id, order_number, payment_method")
+                .select("id, order_number, payment_method, status")
                 .in(
                   "payment_method",
                   sessionIds.map((id) => `Split Bill ${id}`)
@@ -250,9 +251,12 @@ export default function SplitBillInvitations({
       );
 
       const orderMap = (orderResult.data || []).reduce(
-        (acc: Record<string, number>, row: any) => {
+        (acc: Record<string, { orderNumber: number; status?: string }>, row: any) => {
           if (row.payment_method) {
-            acc[row.payment_method] = Number(row.order_number) || 0;
+            acc[row.payment_method] = {
+              orderNumber: Number(row.order_number) || 0,
+              status: row.status || "",
+            };
           }
           return acc;
         },
@@ -303,12 +307,12 @@ export default function SplitBillInvitations({
         return {
           id: row.id,
           splitBillId: row.session_id,
-          orderId: orderMap[`Split Bill ${row.session_id}`]
-            ? `ORD-${String(orderMap[`Split Bill ${row.session_id}`]).padStart(
-                3,
-                "0"
-              )}`
+          orderId: orderMap[`Split Bill ${row.session_id}`]?.orderNumber
+            ? `ORD-${String(
+                orderMap[`Split Bill ${row.session_id}`]?.orderNumber
+              ).padStart(3, "0")}`
             : "Group Order",
+          orderStatus: orderMap[`Split Bill ${row.session_id}`]?.status,
           cafeteria: cafe?.name || "Cafeteria",
           // Store full cafeteria object including ID
           _cafeteriaObj: cafe
@@ -354,14 +358,19 @@ export default function SplitBillInvitations({
     (inv) => inv.status === "pending" && inv.sessionStatus === "active"
   );
   const acceptedInvitations = invitations.filter(
-    (inv) => inv.status === "accepted"
+    (inv) => inv.status === "accepted" || inv.status === "paid"
   );
   const declinedInvitations = invitations.filter(
     (inv) => inv.status === "declined"
   );
-  const ongoingInvitations = invitations.filter(
-    (inv) => inv.status === "accepted" && inv.sessionStatus === "active"
-  );
+  const ongoingInvitations = invitations.filter((inv) => {
+    if (inv.status !== "accepted" && inv.status !== "paid") return false;
+    if (inv.sessionStatus === "cancelled" || inv.sessionStatus === "expired") {
+      return false;
+    }
+    if (!inv.orderStatus) return true;
+    return inv.orderStatus !== "Completed";
+  });
 
   useEffect(() => {
     onCountsChange?.({
@@ -453,6 +462,8 @@ export default function SplitBillInvitations({
         return <Badge className="bg-orange-100 text-orange-700">Pending</Badge>;
       case "accepted":
         return <Badge className="bg-green-100 text-green-700">Accepted</Badge>;
+      case "paid":
+        return <Badge className="bg-emerald-100 text-emerald-700">Paid</Badge>;
       case "declined":
         return <Badge className="bg-slate-100 text-slate-700">Declined</Badge>;
       default:
