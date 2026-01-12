@@ -674,11 +674,11 @@ export default function PaymentMethods() {
             </div>
 
             {selectedTopUpMethod && (
-              <Card className="border-purple-200 bg-purple-50">
+              <Card className="border-[#e8c7d6] bg-[#f9eef2]">
                 <CardContent className="pt-4">
-                  <p className="text-xs text-purple-700 mb-1">Current Balance</p>
-                  <p className="text-2xl text-purple-900">RM {(selectedTopUpMethod.balance ?? 0).toFixed(2)}</p>
-                  <p className="text-xs text-purple-700 mt-1">{selectedTopUpMethod.name}</p>
+                  <p className="text-xs text-[#7a0c3b] mb-1">Current Balance</p>
+                  <p className="text-2xl text-[#7a0c3b]">RM {(selectedTopUpMethod.balance ?? 0).toFixed(2)}</p>
+                  <p className="text-xs text-[#7a0c3b] mt-1">{selectedTopUpMethod.name}</p>
                 </CardContent>
               </Card>
             )}

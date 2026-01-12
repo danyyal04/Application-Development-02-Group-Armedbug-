@@ -508,7 +508,7 @@ export default function Navbar({
                 >
                   <Mail className="w-5 h-5" />
                   {invitations.length > 0 && (
-                    <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-md bg-orange-600 text-white text-[11px] font-bold flex items-center justify-center border-2 border-white transform translate-x-1 -translate-y-1">
+                    <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-md bg-[#7a0c3b] text-white text-[11px] font-bold flex items-center justify-center border-2 border-white transform translate-x-1 -translate-y-1">
                       {invitations.length}
                     </span>
                   )}
