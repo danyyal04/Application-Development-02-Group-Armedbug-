@@ -163,7 +163,6 @@ export default function PaymentMethods() {
 
     if (formData.type === 'card') {
       if (
-        !formData.name ||
         sanitizedCard.length < 12 ||
         !expiryPattern.test(formData.expiry) ||
         !cvvPattern.test(formData.securityCode)
@@ -194,6 +193,11 @@ export default function PaymentMethods() {
       return;
     }
 
+    const resolvedName =
+      formData.type === 'card' && !formData.name.trim()
+        ? 'Credit/Debit Card'
+        : formData.name;
+
     const candidateDetails = formData.type === 'card'
       ? `${sanitizedCard.slice(-4)}|${formData.expiry}`
       : formData.type === 'fpx'
@@ -202,7 +206,7 @@ export default function PaymentMethods() {
 
     const duplicateExists = paymentMethods.some(pm =>
       pm.type === formData.type &&
-      pm.name === formData.name &&
+      pm.name === resolvedName &&
       pm.details === candidateDetails
     );
     if (duplicateExists) {
@@ -216,7 +220,7 @@ export default function PaymentMethods() {
     const payload: any = {
       user_id: user.id,
       type: formData.type,
-      name: formData.name,
+      name: resolvedName,
       details: candidateDetails,
       pin: formData.type === 'card' ? formData.securityCode : formData.pin,
       is_default: paymentMethods.length === 0,
@@ -733,3 +737,4 @@ export default function PaymentMethods() {
     </div>
   );
 }
+

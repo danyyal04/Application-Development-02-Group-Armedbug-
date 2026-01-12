@@ -375,6 +375,14 @@ export default function SplitBillPage({
     );
   };
 
+  const getMaskedPaymentDetails = (method: PaymentMethod) => {
+    if (!method.details) return "";
+    const digits = method.details.replace(/\D/g, "");
+    if (!digits) return method.details;
+    const last4 = digits.slice(-4);
+    return `**** ${last4}`;
+  };
+
   // Load participants from DB
   const refreshParticipants = useCallback(async () => {
     const { data, error } = await supabase
@@ -530,11 +538,6 @@ export default function SplitBillPage({
   };
 
   const handleConfirmPayment = () => {
-    if (!paymentCredentials) {
-      toast.error("Invalid payment details. Please check and try again.");
-      return;
-    }
-
     if (!selectedPaymentId) {
       toast.error("Please select a payment method");
       return;
@@ -545,6 +548,11 @@ export default function SplitBillPage({
     );
     if (!selectedMethod) {
       toast.error("Invalid payment method. Please choose another.");
+      return;
+    }
+
+    if (selectedMethod.type !== "card" && !paymentCredentials) {
+      toast.error("Invalid payment details. Please check and try again.");
       return;
     }
 
@@ -1372,7 +1380,7 @@ export default function SplitBillPage({
                         >
                           <p className="text-slate-900">{method.name}</p>
                           <p className="text-sm text-slate-600">
-                            {method.details}
+                            {getMaskedPaymentDetails(method)}
                           </p>
                         </Label>
                         <CreditCard className="w-4 h-4 text-slate-400" />
@@ -1384,27 +1392,39 @@ export default function SplitBillPage({
             </div>
 
             {/* Payment Credentials */}
-            <div className="space-y-2">
-              <Label htmlFor="credentials">
-                {selectedPayment?.type === "card" ? "Card CVV" : "PIN"}
-              </Label>
-              <Input
-                id="credentials"
-                type="password"
-                placeholder="Enter credentials"
-                value={paymentCredentials}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setPaymentCredentials(e.target.value)
-                }
-              />
-            </div>
+            {requiresManualCredentials ? (
+              <div className="space-y-2">
+                <Label htmlFor="credentials">
+                  {selectedPayment?.type === "card" ? "Card CVV" : "PIN"}
+                </Label>
+                <Input
+                  id="credentials"
+                  type="password"
+                  placeholder="Enter credentials"
+                  value={paymentCredentials}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setPaymentCredentials(e.target.value)
+                  }
+                />
+              </div>
+            ) : (
+              <Alert className="border-emerald-200 bg-emerald-50 pl-11">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                <AlertDescription className="text-xs text-emerald-800">
+                  This card supports auto-pay. It will be charged once you
+                  confirm.
+                </AlertDescription>
+              </Alert>
+            )}
 
-            <Alert className="border-amber-200 bg-amber-50 pl-11">
-              <AlertCircle className="w-4 h-4 text-amber-600" />
-              <AlertDescription className="text-xs text-amber-800">
-                Demo mode: Enter any credentials to simulate payment
-              </AlertDescription>
-            </Alert>
+            {requiresManualCredentials && (
+              <Alert className="border-amber-200 bg-amber-50 pl-11">
+                <AlertCircle className="w-4 h-4 text-amber-600" />
+                <AlertDescription className="text-xs text-amber-800">
+                  Demo mode: Enter any credentials to simulate payment
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
           <div className="flex gap-2">
             <Button
@@ -1510,7 +1530,7 @@ export default function SplitBillPage({
                         >
                           <p className="text-slate-900">{method.name}</p>
                           <p className="text-sm text-slate-600">
-                            {method.details}
+                            {getMaskedPaymentDetails(method)}
                           </p>
                         </Label>
                         <CreditCard className="w-4 h-4 text-slate-400" />
@@ -1537,7 +1557,7 @@ export default function SplitBillPage({
                 />
               </div>
             ) : (
-              <Alert className="border-emerald-200 bg-emerald-50">
+              <Alert className="border-emerald-200 bg-emerald-50 pl-11">
                 <CheckCircle className="w-4 h-4 text-emerald-600" />
                 <AlertDescription className="text-xs text-emerald-800">
                   This card supports auto-pay. It will be charged once you

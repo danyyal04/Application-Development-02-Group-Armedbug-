@@ -251,10 +251,10 @@ export default function SplitBillInvitations({
       );
 
       const orderMap = (orderResult.data || []).reduce(
-        (acc: Record<string, { orderNumber: number; status?: string }>, row: any) => {
+        (acc: Record<string, { orderId: string; status?: string }>, row: any) => {
           if (row.payment_method) {
             acc[row.payment_method] = {
-              orderNumber: Number(row.order_number) || 0,
+              orderId: `ORD-${String(row.id || "").slice(-6).toUpperCase()}`,
               status: row.status || "",
             };
           }
@@ -307,11 +307,8 @@ export default function SplitBillInvitations({
         return {
           id: row.id,
           splitBillId: row.session_id,
-          orderId: orderMap[`Split Bill ${row.session_id}`]?.orderNumber
-            ? `ORD-${String(
-                orderMap[`Split Bill ${row.session_id}`]?.orderNumber
-              ).padStart(3, "0")}`
-            : "Group Order",
+          orderId:
+            orderMap[`Split Bill ${row.session_id}`]?.orderId || "Group Order",
           orderStatus: orderMap[`Split Bill ${row.session_id}`]?.status,
           cafeteria: cafe?.name || "Cafeteria",
           // Store full cafeteria object including ID
