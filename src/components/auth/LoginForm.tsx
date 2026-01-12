@@ -209,6 +209,7 @@ export default function LoginForm({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    className="pr-10"
                   />
                   <button
                     type="button"

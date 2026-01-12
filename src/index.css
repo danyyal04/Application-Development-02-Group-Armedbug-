@@ -191,3 +191,9 @@
 html {
   font-size: var(--font-size);
 }
+
+/* Hide default password reveal button in Edge/IE */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
