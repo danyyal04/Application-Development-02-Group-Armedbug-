@@ -68,10 +68,7 @@ export default function AdminDashboard({
                 Manage cafeteria owner registrations and user accounts
               </p>
             </div>
-            <Button variant="outline" onClick={onLogout} className="gap-2">
-              <LogOut className="w-4 h-4" />
-              Logout
-            </Button>
+
           </div>
         </div>
 

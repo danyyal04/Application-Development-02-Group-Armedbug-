@@ -15,7 +15,18 @@ interface RegisterFormProps {
 }
 
 export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+    role: string;
+    businessName: string;
+    businessAddress: string;
+    contactNumber: string;
+    ownerIdFile: File | null;
+    businessLogoFile: File | null;
+  }>({
     name: '',
     email: '',
     password: '',
@@ -24,8 +35,8 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
     businessName: '',
     businessAddress: '',
     contactNumber: '',
-    ownerIdFile: '',
-    businessLogoFile: '',
+    ownerIdFile: null,
+    businessLogoFile: null,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -36,6 +47,14 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
   []
 );
 
+  const uploadFile = async (file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `owner-docs/${Date.now()}-${Math.random()}.${fileExt}`;
+    const { error } = await supabase.storage.from('documents').upload(fileName, file);
+    if (error) throw error;
+    const { data } = supabase.storage.from('documents').getPublicUrl(fileName);
+    return data.publicUrl;
+  };
 
   const validateInputs = () => {
     if (!formData.name.trim()) {
@@ -117,6 +136,22 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
 
       const user = data.user;
       if (user && formData.role === 'owner') {
+        let ownerIdUrl = '';
+        let businessLogoUrl = '';
+
+        try {
+          if (formData.ownerIdFile) {
+             ownerIdUrl = await uploadFile(formData.ownerIdFile);
+          }
+          if (formData.businessLogoFile) {
+             businessLogoUrl = await uploadFile(formData.businessLogoFile);
+          }
+        } catch (uploadError: any) {
+           toast.error('Failed to upload documents: ' + uploadError.message);
+           setLoading(false);
+           return;
+        }
+
         // Use a security-definer RPC to bypass RLS for owner registration
         const { error: reqErr } = await supabase.rpc('create_owner_registration', {
           _auth_id: user.id,
@@ -125,8 +160,8 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
           _business_address: formData.businessAddress,
           _contact_number: formData.contactNumber,
           _documents: {
-            owner_identification: formData.ownerIdFile,
-            business_logo: formData.businessLogoFile || null,
+            owner_identification: ownerIdUrl,
+            business_logo: businessLogoUrl,
           },
         });
         if (reqErr) {
@@ -137,13 +172,23 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
       }
 
       if (user) {
-        await supabase.auth.signOut(); // ensure no auto-login
+        if (data.session) {
+          // If auto-login happened, sign out. 
+          // App.tsx will handle the SIGNED_OUT event and redirect to login.
+          // We DO NOT call onRegister() here to avoid a race condition 
+          // (changing page before App.tsx processes the initial SIGNED_IN event).
+          await supabase.auth.signOut(); 
+        } else {
+          // No session means no auto-signin (e.g. email confirmation pending).
+          // Manually redirect since no auth event will fire.
+          onRegister(); 
+        }
+
         toast.success(
           formData.role === 'owner'
             ? 'Application submitted. Please wait for admin approval.'
             : 'Registration successful! Please verify your email, then login.'
         );
-        onRegister(); // redirect to login page
       }
     } catch (err: any) {
       toast.error('Unexpected error: ' + err.message);
@@ -265,12 +310,13 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                         <Label>Owner Identification (IC/Passport) *</Label>
                         <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
                           <Upload className="w-4 h-4 text-slate-500" />
-                          <span>{formData.ownerIdFile || 'Choose file'}</span>
+                          <span>{formData.ownerIdFile?.name || 'Choose file'}</span>
                           <input
                             type="file"
                             className="hidden"
+                            accept="image/*,.pdf"
                             onChange={(e) =>
-                              setFormData({ ...formData, ownerIdFile: e.target.files?.[0]?.name || '' })
+                              setFormData({ ...formData, ownerIdFile: e.target.files?.[0] || null })
                             }
                           />
                         </label>
@@ -279,12 +325,13 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
                         <Label>Business Logo *</Label>
                         <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
                           <Upload className="w-4 h-4 text-slate-500" />
-                          <span>{formData.businessLogoFile || 'Choose file (logo shown to customers)'}</span>
+                          <span>{formData.businessLogoFile?.name || 'Choose file (logo shown to customers)'}</span>
                           <input
                             type="file"
                             className="hidden"
+                            accept="image/*"
                             onChange={(e) =>
-                              setFormData({ ...formData, businessLogoFile: e.target.files?.[0]?.name || '' })
+                              setFormData({ ...formData, businessLogoFile: e.target.files?.[0] || null })
                             }
                           />
                         </label>
@@ -330,7 +377,10 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
               <Button
                 type="submit"
                 className="w-full text-white hover:opacity-90"
-                style={{ background: 'linear-gradient(90deg, #7e22ce, #ec4899)' }}
+                style={{
+                  background:
+                    'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))',
+                }}
                 disabled={loading}
               >
                 {loading

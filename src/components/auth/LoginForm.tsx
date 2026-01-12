@@ -78,37 +78,21 @@ export default function LoginForm({
           (data.user.user_metadata?.status as string) ||
           "active";
 
-        // Fetch matching registration_request by linked app user id and/or email
-        const { data: appUser } = await supabase
-          .from("user")
-          .select("id")
-          .eq("auth_id", data.user.id)
+        // Check for owner registration status specifically
+        // usage of 'user_id' matches the new schema in registration_request table
+        const { data: regData, error: regError } = await supabase
+          .from("registration_request")
+          .select("status")
+          .eq("user_id", data.user.id)
           .maybeSingle();
-        const filters: string[] = [];
-        if (appUser?.id) filters.push(`user_id.eq.${appUser.id}`);
-        if (data.user.email) filters.push(`email.ilike.${data.user.email}`);
-        const orFilter = filters.join(",");
-
-        const { data: regData, error: regError } = orFilter
-          ? await supabase
-              .from("registration_request")
-              .select("status")
-              .or(orFilter)
-              .order("submitted_at", { ascending: false })
-              .limit(1)
-              .maybeSingle()
-          : { data: null, error: null };
 
         const regStatus = regData?.status
           ? String(regData.status).trim().toLowerCase()
           : null;
 
-        if (regError) {
-          // If select blocked by RLS, fall back to metadata
-          status = status || "active";
-        } else if (regStatus) {
-          role = isAdmin ? "admin" : "owner";
-          status = regStatus;
+        if (!regError && regStatus) {
+           role = isAdmin ? "admin" : "owner";
+           status = regStatus;
         }
 
         status = (status || "active").toLowerCase();

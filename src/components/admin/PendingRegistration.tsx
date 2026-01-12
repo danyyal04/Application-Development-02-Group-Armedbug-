@@ -221,7 +221,7 @@ export default function PendingRegistrations({
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-700">Submitted Documents</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {Object.entries(registration.documents).map(([key, fileName]) => (
+                  {Object.entries(registration.documents).map(([key, url]) => (
                     <div
                       key={key}
                       className="flex items-center justify-between p-3 bg-slate-50 rounded border border-slate-200"
@@ -230,13 +230,20 @@ export default function PendingRegistrations({
                         <FileText className="w-4 h-4 text-slate-500" />
                         <div className="min-w-0">
                           <p className="text-sm text-slate-900">{formatKey(key)}</p>
-                          <p className="text-xs text-slate-500 truncate max-w-[140px]">
-                            {String(fileName)}
-                          </p>
+                          <a 
+                            href={String(url)} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-xs text-blue-600 hover:underline truncate max-w-[140px] block"
+                          >
+                            View Document
+                          </a>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <Download className="w-4 h-4" />
+                      <Button variant="ghost" size="sm" asChild>
+                        <a href={String(url)} target="_blank" rel="noreferrer">
+                           <Download className="w-4 h-4" />
+                        </a>
                       </Button>
                     </div>
                   ))}
@@ -332,7 +339,7 @@ export default function PendingRegistrations({
                 <p className="text-sm text-slate-500">Submitted Documents</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {Object.entries(selectedRegistration.documents).map(
-                    ([key, fileName]) => (
+                    ([key, url]) => (
                       <div
                         key={key}
                         className="flex items-center justify-between p-3 bg-slate-50 rounded border border-slate-200"
@@ -341,13 +348,20 @@ export default function PendingRegistrations({
                           <FileText className="w-4 h-4 text-slate-500" />
                           <div className="min-w-0">
                             <p className="text-sm text-slate-900">{formatKey(key)}</p>
-                            <p className="text-xs text-slate-500 truncate max-w-[140px]">
-                              {String(fileName)}
-                            </p>
+                            <a 
+                                href={String(url)} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="text-xs text-blue-600 hover:underline truncate max-w-[140px] block"
+                            >
+                                View Document
+                            </a>
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm">
-                          <Download className="w-4 h-4" />
+                        <Button variant="ghost" size="sm" asChild>
+                            <a href={String(url)} target="_blank" rel="noreferrer">
+                                <Download className="w-4 h-4" />
+                            </a>
                         </Button>
                       </div>
                     )
@@ -428,11 +442,11 @@ export default function PendingRegistrations({
               Cancel
             </Button>
             <Button
-              variant="destructive"
+              className="bg-red-600 hover:bg-red-700 text-white"
               onClick={handleReject}
               disabled={processing}
             >
-              {processing ? "Processing..." : "Reject Registration"}
+              {processing ? "Processing..." : "Submit"}
             </Button>
           </DialogFooter>
         </DialogContent>
