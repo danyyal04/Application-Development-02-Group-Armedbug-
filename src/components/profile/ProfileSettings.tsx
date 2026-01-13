@@ -709,8 +709,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
               <Button
                 onClick={handleUploadProfilePic}
                 disabled={!selectedPic}
-                className="text-white hover:opacity-90"
-                style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
+                className="text-white hover:opacity-90 bg-[#800000] hover:bg-[#600000]"
               >
                 <ImagePlus className="w-4 h-4 mr-2" />
                 Upload Picture
@@ -730,7 +729,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
 
         <CardContent className="space-y-4">
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="name">Full Name</Label>
             <Input
               id="name"
@@ -739,7 +738,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -748,7 +747,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
             <Input
               id="phone"
@@ -761,8 +760,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
           <Button
             onClick={handleSaveProfile}
             disabled={savingProfile}
-            className="text-white hover:opacity-90"
-            style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
+            className="text-white hover:opacity-90 bg-[#800000] hover:bg-[#600000]"
           >
             <Save className="w-4 h-4 mr-2" />
             {savingProfile ? "Saving..." : "Save Profile"}
@@ -779,7 +777,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="current-password">Current Password</Label>
             <div className="relative">
               <Input
@@ -799,7 +797,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
             </div>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="new-password">New Password</Label>
             <div className="relative">
               <Input
@@ -819,7 +817,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
             </div>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="confirm-password">Confirm New Password</Label>
             <div className="relative">
               <Input
@@ -842,7 +840,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
           <Button
             onClick={handleChangePassword}
             disabled={changingPassword}
-            variant="outline"
+            className="text-white hover:opacity-90 bg-[#800000] hover:bg-[#600000]"
           >
             <Lock className="w-4 h-4 mr-2" />
             {changingPassword ? "Updating..." : "Change Password"}
@@ -899,7 +897,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
           <Button
             onClick={handleSavePreferences}
             disabled={savingPreferences}
-            className="text-white hover:opacity-90"
+            className="text-white hover:opacity-90 bg-[#800000] hover:bg-[#600000]"
             style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
           >
             <Save className="w-4 h-4 mr-2" />
@@ -922,7 +920,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
 
         <CardContent className="space-y-6">
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="dietary-type">Dietary Type</Label>
             <Select
               value={foodPreferences.dietaryType}
@@ -941,7 +939,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
             </Select>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="spice-level">Spice Level</Label>
             <Select
               value={foodPreferences.spiceLevel}
@@ -959,7 +957,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
             </Select>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label className="mb-3 block">Favourite Food Categories</Label>
             <div className="flex flex-wrap gap-3">
               {foodCategories.map(category => {
@@ -985,8 +983,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
           <Button
             onClick={handleSaveFoodPreferences}
             disabled={savingFoodPrefs}
-            className="text-white hover:opacity-90"
-            style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
+            className="text-white hover:opacity-90 bg-[#800000] hover:bg-[#600000]"
           >
             <Save className="w-4 h-4 mr-2" />
             {savingFoodPrefs ? "Saving..." : "Save Food Preferences"}
@@ -1102,8 +1099,7 @@ export default function ProfileSettings({ user, onNavigate }: ProfileSettingsPro
                 toast.error(err.message || 'Failed to save favourite cafeterias');
               }
             }}
-            className="text-white hover:opacity-90"
-            style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}
+            className="text-white hover:opacity-90 bg-[#800000] hover:bg-[#600000]"
           >
             <Save className="w-4 h-4 mr-2" />
             Save Favourite Cafeterias

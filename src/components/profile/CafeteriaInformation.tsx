@@ -6,6 +6,14 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Alert, AlertDescription } from "../ui/alert";
@@ -22,6 +30,7 @@ import {
   Upload,
   Calendar,
   ImagePlus,
+  User,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -56,6 +65,7 @@ export default function CafeteriaInformation({
     approvalStatus: user.accountStatus || "approved", // approved, pending, rejected
     ssmNumber: "SSM-1234567890",
     businessLicenseNumber: "BL-2024-UTM-001",
+    ownerIC: "950101-01-5678",
     documents: {
       ssmCertificate: {
         name: "SSM_Certificate_CafeAngkasa.pdf",
@@ -70,7 +80,7 @@ export default function CafeteriaInformation({
         expiryDate: "2025-11-15",
       },
       ownerIdentification: {
-        name: "Owner_IC_Ahmad.pdf",
+        name: "Owner_Identification_Document.pdf",
         uploadDate: "2024-11-15",
         status: "valid",
         expiryDate: "2030-12-31",
@@ -98,6 +108,24 @@ export default function CafeteriaInformation({
         const cafeteriaRow = context.cafeteria;
         setCafeteriaRecord(cafeteriaRow);
         setShopImageUrl(cafeteriaRow?.shop_image_url || cafeteriaRow?.image || null);
+        
+        // Update documents with real URL if available
+        let realDocUrl = cafeteriaRow?.owner_identification_url;
+        
+        // Fallback: If no document in cafeteria record, check registration request
+        if (!realDocUrl) {
+          const { data: regData } = await supabase
+            .from('registration_request')
+             // user.id is available in scope from useAuth() hook used higher up
+            .select('documents')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (regData?.documents?.owner_identification) {
+            realDocUrl = regData.documents.owner_identification;
+          }
+        }
+        
         setCafeteriaData((prev) => ({
           ...prev,
           businessName: cafeteriaRow?.name || context.cafeteriaName || prev.businessName,
@@ -105,6 +133,15 @@ export default function CafeteriaInformation({
           businessAddress: cafeteriaRow?.location || prev.businessAddress,
           email: user.email,
           registrationDate: cafeteriaRow?.created_at || prev.registrationDate,
+          documents: {
+             ...prev.documents,
+             ownerIdentification: {
+               ...prev.documents.ownerIdentification,
+               // If we have a real URL, use a generic name or parse it, otherwise keep mock
+               name: realDocUrl ? "Owner_Identification_Document.pdf" : prev.documents.ownerIdentification.name, 
+               url: realDocUrl 
+             } as any // using 'any' to bypass strict shape for this quick fix or extend the interface
+          }
         }));
       } catch (error: any) {
         if (isMounted) {
@@ -160,6 +197,9 @@ export default function CafeteriaInformation({
     }
   };
 
+  const [selectedDoc, setSelectedDoc] = useState<File | null>(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+
   // UC015 - Check document status
   const checkDocumentExpiry = (
     expiryDate: string
@@ -177,7 +217,75 @@ export default function CafeteriaInformation({
 
   const handleUpdateDocuments = () => {
     setShowUploadDialog(true);
-    toast.info("Document upload feature will be available soon");
+  };
+
+  const handleDocumentUpload = async () => {
+    if (!selectedDoc) {
+      toast.error("Please select a document to upload.");
+      return;
+    }
+
+    setIsUploadingDoc(true);
+    try {
+       // Ensure we have a cafeteria record ID
+       let activeId = cafeteriaRecord?.id;
+       if (!activeId) {
+          throw new Error("Cafeteria record not found. Please refresh.");
+       }
+
+       const fileExt = selectedDoc.name.split(".").pop();
+       const fileName = `owner-id-${activeId}-${Date.now()}.${fileExt}`;
+       // Using 'documents' bucket as per setup
+       const filePath = `${activeId}/${fileName}`; 
+
+       const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, selectedDoc, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+       if (uploadError) throw uploadError;
+
+       const { data: publicData } = supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+        
+       if (!publicData?.publicUrl) throw new Error("Failed to get public URL.");
+       
+       const publicUrl = publicData.publicUrl;
+
+       // Update DB
+       const { error: dbError } = await supabase
+         .from('cafeterias')
+         .update({ owner_identification_url: publicUrl } as any)
+         .eq('id', activeId);
+
+       if (dbError) throw dbError;
+
+       // Update Local State
+       setCafeteriaData(prev => ({
+         ...prev,
+         documents: {
+           ...prev.documents,
+           ownerIdentification: {
+             ...prev.documents.ownerIdentification,
+             name: selectedDoc.name,
+             url: publicUrl
+           } as any
+         }
+       }));
+       
+       toast.success("Document uploaded successfully!");
+       setShowUploadDialog(false);
+       setSelectedDoc(null);
+
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error(error.message || "Failed to upload document.");
+    } finally {
+      setIsUploadingDoc(false);
+    }
   };
 
   const handleShopImageSelection = (file: File | null) => {
@@ -242,16 +350,13 @@ export default function CafeteriaInformation({
 
       const publicUrl = publicData.publicUrl;
 
-      // Try to persist to DB via RPC (requires set_shop_image_url security definer)
-      try {
-        await supabase.rpc("set_shop_image_url", {
-          _cafeteria_id: activeRecord.id,
-          _url: publicUrl,
-        });
-      } catch (rpcError: any) {
-        // Non-fatal; still update local state so the owner sees it.
-        console.warn("set_shop_image_url failed", rpcError);
-      }
+      // Persist to DB directly
+      const { error: dbError } = await supabase
+        .from('cafeterias')
+        .update({ shop_image_url: publicUrl, image: publicUrl } as any)
+        .eq('id', activeRecord.id);
+
+      if (dbError) throw dbError;
 
       // Update local state so owner sees the latest image immediately
       setShopImageUrl(`${publicUrl}?t=${Date.now()}`);
@@ -296,7 +401,7 @@ export default function CafeteriaInformation({
           <div>
             <h1 className="text-slate-900 mb-2">Cafeteria Information</h1>
             <p className="text-slate-600">
-              View and manage your business profile and verification documents
+              View business profile and identification documents
             </p>
           </div>
           {getApprovalStatusBadge(cafeteriaData.approvalStatus)}
@@ -313,22 +418,7 @@ export default function CafeteriaInformation({
       )}
 
       {/* UC015 - AF1: Alert for Expired Documents */}
-      {hasExpiredDocuments && (
-        <Alert className="mb-6 border-red-200 bg-red-50">
-          <AlertCircle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">
-            Your documents are incomplete or expired. Please update your
-            documents.
-            <Button
-              variant="link"
-              className="text-red-600 hover:text-red-800 p-0 ml-2"
-              onClick={handleUpdateDocuments}
-            >
-              Upload Updated Documents
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+
 
       {/* UC015 - Alert for Expiring Soon Documents */}
       {hasExpiringSoonDocuments && !hasExpiredDocuments && (
@@ -402,7 +492,7 @@ export default function CafeteriaInformation({
                 <Button
                   onClick={handleShopImageUpload}
                   disabled={!selectedShopImage || isUploadingShopImage || isLoadingCafeteria}
-                  className="bg-gradient-to-r from-purple-700 to-pink-700 text-white hover:opacity-90"
+                  className="bg-[#800000] hover:bg-[#600000] text-white hover:opacity-90"
                 >
                   {isUploadingShopImage ? "Uploading..." : "Save Shop Image"}
                 </Button>
@@ -487,14 +577,14 @@ export default function CafeteriaInformation({
           </CardContent>
         </Card>
 
-        {/* Registration Information Card */}
+        {/* Owner Identification Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-purple-700" />
-              Registration Information
+              <User className="w-5 h-5 text-purple-700" />
+              Owner Identification
             </CardTitle>
-            <CardDescription>Business registration details</CardDescription>
+            <CardDescription>Owner personal and identification details</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -507,205 +597,75 @@ export default function CafeteriaInformation({
             </div>
 
             <div>
-              <p className="text-sm text-slate-600">SSM Registration Number</p>
-              <p className="text-slate-900">{cafeteriaData.ssmNumber}</p>
+              <p className="text-sm text-slate-600">Full Name</p>
+              <p className="text-slate-900">{cafeteriaData.ownerName}</p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-600">Business License Number</p>
-              <p className="text-slate-900">
-                {cafeteriaData.businessLicenseNumber}
-              </p>
+              <p className="text-sm text-slate-600">Identity Card Number</p>
+              <p className="text-slate-900">{cafeteriaData.ownerIC}</p>
             </div>
 
-            <Button
-              onClick={handleUpdateDocuments}
-              variant="outline"
-              className="w-full mt-4"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Update Business Information
-            </Button>
+            <div>
+              <p className="text-sm text-slate-600">Identification Document</p>
+              <div className="flex items-center gap-2 mt-1">
+                <FileText className="w-4 h-4 text-purple-700" />
+                <span className="text-slate-900">{cafeteriaData.documents.ownerIdentification.name}</span>
+                <Button 
+                  variant="link" 
+                  className="h-auto p-0 ml-2 text-purple-700 hover:text-purple-900" 
+                  onClick={() => {
+                    // Check if there is a real URL (we attached it to the object in loadCafeteria via 'as any' hack or we can check the record directly)
+                    // Better to check the record we have in state
+                    const docUrl = (cafeteriaData.documents.ownerIdentification as any).url;
+                    
+                    if (docUrl) {
+                      window.open(docUrl, '_blank');
+                    } else {
+                      toast.info(`Viewing ${cafeteriaData.documents.ownerIdentification.name}`, { description: "No document URL found in database (Demo Mode)." });
+                    }
+                  }}
+                >
+                  View
+                </Button>
+              </div>
+            </div>
+
+            {/* Button removed as per user request */}
           </CardContent>
         </Card>
       </div>
 
-      {/* Business Verification Documents */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-purple-700" />
-            Business Verification Documents
-          </CardTitle>
-          <CardDescription>
-            View and manage your uploaded business documents
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* SSM Certificate */}
-            <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-purple-700" />
-                </div>
-                <div>
-                  <p className="text-slate-900">SSM Certificate</p>
-                  <p className="text-sm text-slate-600">
-                    {cafeteriaData.documents.ssmCertificate.name}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Uploaded:{" "}
-                    {new Date(
-                      cafeteriaData.documents.ssmCertificate.uploadDate
-                    ).toLocaleDateString()}{" "}
-                    | Expires:{" "}
-                    {new Date(
-                      cafeteriaData.documents.ssmCertificate.expiryDate
-                    ).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ssmCertificate.expiryDate
-                ) === "valid" && (
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Valid
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ssmCertificate.expiryDate
-                ) === "expiring-soon" && (
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                    Expiring Soon
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ssmCertificate.expiryDate
-                ) === "expired" && (
-                  <Badge className="bg-red-100 text-red-800 border-red-300">
-                    Expired
-                  </Badge>
-                )}
-                <Button variant="ghost" size="sm">
-                  View
-                </Button>
-              </div>
-            </div>
 
-            {/* Business License */}
-            <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-purple-700" />
-                </div>
-                <div>
-                  <p className="text-slate-900">Business License</p>
-                  <p className="text-sm text-slate-600">
-                    {cafeteriaData.documents.businessLicense.name}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Uploaded:{" "}
-                    {new Date(
-                      cafeteriaData.documents.businessLicense.uploadDate
-                    ).toLocaleDateString()}{" "}
-                    | Expires:{" "}
-                    {new Date(
-                      cafeteriaData.documents.businessLicense.expiryDate
-                    ).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.businessLicense.expiryDate
-                ) === "valid" && (
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Valid
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.businessLicense.expiryDate
-                ) === "expiring-soon" && (
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                    Expiring Soon
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.businessLicense.expiryDate
-                ) === "expired" && (
-                  <Badge className="bg-red-100 text-red-800 border-red-300">
-                    Expired
-                  </Badge>
-                )}
-                <Button variant="ghost" size="sm">
-                  View
-                </Button>
-              </div>
+      {/* Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Owner Identification</DialogTitle>
+            <DialogDescription>
+              Upload a valid identification document (PDF or Image) to verify your identity.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="doc-upload">Select Document</Label>
+              <Input 
+                id="doc-upload" 
+                type="file" 
+                accept=".pdf,image/*" 
+                onChange={(e) => setSelectedDoc(e.target.files?.[0] || null)}
+              />
             </div>
-
-            {/* Owner Identification */}
-            <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-purple-700" />
-                </div>
-                <div>
-                  <p className="text-slate-900">Owner Identification</p>
-                  <p className="text-sm text-slate-600">
-                    {cafeteriaData.documents.ownerIdentification.name}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Uploaded:{" "}
-                    {new Date(
-                      cafeteriaData.documents.ownerIdentification.uploadDate
-                    ).toLocaleDateString()}{" "}
-                    | Expires:{" "}
-                    {new Date(
-                      cafeteriaData.documents.ownerIdentification.expiryDate
-                    ).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ownerIdentification.expiryDate
-                ) === "valid" && (
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Valid
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ownerIdentification.expiryDate
-                ) === "expiring-soon" && (
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                    Expiring Soon
-                  </Badge>
-                )}
-                {checkDocumentExpiry(
-                  cafeteriaData.documents.ownerIdentification.expiryDate
-                ) === "expired" && (
-                  <Badge className="bg-red-100 text-red-800 border-red-300">
-                    Expired
-                  </Badge>
-                )}
-                <Button variant="ghost" size="sm">
-                  View
-                </Button>
-              </div>
+            <div className="flex justify-end gap-2">
+               <Button variant="outline" onClick={() => setShowUploadDialog(false)} disabled={isUploadingDoc}>Cancel</Button>
+               <Button onClick={handleDocumentUpload} disabled={!selectedDoc || isUploadingDoc}>
+                 {isUploadingDoc ? "Uploading..." : "Upload"}
+               </Button>
             </div>
-
-            <Button
-              onClick={handleUpdateDocuments}
-              className="w-full bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-800 hover:to-pink-800"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Upload Updated Documents
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -14,7 +14,7 @@ const DEFAULT_CATEGORY = 'Malaysian';
 
 const profileSelection = 'id, cafeteria_id, cafeteria_name, role';
 const cafeteriaSelection =
-  'id, owner_auth_id, name, location, description, image, shop_image_url, category, rating, estimated_time, is_open, created_at, updated_at';
+  'id, owner_auth_id, name, location, description, image, shop_image_url, category, rating, estimated_time, is_open, owner_identification_url, created_at, updated_at';
 
 export async function ensureCafeteriaContext(user: EnsureUser) {
   if (!user?.id) {

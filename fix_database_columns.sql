@@ -20,3 +20,7 @@ alter table profiles add column if not exists favourite_cafeterias text[];
 
 -- Force schema cache reload
 comment on table profiles is 'User profiles with preferences (Updated schema)';
+
+-- Cafeteria Owner Identification
+-- Adding this to cafeterias table as it is related to the business entity verification
+alter table cafeterias add column if not exists owner_identification_url text;

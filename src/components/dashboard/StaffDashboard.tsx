@@ -307,37 +307,37 @@ export default function StaffDashboard({ user, currentPage, onNavigate }: StaffD
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate('manage-menu')}>
-          <CardHeader>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 cursor-pointer hover:shadow-lg transition-shadow min-h-[160px] flex flex-col justify-center" onClick={() => onNavigate('manage-menu')}>
+          <CardHeader className="pb-6">
             <CardTitle className="text-purple-900">Manage Menu</CardTitle>
             <CardDescription className="text-purple-700">Add, edit or remove menu items</CardDescription>
           </CardHeader>
         </Card>
 
-        <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate('manage-orders')}>
-          <CardHeader>
+        <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 cursor-pointer hover:shadow-lg transition-shadow min-h-[160px] flex flex-col justify-center" onClick={() => onNavigate('manage-orders')}>
+          <CardHeader className="pb-6">
             <CardTitle className="text-amber-900">Manage Orders</CardTitle>
             <CardDescription className="text-amber-700">Update order status and track progress</CardDescription>
           </CardHeader>
         </Card>
 
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate('queue-dashboard')}>
-          <CardHeader>
+        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 cursor-pointer hover:shadow-lg transition-shadow min-h-[160px] flex flex-col justify-center" onClick={() => onNavigate('queue-dashboard')}>
+          <CardHeader className="pb-6">
             <CardTitle className="text-blue-900">Queue Dashboard</CardTitle>
             <CardDescription className="text-blue-700">Live queue and prep status</CardDescription>
           </CardHeader>
         </Card>
 
-        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate('manage-payments')}>
-          <CardHeader>
+        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50 cursor-pointer hover:shadow-lg transition-shadow min-h-[160px] flex flex-col justify-center" onClick={() => onNavigate('manage-payments')}>
+          <CardHeader className="pb-6">
             <CardTitle className="text-emerald-900">Manage Payments</CardTitle>
             <CardDescription className="text-emerald-700">View revenue and received payments</CardDescription>
           </CardHeader>
         </Card>
 
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate('cafeteria-info')}>
-          <CardHeader>
+        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 cursor-pointer hover:shadow-lg transition-shadow min-h-[160px] flex flex-col justify-center" onClick={() => onNavigate('cafeteria-info')}>
+          <CardHeader className="pb-6">
             <CardTitle className="text-blue-900">Cafeteria Information</CardTitle>
             <CardDescription className="text-blue-700">Business details & documents</CardDescription>
           </CardHeader>
