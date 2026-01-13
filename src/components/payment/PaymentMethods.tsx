@@ -597,9 +597,9 @@ export default function PaymentMethods() {
                       {pm.balance != null && (
                         <span>Balance: RM {pm.balance.toFixed(2)}</span>
                       )}
-                      {pm.credit_limit != null && (
-                        <span>Credit limit: RM {pm.credit_limit.toFixed(2)}</span>
-                      )}
+                    {pm.type === 'card' && pm.credit_limit != null && (
+                      <span>Credit limit: RM {pm.credit_limit.toFixed(2)}</span>
+                    )}
                     </div>
                   </div>
                 </div>

@@ -708,9 +708,9 @@ export default function CheckoutPage({
                           </div>
                           <p className="text-sm text-slate-600">
                             {getPaymentTypeLabel(pm.type)} -{" "}
-                            {pm.type === "fpx" || pm.type === "ewallet"
-                              ? `Balance: RM ${pm.balance?.toFixed(2)}`
-                              : `Limit: RM ${pm.credit_limit?.toFixed(2)}`}
+                            {pm.type === "card"
+                              ? `Limit: RM ${pm.credit_limit?.toFixed(2)}`
+                              : `Balance: RM ${pm.balance?.toFixed(2)}`}
                           </p>
                         </div>
                         <CreditCard className="w-5 h-5 text-slate-400" />

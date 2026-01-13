@@ -383,6 +383,116 @@ export default function SplitBillPage({
     return `**** ${last4}`;
   };
 
+  const normalizeIdentifier = (value?: string | null) =>
+    String(value || "")
+      .trim()
+      .toLowerCase();
+
+  const refundParticipantsByEmail = async (emails: string[]) => {
+    const normalizedEmails = emails.map((email) => normalizeIdentifier(email));
+    const uniqueEmails = Array.from(new Set(normalizedEmails)).filter(Boolean);
+    if (uniqueEmails.length === 0) return { failed: [] as string[] };
+
+    const emailToAmount = participants.reduce(
+      (acc, participant) => {
+        const key = normalizeIdentifier(participant.email);
+        if (key && participant.paid) {
+          acc[key] = participant.amount;
+        }
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    const { data: profileRows, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .in("email", uniqueEmails);
+
+    if (profileError) {
+      return { failed: uniqueEmails };
+    }
+
+    const emailToUserId = (profileRows || []).reduce(
+      (acc: Record<string, string>, row: any) => {
+        const key = normalizeIdentifier(row.email);
+        if (key && row.id) acc[key] = row.id;
+        return acc;
+      },
+      {}
+    );
+
+    const userIds = Array.from(new Set(Object.values(emailToUserId)));
+    if (userIds.length === 0) {
+      return { failed: uniqueEmails };
+    }
+
+    const { data: paymentRows, error: paymentError } = await supabase
+      .from("payment")
+      .select("id, user_id, type, balance, credit_limit, is_default, created_at")
+      .in("user_id", userIds);
+
+    if (paymentError) {
+      return { failed: uniqueEmails };
+    }
+
+    const paymentsByUser = (paymentRows || []).reduce(
+      (acc: Record<string, PaymentMethod[]>, row: any) => {
+        acc[row.user_id] = acc[row.user_id] || [];
+        acc[row.user_id].push(row);
+        return acc;
+      },
+      {}
+    );
+
+    const failed: string[] = [];
+
+    for (const email of uniqueEmails) {
+      const userId = emailToUserId[email];
+      const refundAmount = emailToAmount[email];
+      if (!userId || typeof refundAmount !== "number") {
+        failed.push(email);
+        continue;
+      }
+
+      const methods = paymentsByUser[userId] || [];
+      const preferred =
+        methods.find((method) => method.is_default) || methods[0];
+      if (!preferred) {
+        failed.push(email);
+        continue;
+      }
+
+      const updatePayload: Partial<PaymentMethod> = {};
+      if (preferred.type === "card") {
+        if (typeof preferred.credit_limit === "number") {
+          updatePayload.credit_limit = preferred.credit_limit + refundAmount;
+        } else {
+          failed.push(email);
+          continue;
+        }
+      } else {
+        if (typeof preferred.balance === "number") {
+          updatePayload.balance = preferred.balance + refundAmount;
+        } else {
+          failed.push(email);
+          continue;
+        }
+      }
+
+      const { error: refundError } = await supabase
+        .from("payment")
+        .update(updatePayload)
+        .eq("id", preferred.id);
+
+      if (refundError) {
+        failed.push(email);
+      }
+    }
+
+    return { failed };
+  };
+
   // Load participants from DB
   const refreshParticipants = useCallback(async () => {
     const { data, error } = await supabase
@@ -678,23 +788,61 @@ export default function SplitBillPage({
       );
 
       if (rpcError) {
-        console.error("RPC Error:", rpcError);
-        toast.error(rpcError.message || "Failed to cancel split bill.");
-        setIsProcessing(false);
-        return;
+        const rpcMessage = (rpcError.message || "").toLowerCase();
+        const isMissingRpc =
+          rpcError.code === "42883" || rpcMessage.includes("does not exist");
+        if (!isMissingRpc) {
+          console.error("RPC Error:", rpcError);
+          toast.error(rpcError.message || "Failed to cancel split bill.");
+          setIsProcessing(false);
+          return;
+        }
       }
 
-      if (!rpcData.success) {
+      if (!rpcError && !rpcData.success) {
         toast.error(rpcData.message || "Cancellation failed.");
         setIsProcessing(false);
         return;
       }
 
+      if (rpcError) {
+        const { error: cancelError } = await supabase
+          .from("split_bill_sessions")
+          .update({ status: "cancelled" })
+          .eq("id", splitBillId);
+
+        if (cancelError) {
+          toast.error(cancelError.message || "Unable to cancel split bill.");
+          setIsProcessing(false);
+          return;
+        }
+
+        const paidEmails = participants
+          .filter((participant) => participant.paid)
+          .map((participant) => participant.email);
+        const { failed } = await refundParticipantsByEmail(paidEmails);
+
+        if (failed.length > 0) {
+          toast.warning(
+            `Session cancelled, but refunds failed for: ${failed.join(", ")}`
+          );
+        } else {
+          toast.success("Split bill cancelled. Refunds have been issued.");
+        }
+
+        onCancel();
+        return;
+      }
+
       const failedList = rpcData.failed_participants || [];
       if (failedList.length > 0) {
+        const { failed } = await refundParticipantsByEmail(failedList);
         toast.warning(
           `Session cancelled, but refunds failed for: ${failedList.join(", ")}`
         );
+        if (failed.length === 0) {
+          toast.success("Fallback refunds completed for failed participants.");
+        }
       } else {
         toast.success("Split bill cancelled. Refunds have been issued.");
       }
