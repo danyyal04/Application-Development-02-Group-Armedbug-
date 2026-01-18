@@ -251,10 +251,15 @@ export default function SplitBillInvitations({
       );
 
       const orderMap = (orderResult.data || []).reduce(
-        (acc: Record<string, { orderId: string; status?: string }>, row: any) => {
+        (
+          acc: Record<string, { orderId: string; status?: string }>,
+          row: any
+        ) => {
           if (row.payment_method) {
             acc[row.payment_method] = {
-              orderId: `ORD-${String(row.id || "").slice(-6).toUpperCase()}`,
+              orderId: `ORD-${String(row.id || "")
+                .slice(-6)
+                .toUpperCase()}`,
               status: row.status || "",
             };
           }
@@ -456,7 +461,11 @@ export default function SplitBillInvitations({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
-        return <Badge className="bg-orange-100 text-orange-700">Pending</Badge>;
+        return (
+          <Badge className="bg-[#7a0c3b]/10 text-[#7a0c3b] border-[#7a0c3b]/20">
+            Pending
+          </Badge>
+        );
       case "accepted":
         return <Badge className="bg-green-100 text-green-700">Accepted</Badge>;
       case "paid":
@@ -546,7 +555,7 @@ export default function SplitBillInvitations({
                 {pendingInvitations.map((invitation) => (
                   <Card
                     key={invitation.id}
-                    className="border-2 border-orange-200 bg-orange-50/30"
+                    className="border-2 border-[#7a0c3b]/20 bg-[#7a0c3b]/5"
                   >
                     <CardContent className="pt-6">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -573,7 +582,7 @@ export default function SplitBillInvitations({
                             Total: RM {invitation.totalAmount.toFixed(2)}
                           </p>
                           <div className="flex items-center gap-4 mt-2">
-                            <p className="text-purple-700">
+                            <p className="text-[#7a0c3b] font-semibold">
                               Your Share: RM {invitation.myShare.toFixed(2)}
                             </p>
                             <div className="flex items-center gap-1 text-xs text-slate-500">
@@ -594,7 +603,7 @@ export default function SplitBillInvitations({
                           </Button>
                           <Button
                             variant="outline"
-                            className="border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="border-[#7a0c3b]/20 text-[#7a0c3b] hover:bg-[#7a0c3b]/10"
                             onClick={() =>
                               handleDeclineInvitation(invitation.id)
                             }

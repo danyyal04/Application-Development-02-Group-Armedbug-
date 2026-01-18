@@ -527,7 +527,7 @@ export default function Navbar({
                 >
                   <ShoppingCart className="w-5 h-5" />
                   {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[11px] flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#7a0c3b] text-white text-[11px] flex items-center justify-center border-2 border-white">
                       {cartCount}
                     </span>
                   )}
@@ -537,7 +537,13 @@ export default function Navbar({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
-                  <Avatar className="h-8 w-8" style={{ background: 'linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))' }}>
+                  <Avatar
+                    className="h-8 w-8"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, oklch(40.8% 0.153 2.432), oklch(40.8% 0.153 2.432))",
+                    }}
+                  >
                     <AvatarFallback className="text-white bg-transparent">
                       {initials}
                     </AvatarFallback>

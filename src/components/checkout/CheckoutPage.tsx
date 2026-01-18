@@ -387,7 +387,10 @@ export default function CheckoutPage({
         typeof payment.credit_limit === "number" &&
         total > payment.credit_limit
       ) {
-        toast.error("Payment failed or cancelled");
+        toast.error(
+          "Credit limit exceeded. Please use another payment method."
+        );
+        setIsProcessing(false);
         return;
       }
       if (
@@ -395,7 +398,8 @@ export default function CheckoutPage({
         typeof payment.balance === "number" &&
         total > payment.balance
       ) {
-        toast.error("Payment failed or cancelled");
+        toast.error("Insufficient balance. Please top up your account.");
+        setIsProcessing(false);
         return;
       }
 
@@ -834,11 +838,11 @@ export default function CheckoutPage({
                   <div className="flex items-start gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                     <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5" />
                     <p className="text-xs text-emerald-800">
-                    CREDIT/DEBIT CARDS are auto-charged when you place your
-                    order.
-                  </p>
-                </div>
-              )}
+                      CREDIT/DEBIT CARDS are auto-charged when you place your
+                      order.
+                    </p>
+                  </div>
+                )}
               <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
                 <p className="text-xs text-blue-800">
@@ -892,8 +896,12 @@ export default function CheckoutPage({
                     id="credentials"
                     type="password"
                     placeholder="Enter PIN"
+                    maxLength={6}
+                    inputMode="numeric"
                     value={paymentCredentials}
-                    onChange={(e) => setPaymentCredentials(e.target.value)}
+                    onChange={(e) =>
+                      setPaymentCredentials(e.target.value.slice(0, 6))
+                    }
                   />
                 </div>
                 <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
@@ -1016,7 +1024,7 @@ export default function CheckoutPage({
                     onChange={(e) =>
                       setNewPaymentData({
                         ...newPaymentData,
-                        pin: e.target.value,
+                        pin: e.target.value.slice(0, 6),
                       })
                     }
                   />
@@ -1067,7 +1075,7 @@ export default function CheckoutPage({
                     onChange={(e) =>
                       setNewPaymentData({
                         ...newPaymentData,
-                        pin: e.target.value,
+                        pin: e.target.value.slice(0, 6),
                       })
                     }
                   />
@@ -1116,7 +1124,7 @@ export default function CheckoutPage({
                       onChange={(e) =>
                         setNewPaymentData({
                           ...newPaymentData,
-                          securityCode: e.target.value,
+                          securityCode: e.target.value.slice(0, 3),
                         })
                       }
                     />
@@ -1170,7 +1178,6 @@ export default function CheckoutPage({
             <DialogTitle>Payment Successful</DialogTitle>
             <DialogDescription>Your order has been placed.</DialogDescription>
           </DialogHeader>
-
 
           <div className="mt-6 mb-6 text-center">
             <div className="bg-gradient-to-r from-[oklch(40.8%_0.153_2.432)] to-[oklch(40.8%_0.153_2.432)] rounded-xl p-6 text-white shadow-lg mx-auto max-w-sm">

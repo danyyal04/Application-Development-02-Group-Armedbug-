@@ -71,6 +71,7 @@ interface PaymentMethod {
   is_default?: boolean;
   balance?: number | null;
   credit_limit?: number | null;
+  pin?: string;
 }
 
 interface ReceiptItem {
@@ -393,16 +394,13 @@ export default function SplitBillPage({
     const uniqueEmails = Array.from(new Set(normalizedEmails)).filter(Boolean);
     if (uniqueEmails.length === 0) return { failed: [] as string[] };
 
-    const emailToAmount = participants.reduce(
-      (acc, participant) => {
-        const key = normalizeIdentifier(participant.email);
-        if (key && participant.paid) {
-          acc[key] = participant.amount;
-        }
-        return acc;
-      },
-      {} as Record<string, number>
-    );
+    const emailToAmount = participants.reduce((acc, participant) => {
+      const key = normalizeIdentifier(participant.email);
+      if (key && participant.paid) {
+        acc[key] = participant.amount;
+      }
+      return acc;
+    }, {} as Record<string, number>);
 
     const { data: profileRows, error: profileError } = await supabase
       .from("profiles")
@@ -429,7 +427,9 @@ export default function SplitBillPage({
 
     const { data: paymentRows, error: paymentError } = await supabase
       .from("payment")
-      .select("id, user_id, type, balance, credit_limit, is_default, created_at")
+      .select(
+        "id, user_id, type, balance, credit_limit, is_default, created_at"
+      )
       .in("user_id", userIds);
 
     if (paymentError) {
@@ -661,8 +661,32 @@ export default function SplitBillPage({
       return;
     }
 
-    if (selectedMethod.type !== "card" && !paymentCredentials) {
+    const requiresPin = selectedMethod.type !== "card";
+    if (
+      requiresPin &&
+      (!paymentCredentials || selectedMethod.pin !== paymentCredentials)
+    ) {
       toast.error("Invalid payment details. Please check and try again.");
+      return;
+    }
+
+    if (
+      selectedMethod.type === "card" &&
+      typeof selectedMethod.credit_limit === "number" &&
+      currentParticipant &&
+      currentParticipant.amount > selectedMethod.credit_limit
+    ) {
+      toast.error("Credit limit exceeded. Please use another payment method.");
+      return;
+    }
+
+    if (
+      (selectedMethod.type === "fpx" || selectedMethod.type === "ewallet") &&
+      typeof selectedMethod.balance === "number" &&
+      currentParticipant &&
+      currentParticipant.amount > selectedMethod.balance
+    ) {
+      toast.error("Insufficient balance. Please top up your account.");
       return;
     }
 
@@ -1548,10 +1572,21 @@ export default function SplitBillPage({
                 <Input
                   id="credentials"
                   type="password"
-                  placeholder="Enter credentials"
+                  placeholder={
+                    selectedPayment?.type === "card"
+                      ? "3-digit CVV"
+                      : "6-digit PIN"
+                  }
+                  maxLength={selectedPayment?.type === "card" ? 3 : 6}
+                  inputMode="numeric"
                   value={paymentCredentials}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setPaymentCredentials(e.target.value)
+                    setPaymentCredentials(
+                      e.target.value.slice(
+                        0,
+                        selectedPayment?.type === "card" ? 3 : 6
+                      )
+                    )
                   }
                 />
               </div>
@@ -1697,10 +1732,21 @@ export default function SplitBillPage({
                 <Input
                   id="complete-credentials"
                   type="password"
-                  placeholder="Enter credentials"
+                  placeholder={
+                    selectedPayment?.type === "card"
+                      ? "3-digit CVV"
+                      : "6-digit PIN"
+                  }
+                  maxLength={selectedPayment?.type === "card" ? 3 : 6}
+                  inputMode="numeric"
                   value={paymentCredentials}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setPaymentCredentials(e.target.value)
+                    setPaymentCredentials(
+                      e.target.value.slice(
+                        0,
+                        selectedPayment?.type === "card" ? 3 : 6
+                      )
+                    )
                   }
                 />
               </div>
