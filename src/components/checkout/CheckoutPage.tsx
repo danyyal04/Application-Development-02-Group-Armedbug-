@@ -382,10 +382,18 @@ export default function CheckoutPage({
         return;
       }
 
+      const creditLimitValue =
+        payment.credit_limit == null ? null : Number(payment.credit_limit);
+      const balanceValue =
+        payment.balance == null ? null : Number(payment.balance);
+      const hasCreditLimit =
+        creditLimitValue != null && Number.isFinite(creditLimitValue);
+      const hasBalance = balanceValue != null && Number.isFinite(balanceValue);
+
       if (
         payment.type === "card" &&
-        typeof payment.credit_limit === "number" &&
-        total > payment.credit_limit
+        hasCreditLimit &&
+        total > creditLimitValue
       ) {
         toast.error(
           "Credit limit exceeded. Please use another payment method."
@@ -395,8 +403,8 @@ export default function CheckoutPage({
       }
       if (
         (payment.type === "fpx" || payment.type === "ewallet") &&
-        typeof payment.balance === "number" &&
-        total > payment.balance
+        hasBalance &&
+        total > balanceValue
       ) {
         toast.error("Insufficient balance. Please top up your account.");
         setIsProcessing(false);
@@ -448,18 +456,34 @@ export default function CheckoutPage({
 
       setGeneratedQueueNum(qNum);
 
+      const updatedBalance =
+        hasBalance && payment.type !== "card" ? balanceValue - total : null;
+      const updatedCreditLimit =
+        hasCreditLimit && payment.type === "card"
+          ? creditLimitValue - total
+          : null;
+
+      if (
+        (updatedBalance != null && updatedBalance < 0) ||
+        (updatedCreditLimit != null && updatedCreditLimit < 0)
+      ) {
+        toast.error(
+          payment.type === "card"
+            ? "Credit limit exceeded. Please use another payment method."
+            : "Insufficient balance. Please top up your account."
+        );
+        setIsProcessing(false);
+        return;
+      }
+
+      const updatePayload: Partial<PaymentMethod> = {
+        balance: updatedBalance ?? payment.balance,
+        credit_limit: updatedCreditLimit ?? payment.credit_limit,
+      };
+
       const { error: updateError } = await supabase
         .from("payment")
-        .update({
-          balance:
-            typeof payment.balance === "number"
-              ? payment.balance - total
-              : payment.balance,
-          credit_limit:
-            typeof payment.credit_limit === "number"
-              ? payment.credit_limit - total
-              : payment.credit_limit,
-        })
+        .update(updatePayload)
         .eq("id", selectedPaymentId);
       if (updateError) {
         toast.error(updateError.message || "Payment failed or cancelled");

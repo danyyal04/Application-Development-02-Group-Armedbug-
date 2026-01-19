@@ -670,11 +670,21 @@ export default function SplitBillPage({
       return;
     }
 
+    const creditLimitValue =
+      selectedMethod.credit_limit == null
+        ? null
+        : Number(selectedMethod.credit_limit);
+    const balanceValue =
+      selectedMethod.balance == null ? null : Number(selectedMethod.balance);
+    const hasCreditLimit =
+      creditLimitValue != null && Number.isFinite(creditLimitValue);
+    const hasBalance = balanceValue != null && Number.isFinite(balanceValue);
+
     if (
       selectedMethod.type === "card" &&
-      typeof selectedMethod.credit_limit === "number" &&
+      hasCreditLimit &&
       currentParticipant &&
-      currentParticipant.amount > selectedMethod.credit_limit
+      currentParticipant.amount > creditLimitValue
     ) {
       toast.error("Credit limit exceeded. Please use another payment method.");
       return;
@@ -682,9 +692,9 @@ export default function SplitBillPage({
 
     if (
       (selectedMethod.type === "fpx" || selectedMethod.type === "ewallet") &&
-      typeof selectedMethod.balance === "number" &&
+      hasBalance &&
       currentParticipant &&
-      currentParticipant.amount > selectedMethod.balance
+      currentParticipant.amount > balanceValue
     ) {
       toast.error("Insufficient balance. Please top up your account.");
       return;
@@ -698,18 +708,35 @@ export default function SplitBillPage({
 
       if (isSuccess) {
         const amountToCharge = currentParticipant.amount;
+        const updatedBalance =
+          hasBalance && selectedMethod.type !== "card"
+            ? balanceValue - amountToCharge
+            : null;
+        const updatedCreditLimit =
+          hasCreditLimit && selectedMethod.type === "card"
+            ? creditLimitValue - amountToCharge
+            : null;
+
+        if (
+          (updatedBalance != null && updatedBalance < 0) ||
+          (updatedCreditLimit != null && updatedCreditLimit < 0)
+        ) {
+          toast.error(
+            selectedMethod.type === "card"
+              ? "Credit limit exceeded. Please use another payment method."
+              : "Insufficient balance. Please top up your account."
+          );
+          setIsProcessing(false);
+          return;
+        }
+
+        const updatePayload: Partial<PaymentMethod> = {
+          balance: updatedBalance ?? selectedMethod.balance,
+          credit_limit: updatedCreditLimit ?? selectedMethod.credit_limit,
+        };
         const { error: updateError } = await supabase
           .from("payment")
-          .update({
-            balance:
-              typeof selectedMethod.balance === "number"
-                ? selectedMethod.balance - amountToCharge
-                : selectedMethod.balance,
-            credit_limit:
-              typeof selectedMethod.credit_limit === "number"
-                ? selectedMethod.credit_limit - amountToCharge
-                : selectedMethod.credit_limit,
-          })
+          .update(updatePayload)
           .eq("id", selectedMethod.id);
 
         if (updateError) {
@@ -920,18 +947,66 @@ export default function SplitBillPage({
           return;
         }
 
+        const creditLimitValue =
+          payment.credit_limit == null ? null : Number(payment.credit_limit);
+        const balanceValue =
+          payment.balance == null ? null : Number(payment.balance);
+        const hasCreditLimit =
+          creditLimitValue != null && Number.isFinite(creditLimitValue);
+        const hasBalance = balanceValue != null && Number.isFinite(balanceValue);
+
+        if (
+          payment.type === "card" &&
+          hasCreditLimit &&
+          unpaidAmount > creditLimitValue
+        ) {
+          toast.error(
+            "Credit limit exceeded. Please use another payment method."
+          );
+          setIsProcessing(false);
+          return;
+        }
+
+        if (
+          (payment.type === "fpx" || payment.type === "ewallet") &&
+          hasBalance &&
+          unpaidAmount > balanceValue
+        ) {
+          toast.error("Insufficient balance. Please top up your account.");
+          setIsProcessing(false);
+          return;
+        }
+
+        const updatedBalance =
+          hasBalance && payment.type !== "card"
+            ? balanceValue - unpaidAmount
+            : null;
+        const updatedCreditLimit =
+          hasCreditLimit && payment.type === "card"
+            ? creditLimitValue - unpaidAmount
+            : null;
+
+        if (
+          (updatedBalance != null && updatedBalance < 0) ||
+          (updatedCreditLimit != null && updatedCreditLimit < 0)
+        ) {
+          toast.error(
+            payment.type === "card"
+              ? "Credit limit exceeded. Please use another payment method."
+              : "Insufficient balance. Please top up your account."
+          );
+          setIsProcessing(false);
+          return;
+        }
+
+        const updatePayload: Partial<PaymentMethod> = {
+          balance: updatedBalance ?? payment.balance,
+          credit_limit: updatedCreditLimit ?? payment.credit_limit,
+        };
+
         const { error: updateError } = await supabase
           .from("payment")
-          .update({
-            balance:
-              typeof payment.balance === "number"
-                ? payment.balance - unpaidAmount
-                : payment.balance,
-            credit_limit:
-              typeof payment.credit_limit === "number"
-                ? payment.credit_limit - unpaidAmount
-                : payment.credit_limit,
-          })
+          .update(updatePayload)
           .eq("id", payment.id);
 
         if (updateError) {
