@@ -188,7 +188,7 @@ export default function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFo
         toast.success(
           formData.role === 'owner'
             ? 'Application submitted. Please wait for admin approval.'
-            : 'Registration successful! Please verify your email, then login.'
+            : 'Registration successful! Please log in again.'
         );
       }
     } catch (err: any) {
