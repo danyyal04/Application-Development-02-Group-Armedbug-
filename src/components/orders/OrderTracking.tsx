@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Clock, CheckCircle, ChefHat, Package, Bell, Star, Upload, X, MessageSquare } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs.js";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog.js";
@@ -99,7 +99,10 @@ export default function OrderTracking({ userId, initialTab = "active" }: OrderTr
   const [comment, setComment] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  
+  // Track previous order statuses to detect status changes
+  const previousOrdersRef = useRef<Map<string, OrderStatus>>(new Map());
 
   const loadOrders = async () => {
     setIsLoading(true);
@@ -285,6 +288,51 @@ export default function OrderTracking({ userId, initialTab = "active" }: OrderTr
       channel.unsubscribe();
     };
   }, [userId]);
+
+  // Detect order status changes and show toast notifications
+  useEffect(() => {
+    // Skip on initial load or when orders are empty
+    if (orders.length === 0 || previousOrdersRef.current.size === 0) {
+      // Update the ref with current statuses for future comparisons
+      const statusMap = new Map<string, OrderStatus>();
+      orders.forEach(order => {
+        statusMap.set(order.id, order.status);
+      });
+      previousOrdersRef.current = statusMap;
+      return;
+    }
+
+    // Check each order for status changes
+    orders.forEach(order => {
+      const previousStatus = previousOrdersRef.current.get(order.id);
+      
+      // If status has changed and notifications are enabled
+      if (previousStatus && previousStatus !== order.status && notificationsEnabled) {
+        // Show notification for "Cooking" status change
+        if (order.status === "Cooking") {
+          toast.success(`Your order #${order.orderNumber.toString().padStart(3, "0")} is now cooking! 👨‍🍳`, {
+            description: `${order.cafeteria} is preparing your food`,
+            duration: 5000,
+          });
+        }
+        
+        // Show notification for "Ready for Pickup" status change
+        if (order.status === "Ready for Pickup") {
+          toast.success(`Your order #${order.orderNumber.toString().padStart(3, "0")} is ready! 🎉`, {
+            description: `Please collect your order from ${order.cafeteria}`,
+            duration: 7000,
+          });
+        }
+      }
+    });
+
+    // Update the ref with current statuses
+    const statusMap = new Map<string, OrderStatus>();
+    orders.forEach(order => {
+      statusMap.set(order.id, order.status);
+    });
+    previousOrdersRef.current = statusMap;
+  }, [orders, notificationsEnabled]);
 
   const activeOrders = useMemo(
     () => orders.filter((o) => o.status !== "Completed"),

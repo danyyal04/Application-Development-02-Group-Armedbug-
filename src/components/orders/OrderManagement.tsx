@@ -345,21 +345,7 @@ export default function OrderManagement({ cafeteriaId }: OrderManagementProps) {
         </p>
       )}
 
-      {/* Status Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        {[
-          { label: "Pending", count: orders.filter((o) => o.status === "Pending").length, color: "text-orange-600" },
-          { label: "Cooking", count: orders.filter((o) => o.status === "Cooking").length, color: "text-blue-600" },
-          { label: "Ready", count: orders.filter((o) => o.status === "Ready for Pickup").length, color: "text-green-600" }
-        ].map((stat) => (
-          <Card key={stat.label}>
-             <CardContent className="pt-6 pb-4 flex justify-between items-center">
-                <span className="text-sm font-medium text-slate-500">{stat.label}</span>
-                <span className={`text-2xl font-bold ${stat.color}`}>{stat.count}</span>
-             </CardContent>
-          </Card>
-        ))}
-      </div>
+
 
       <Card className="mb-8 border-none shadow-none bg-transparent">
         <div className="mb-4">
